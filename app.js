@@ -2528,32 +2528,21 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     opacity: 0.4
                 });
             } else if (isActive) {
-                // Highlight ONLY active attacks: make them more prominent
+                // Highlight ONLY active attacks: make them more prominent with orange color
                 const originalWidth = edge.originalWidth || edge.width || 2;
-                const originalColor = edge.originalColor || edge.color;
-
-                // Create highlighted color (brighter version)
-                let highlightColor;
-                if (typeof originalColor === 'object' && originalColor.color) {
-                    // Extract the base color and create a brighter highlight
-                    const baseColor = originalColor.color;
-                    highlightColor = {
-                        color: baseColor,
-                        highlight: originalColor.highlight || baseColor
-                    };
-                } else {
-                    highlightColor = originalColor;
-                }
 
                 edgeUpdates.push({
                     id: edge.id,
                     width: originalWidth + 1.5, // Make active attacks thicker
                     dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
-                    color: highlightColor,
+                    color: {
+                        color: '#f97316',        // Bright orange
+                        highlight: '#fb923c'     // Lighter orange for hover
+                    },
                     opacity: 1.0,
                     shadow: {
                         enabled: true,
-                        color: 'rgba(16, 185, 129, 0.4)',
+                        color: 'rgba(249, 115, 22, 0.5)',  // Orange glow
                         size: 8,
                         x: 0,
                         y: 0
