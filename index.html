@@ -19,8 +19,11 @@
                     // Use full absolute URL to handle Web Worker context correctly
                     const currentUrl = window.location.href;
                     const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-                    return baseUrl + path;
+                    const fullUrl = baseUrl + path;
+                    console.log('[Module.locateFile] Resolving:', path, '→', fullUrl);
+                    return fullUrl;
                 }
+                console.log('[Module.locateFile] Passthrough:', path);
                 return path;
             }
         };
