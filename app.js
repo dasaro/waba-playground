@@ -990,10 +990,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 if (derivingRules.length === 0) {
                     // Contrary is a fact or direct assumption
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another
+                        // Direct attack from one assumption to another (treat as derived)
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
-                        const edgeColor = { color: '#ef4444', highlight: '#dc2626' };
+                        const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
                         visEdges.push({
                             id: `${contrary}-attacks-${assumption}`,
                             from: contrary,
@@ -1238,10 +1238,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 if (derivingRules.length === 0) {
                     // Contrary is a fact or direct assumption
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another
+                        // Direct attack from one assumption to another (treat as derived)
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
-                        const edgeColor = { color: '#ef4444', highlight: '#dc2626' };
+                        const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
                         visEdges.push({
                             id: `${contrary}-attacks-${assumption}`,
                             from: contrary,
