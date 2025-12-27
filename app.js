@@ -449,10 +449,12 @@ class WABAPlayground {
         // Create banner for isolated assumptions
         this.createIsolatedAssumptionsOverlay();
 
-        // Add click handler for edges
+        // Add click handler for edges and nodes
         this.network.on('click', (params) => {
             if (params.edges.length > 0) {
                 this.handleEdgeClick(params.edges[0]);
+            } else if (params.nodes.length > 0) {
+                this.handleNodeClick(params.nodes[0], params.event);
             } else {
                 // Clicked elsewhere, hide tooltip
                 this.hideTooltip();
@@ -884,6 +886,125 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         this.showTooltip(tooltipContent, { x: window.innerWidth / 2, y: window.innerHeight / 2 });
     }
 
+    handleNodeClick(nodeId, event) {
+        // Get node data from vis.js
+        const node = this.networkData.nodes.get(nodeId);
+        if (!node) return;
+
+        // Create popup with node information
+        this.showNodePopup(nodeId, node, event.center);
+    }
+
+    showNodePopup(nodeId, nodeData, position) {
+        // Remove any existing node popup
+        const existing = document.getElementById('node-popup');
+        if (existing) {
+            existing.remove();
+        }
+
+        // Create popup
+        const popup = document.createElement('div');
+        popup.id = 'node-popup';
+        popup.style.cssText = `
+            position: fixed;
+            left: -9999px;
+            top: -9999px;
+            background: var(--bg-secondary);
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 10001;
+            min-width: 250px;
+            max-width: 400px;
+            font-size: 0.9em;
+        `;
+
+        // Build popup content
+        let content = `<div style="margin-bottom: 8px;">`;
+        content += `<strong style="color: var(--primary-color);">Assumption: <code>${nodeId}</code></strong>`;
+        content += `</div>`;
+
+        // Get weight from framework code
+        const weight = this.getElementWeight(nodeId, this.currentFrameworkCode);
+        if (weight && weight !== '?') {
+            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(245, 158, 11, 0.05); border-left: 2px solid #f59e0b; border-radius: 4px;">`;
+            content += `<span class="badge" style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Weight</span>`;
+            content += `<strong style="color: #f59e0b;">${weight}</strong>`;
+            content += `</div>`;
+        }
+
+        // Find contrary
+        const contrary = this.getContrary(nodeId, this.currentFrameworkCode);
+        if (contrary) {
+            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(239, 68, 68, 0.05); border-left: 2px solid #ef4444; border-radius: 4px;">`;
+            content += `<span class="badge" style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Contrary</span>`;
+            content += `<code style="font-size: 0.85em;">${contrary}</code>`;
+            content += `</div>`;
+        }
+
+        // Count incoming and outgoing attacks
+        const incomingAttacks = this.networkData.edges.get({
+            filter: edge => edge.to === nodeId
+        });
+        const outgoingAttacks = this.networkData.edges.get({
+            filter: edge => edge.from === nodeId
+        });
+
+        if (incomingAttacks.length > 0 || outgoingAttacks.length > 0) {
+            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.05); border-left: 2px solid #6366f1; border-radius: 4px;">`;
+            content += `<div style="font-size: 0.85em; margin-bottom: 4px;">`;
+            content += `<span class="badge" style="background: #6366f1; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Attacks</span>`;
+            content += `</div>`;
+            content += `<div style="font-size: 0.85em; color: var(--text-muted);">`;
+            content += `Incoming: <strong>${incomingAttacks.length}</strong> | `;
+            content += `Outgoing: <strong>${outgoingAttacks.length}</strong>`;
+            content += `</div>`;
+            content += `</div>`;
+        }
+
+        content += `<button onclick="document.getElementById('node-popup').remove()" style="background: #10b981; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Close</button>`;
+
+        popup.innerHTML = content;
+        document.body.appendChild(popup);
+
+        // Position popup
+        const popupRect = popup.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 10;
+
+        let left = position.x + 10;
+        let top = position.y + 10;
+
+        if (left + popupRect.width + margin > viewportWidth) {
+            left = position.x - popupRect.width - 10;
+        }
+
+        if (top + popupRect.height + margin > viewportHeight) {
+            top = position.y - popupRect.height - 10;
+        }
+
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+
+        // Close popup when clicking outside
+        setTimeout(() => {
+            const closeOnClickOutside = (e) => {
+                if (!popup.contains(e.target)) {
+                    popup.remove();
+                    document.removeEventListener('click', closeOnClickOutside);
+                }
+            };
+            document.addEventListener('click', closeOnClickOutside);
+        }, 100);
+    }
+
+    getContrary(assumption, frameworkCode) {
+        const contraryMatch = frameworkCode.match(new RegExp(`contrary\\(${assumption}\\s*,\\s*([^)]+)\\)`, 'm'));
+        return contraryMatch ? contraryMatch[1].trim() : null;
+    }
+
     createAttackDerivationTooltip(edgeData, frameworkCode) {
         const { attackedAssumption, attackingElement, derivedBy, sourceSet, targetSet, label } = edgeData;
 
@@ -1275,6 +1396,141 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         setTimeout(() => {
             const closeOnClickOutside = (e) => {
                 if (!popup.contains(e.target) && e.target.id !== arrowId) {
+                    popup.remove();
+                    document.removeEventListener('click', closeOnClickOutside);
+                }
+            };
+            document.addEventListener('click', closeOnClickOutside);
+        }, 100);
+    }
+
+    showDerivationChain(atom, parsed, triggerElement) {
+        // Remove any existing derivation popup
+        const existing = document.getElementById('derivation-popup');
+        if (existing) {
+            existing.remove();
+        }
+
+        // Get element position
+        const rect = triggerElement.getBoundingClientRect();
+
+        // Create popup
+        const popup = document.createElement('div');
+        popup.id = 'derivation-popup';
+        popup.style.cssText = `
+            position: fixed;
+            left: -9999px;
+            top: -9999px;
+            background: var(--bg-secondary);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 10001;
+            min-width: 300px;
+            max-width: 500px;
+            font-size: 0.9em;
+            max-height: 80vh;
+            overflow-y: auto;
+        `;
+
+        // Build derivation tree recursively
+        const buildTree = (currentAtom, depth = 0, visited = new Set()) => {
+            if (visited.has(currentAtom) || depth > 10) return '';
+            visited.add(currentAtom);
+
+            const indent = '  '.repeat(depth);
+            const weight = parsed.weights.get(currentAtom);
+            const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color)">(w: ${weight})</span>` : '';
+
+            let html = `<div style="margin-left: ${depth * 16}px; margin-bottom: 4px;">`;
+
+            if (depth > 0) {
+                html += `<span style="color: var(--text-muted)">└─</span> `;
+            }
+
+            // Find rules that derive this atom
+            const derivingRules = [];
+            parsed.rules.forEach((rule, ruleId) => {
+                if (rule.head === currentAtom) {
+                    derivingRules.push({ ruleId, rule });
+                }
+            });
+
+            if (parsed.assumptions.has(currentAtom)) {
+                // It's an assumption
+                html += `<code style="font-size: 0.85em; color: var(--success-color)">${currentAtom}</code>${weightDisplay} `;
+                html += `<span class="badge" style="background: var(--success-color); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em;">assumption</span>`;
+            } else if (derivingRules.length > 0) {
+                // It's derived by rules
+                html += `<code style="font-size: 0.85em; color: var(--info-color)">${currentAtom}</code>${weightDisplay}`;
+                html += '</div>';
+
+                // Show each deriving rule
+                derivingRules.forEach(({ ruleId, rule }) => {
+                    html += `<div style="margin-left: ${(depth + 1) * 16}px; margin-bottom: 4px; font-size: 0.85em; color: var(--text-muted);">`;
+                    html += `<span class="badge" style="background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em;">${ruleId}</span> `;
+                    if (rule.body.length > 0) {
+                        html += `← <code style="font-size: 0.85em;">${rule.body.join(', ')}</code>`;
+                        html += '</div>';
+
+                        // Recursively show body atoms
+                        rule.body.forEach(bodyAtom => {
+                            html += buildTree(bodyAtom, depth + 2, new Set(visited));
+                        });
+                    } else {
+                        html += `(fact)`;
+                        html += '</div>';
+                    }
+                });
+                return html;
+            } else {
+                // Unknown derivation
+                html += `<code style="font-size: 0.85em;">${currentAtom}</code>${weightDisplay}`;
+            }
+
+            html += '</div>';
+            return html;
+        };
+
+        let content = `<div style="margin-bottom: 8px;">`;
+        content += `<strong style="color: var(--primary-color);">Derivation Chain for <code>${atom}</code></strong>`;
+        content += `</div>`;
+        content += buildTree(atom);
+        content += `<button onclick="document.getElementById('derivation-popup').remove()" style="background: #3b82f6; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; margin-top: 8px;">Close</button>`;
+
+        popup.innerHTML = content;
+        document.body.appendChild(popup);
+
+        // Position popup
+        const popupRect = popup.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 10;
+
+        let left = rect.left;
+        let top = rect.bottom + 5;
+
+        if (left + popupRect.width + margin > viewportWidth) {
+            left = rect.right - popupRect.width;
+        }
+
+        if (top + popupRect.height + margin > viewportHeight) {
+            const topPlacement = rect.top - popupRect.height - 5;
+            if (topPlacement >= margin) {
+                top = topPlacement;
+            } else {
+                top = viewportHeight - popupRect.height - margin;
+            }
+        }
+
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+
+        // Close popup when clicking outside
+        setTimeout(() => {
+            const closeOnClickOutside = (e) => {
+                if (!popup.contains(e.target) && !triggerElement.contains(e.target)) {
                     popup.remove();
                     document.removeEventListener('click', closeOnClickOutside);
                 }
@@ -2833,6 +3089,8 @@ ${framework}
 #show extension_cost/1.
 #show assumption/1.
 #show contrary/2.
+#show head/2.
+#show body/2.
 `;
         }
 
@@ -3096,11 +3354,12 @@ ${framework}
         if (parsed.derived && parsed.derived.length > 0) {
             contentHTML += '<div class="assumption-section">';
             contentHTML += '<span class="section-label">Derived Atoms:</span>';
-            contentHTML += '<div class="derived-list" style="display: flex; flex-wrap: wrap; gap: 6px;">';
+            contentHTML += '<div class="attacks-list">';
             parsed.derived.forEach(atom => {
                 const weight = parsed.weights.get(atom);
-                const weightDisplay = weight !== undefined ? ` (${weight})` : '';
-                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color);">${atom}${weightDisplay}</span>`;
+                const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color)">(w: ${weight})</span>` : '';
+                const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                contentHTML += `<div class="attack-item" style="cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</div>`;
             });
             contentHTML += '</div></div>';
         }
@@ -3179,6 +3438,17 @@ ${framework}
             this.resetGraphColors();
         });
 
+        // Add click handlers for derived atoms to show derivation chain
+        parsed.derived.forEach(atom => {
+            const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const atomEl = answerDiv.querySelector(`#${atomId}`);
+            if (atomEl) {
+                atomEl.addEventListener('click', () => {
+                    this.showDerivationChain(atom, parsed, atomEl);
+                });
+            }
+        });
+
         this.output.appendChild(answerDiv);
     }
 
@@ -3192,10 +3462,11 @@ ${framework}
             supported: [],
             assumptions: new Set(),
             contraries: new Map(),  // Map from assumption to contrary
-            weights: new Map()  // Map from atom to weight
+            weights: new Map(),  // Map from atom to weight
+            rules: new Map()  // Map from rule ID to {head, body[]}
         };
 
-        // First pass: collect assumptions and contraries
+        // First pass: collect assumptions, contraries, and rules
         predicates.forEach(pred => {
             const assumptionMatch = pred.match(/^assumption\(([^)]+)\)$/);
             if (assumptionMatch) {
@@ -3206,6 +3477,30 @@ ${framework}
             const contraryMatch = pred.match(/^contrary\(([^,]+),\s*([^)]+)\)$/);
             if (contraryMatch) {
                 result.contraries.set(contraryMatch[1], contraryMatch[2]);
+                return;
+            }
+
+            const headMatch = pred.match(/^head\(([^,]+),\s*([^)]+)\)$/);
+            if (headMatch) {
+                const ruleId = headMatch[1];
+                const head = headMatch[2];
+                if (!result.rules.has(ruleId)) {
+                    result.rules.set(ruleId, { head, body: [] });
+                } else {
+                    result.rules.get(ruleId).head = head;
+                }
+                return;
+            }
+
+            const bodyMatch = pred.match(/^body\(([^,]+),\s*([^)]+)\)$/);
+            if (bodyMatch) {
+                const ruleId = bodyMatch[1];
+                const bodyAtom = bodyMatch[2];
+                if (!result.rules.has(ruleId)) {
+                    result.rules.set(ruleId, { head: null, body: [bodyAtom] });
+                } else {
+                    result.rules.get(ruleId).body.push(bodyAtom);
+                }
                 return;
             }
         });
