@@ -16,7 +16,7 @@ class WABAPlayground {
         this.optimizeSelect = document.getElementById('optimize-select');
         this.constraintSelect = document.getElementById('constraint-select');
         this.flatConstraint = document.getElementById('flat-constraint');
-        this.graphModeSelect = document.getElementById('graph-mode-select');
+        this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
 
         // Simple ABA mode elements
         this.inputMode = document.getElementById('input-mode');
@@ -212,7 +212,9 @@ class WABAPlayground {
         // Regenerate graph when configuration changes
         this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
         this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
-        this.graphModeSelect.addEventListener('change', () => this.regenerateGraph());
+        this.graphModeRadios.forEach(radio => {
+            radio.addEventListener('change', () => this.regenerateGraph());
+        });
 
         // Disable budget constraint when optimization is enabled
         this.optimizeSelect.addEventListener('change', (e) => {
@@ -647,7 +649,7 @@ class WABAPlayground {
             return;
         }
 
-        const graphMode = this.graphModeSelect.value;
+        const graphMode = document.querySelector('input[name="graph-mode"]:checked')?.value || 'standard';
 
         if (graphMode === 'assumption-direct') {
             await this.updateGraphAssumptionLevelDirect(frameworkCode);

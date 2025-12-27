@@ -164,7 +164,7 @@
                                 <option value="linear">Linear Topology</option>
                                 <option value="cycle">Cycle Topology</option>
                                 <option value="tree">Tree Topology</option>
-                                <option value="complete">Complete Topology</option>
+                                <option value="complete" selected>Complete Topology</option>
                                 <option value="mixed">Mixed Topology</option>
                                 <option value="isolated">Isolated Components</option>
                             </select>
@@ -177,16 +177,6 @@
                         </div>
                     </div>
 
-                    <div class="config-grid">
-                        <div class="config-item">
-                            <label for="graph-mode-select">Graph Visualization</label>
-                            <select id="graph-mode-select" class="select">
-                                <option value="standard">Standard (All Nodes)</option>
-                                <option value="assumption-direct">Assumption-level (Direct)</option>
-                                <option value="assumption-branching">Assumption-level (Branching)</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Editor Container -->
@@ -251,6 +241,20 @@ c_a: 70"></textarea>
                 <div class="graph-container" id="graph-container">
                     <div class="graph-header">
                         <h3>Argumentation Graph</h3>
+                        <div class="graph-mode-selector">
+                            <label class="mode-option">
+                                <input type="radio" name="graph-mode" value="standard">
+                                <span>Standard</span>
+                            </label>
+                            <label class="mode-option">
+                                <input type="radio" name="graph-mode" value="assumption-direct" checked>
+                                <span>Assumption-Direct</span>
+                            </label>
+                            <label class="mode-option">
+                                <input type="radio" name="graph-mode" value="assumption-branching">
+                                <span>Assumption-Branching</span>
+                            </label>
+                        </div>
                         <div class="graph-controls">
                             <button id="reset-layout-btn" class="clear-btn">🔄 Reset Layout</button>
                             <button id="fullscreen-btn" class="clear-btn">⛶ Fullscreen</button>

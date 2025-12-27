@@ -46,29 +46,31 @@ weight(b, 70).
 weight(c, 50).
 weight(d, 30).
 
-% Linear attack chain
-% Non-derived: c_a always holds, attacks a
+% Linear attack chain: each assumption attacks the next
+% Non-derived: c_a always holds, attacks a (start of chain)
 head(r1, c_a).
 weight(c_a, 80).
 
-% Derived: c_b <- c (c attacks b via derivation)
+% Derived: c_b <- a (a attacks b)
 head(r2, c_b).
-body(r2, c).
-weight(c_b, 60).
+body(r2, a).
+weight(c_b, 85).
 
-% Non-derived: c_c always holds, attacks c
+% Derived: c_c <- b (b attacks c)
 head(r3, c_c).
-weight(c_c, 40);
+body(r3, b).
+weight(c_c, 65).
 
-% Non-derived: c_d always holds, attacks d
+% Derived: c_d <- c (c attacks d)
 head(r4, c_d).
-weight(c_d, 20).
+body(r4, c).
+weight(c_d, 45).
 
 % Contraries: each assumption has exactly ONE contrary
-contrary(a, c_a).   % chain: c_a attacks a
-contrary(b, c_b).   % chain: c attacks b via c_b
-contrary(c, c_c).   % chain: c_c attacks c
-contrary(d, c_d).   % chain: c_d attacks d
+contrary(a, c_a).   % chain start: c_a attacks a
+contrary(b, c_b).   % chain: a attacks b
+contrary(c, c_c).   % chain: b attacks c
+contrary(d, c_d).   % chain: c attacks d
 
 budget(80).
 `,
