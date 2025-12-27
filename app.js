@@ -4096,18 +4096,18 @@ ${framework}
             parsed.successful.forEach(attack => {
                 const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
                 if (match) {
-                    const [, attackingElement, target, weight] = match;
+                    const [, attackingElement, targetAssumption, weight] = match;
 
-                    // Find assumptions that support the attacking element
+                    // Find assumptions that support the attacking element (contrary)
                     const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
 
-                    // Format as "a1, a2, ..., an ⊢ target"
+                    // Format as "a1, a2, ..., an ⊢ c [target]"
                     if (supportingAssumptions.length > 0) {
                         const assumptions = supportingAssumptions.join(', ');
-                        contentHTML += `<div class="attack-item">${assumptions} <span class="attack-arrow">⊢</span> ${target}</div>`;
+                        contentHTML += `<div class="attack-item">${assumptions} <span class="attack-arrow">⊢</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span></div>`;
                     } else {
                         // Non-derived attack (no supporting assumptions)
-                        contentHTML += `<div class="attack-item">⊤ <span class="attack-arrow">⊢</span> ${target}</div>`;
+                        contentHTML += `<div class="attack-item">⊤ <span class="attack-arrow">⊢</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span></div>`;
                     }
                 }
             });
@@ -4122,18 +4122,18 @@ ${framework}
             parsed.discarded.forEach(attack => {
                 const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
                 if (match) {
-                    const [, attackingElement, target, weight] = match;
+                    const [, attackingElement, targetAssumption, weight] = match;
 
-                    // Find assumptions that support the attacking element
+                    // Find assumptions that support the attacking element (contrary)
                     const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
 
-                    // Format as "a1, a2, ..., an ⊢ target (w: weight)"
+                    // Format as "a1, a2, ..., an ⊬ c [target] (w: weight)"
                     if (supportingAssumptions.length > 0) {
                         const assumptions = supportingAssumptions.join(', ');
-                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${target} <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
                     } else {
                         // Non-derived attack (no supporting assumptions)
-                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${target} <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
                     }
                 }
             });
