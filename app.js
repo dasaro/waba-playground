@@ -2825,10 +2825,14 @@ ${framework}
             return `
 % Standard Output Filter
 #show in/1.
+#show out/1.
+#show supported/1.
 #show supported_with_weight/2.
 #show attacks_successfully_with_weight/3.
 #show discarded_attack/3.
 #show extension_cost/1.
+#show assumption/1.
+#show contrary/2.
 `;
         }
 
@@ -3088,6 +3092,34 @@ ${framework}
             contentHTML += '</div></div>';
         }
 
+        // Derived atoms (non-assumption supported atoms)
+        if (parsed.derived && parsed.derived.length > 0) {
+            contentHTML += '<div class="assumption-section">';
+            contentHTML += '<span class="section-label">Derived Atoms:</span>';
+            contentHTML += '<div class="derived-list" style="display: flex; flex-wrap: wrap; gap: 6px;">';
+            parsed.derived.forEach(atom => {
+                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color);">${atom}</span>`;
+            });
+            contentHTML += '</div></div>';
+        }
+
+        // Active contraries (contrary atoms that are supported)
+        if (parsed.activeContraries && parsed.activeContraries.length > 0) {
+            contentHTML += '<div class="assumption-section">';
+            contentHTML += '<span class="section-label">Active Contraries:</span>';
+            contentHTML += '<div class="contraries-list" style="display: flex; flex-direction: column; gap: 4px;">';
+            parsed.activeContraries.forEach(({ assumption, contrary }) => {
+                const isDefeated = !parsed.in.includes(assumption);
+                contentHTML += `<div style="font-family: monospace; font-size: 0.9em;">`;
+                contentHTML += `<span style="color: var(--warning-color)">${contrary}</span> `;
+                contentHTML += `<span style="color: var(--text-muted)">attacks</span> `;
+                contentHTML += `<span style="color: ${isDefeated ? 'var(--error-color)' : 'var(--success-color)'}">${assumption}</span>`;
+                contentHTML += isDefeated ? ' <span style="color: var(--error-color)">✗</span>' : '';
+                contentHTML += `</div>`;
+            });
+            contentHTML += '</div></div>';
+        }
+
         contentHTML += '</div>';
 
         answerDiv.innerHTML = `
@@ -3154,10 +3186,28 @@ ${framework}
             out: [],
             cost: null,
             discarded: [],
-            successful: []
+            successful: [],
+            supported: [],
+            assumptions: new Set(),
+            contraries: new Map()  // Map from assumption to contrary
         };
 
-        // predicates is an array of strings like ["in(a)", "extension_cost(0)", ...]
+        // First pass: collect assumptions and contraries
+        predicates.forEach(pred => {
+            const assumptionMatch = pred.match(/^assumption\(([^)]+)\)$/);
+            if (assumptionMatch) {
+                result.assumptions.add(assumptionMatch[1]);
+                return;
+            }
+
+            const contraryMatch = pred.match(/^contrary\(([^,]+),\s*([^)]+)\)$/);
+            if (contraryMatch) {
+                result.contraries.set(contraryMatch[1], contraryMatch[2]);
+                return;
+            }
+        });
+
+        // Second pass: collect everything else
         predicates.forEach(pred => {
             // Extract in() predicates
             const inMatch = pred.match(/^in\(([^)]+)\)$/);
@@ -3170,6 +3220,13 @@ ${framework}
             const outMatch = pred.match(/^out\(([^)]+)\)$/);
             if (outMatch) {
                 result.out.push(outMatch[1]);
+                return;
+            }
+
+            // Extract supported atoms
+            const supportedMatch = pred.match(/^supported\(([^)]+)\)$/);
+            if (supportedMatch) {
+                result.supported.push(supportedMatch[1]);
                 return;
             }
 
@@ -3190,6 +3247,17 @@ ${framework}
             if (pred.startsWith('attacks_successfully_with_weight(')) {
                 result.successful.push(pred);
                 return;
+            }
+        });
+
+        // Compute derived atoms (supported but not assumptions)
+        result.derived = result.supported.filter(atom => !result.assumptions.has(atom));
+
+        // Compute active contraries (contrary atoms that are supported)
+        result.activeContraries = [];
+        result.contraries.forEach((contrary, assumption) => {
+            if (result.supported.includes(contrary)) {
+                result.activeContraries.push({ assumption, contrary });
             }
         });
 
