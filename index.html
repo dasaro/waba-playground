@@ -14,14 +14,29 @@
         // Tell Emscripten where to find WASM files on GitHub Pages
         var Module = {
             locateFile: function(path) {
+                console.log('[Module.locateFile] Called with path:', path);
+                console.log('[Module.locateFile] window.location:', window.location.href);
+                console.log('[Module.locateFile] hostname:', window.location.hostname);
+
                 // For WASM files, use absolute URL (critical for GitHub Pages project repos)
                 if (path.endsWith('.wasm') || path.endsWith('.worker.js')) {
                     // HARDCODED for GitHub Pages project repo (most reliable)
                     // WASM files are in dist/ subdirectory
                     const isGitHubPages = window.location.hostname === 'dasaro.github.io';
-                    if (isGitHubPages) {
+                    const hasProjectPath = window.location.pathname.includes('/waba-playground');
+
+                    console.log('[Module.locateFile] isGitHubPages:', isGitHubPages);
+                    console.log('[Module.locateFile] hasProjectPath:', hasProjectPath);
+
+                    if (isGitHubPages && hasProjectPath) {
                         const fullUrl = 'https://dasaro.github.io/waba-playground/dist/' + path;
-                        console.log('[Module.locateFile] GitHub Pages mode:', path, '→', fullUrl);
+                        console.log('[Module.locateFile] ✓ GitHub Pages project mode:', fullUrl);
+                        return fullUrl;
+                    } else if (isGitHubPages && !hasProjectPath) {
+                        // Weird state - on GitHub Pages but not in project path?
+                        console.warn('[Module.locateFile] ⚠️ On GitHub Pages but not in project path!');
+                        const fullUrl = 'https://dasaro.github.io/waba-playground/dist/' + path;
+                        console.log('[Module.locateFile] ✓ Forcing project path:', fullUrl);
                         return fullUrl;
                     }
 
@@ -29,7 +44,7 @@
                     const currentUrl = window.location.href;
                     const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
                     const fullUrl = baseUrl + 'dist/' + path;
-                    console.log('[Module.locateFile] Local mode:', path, '→', fullUrl);
+                    console.log('[Module.locateFile] ✓ Local mode:', fullUrl);
                     return fullUrl;
                 }
                 console.log('[Module.locateFile] Passthrough:', path);
