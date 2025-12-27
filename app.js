@@ -16,6 +16,7 @@ class WABAPlayground {
         this.optimizeSelect = document.getElementById('optimize-select');
         this.constraintSelect = document.getElementById('constraint-select');
         this.flatConstraint = document.getElementById('flat-constraint');
+        this.graphModeSelect = document.getElementById('graph-mode-select');
 
         // Simple ABA mode elements
         this.inputMode = document.getElementById('input-mode');
@@ -211,6 +212,7 @@ class WABAPlayground {
         // Regenerate graph when configuration changes
         this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
         this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
+        this.graphModeSelect.addEventListener('change', () => this.regenerateGraph());
 
         // Disable budget constraint when optimization is enabled
         this.optimizeSelect.addEventListener('change', (e) => {
@@ -645,6 +647,20 @@ class WABAPlayground {
             return;
         }
 
+        const graphMode = this.graphModeSelect.value;
+
+        if (graphMode === 'assumption') {
+            await this.updateGraphAssumptionLevel(frameworkCode);
+        } else {
+            await this.updateGraphStandard(frameworkCode);
+        }
+    }
+
+    async updateGraphStandard(frameworkCode) {
+        if (!this.clingoReady) {
+            return;
+        }
+
         try {
             const semiring = this.semiringSelect.value;
 
@@ -913,6 +929,242 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         } catch (error) {
             console.error('Error updating graph:', error);
         }
+    }
+
+    async updateGraphAssumptionLevel(frameworkCode) {
+        if (!this.clingoReady) {
+            return;
+        }
+
+        try {
+            // Parse framework to extract assumptions, contraries, rules, and weights
+            const assumptions = this.parseAssumptions(frameworkCode);
+            const contraries = this.parseContraries(frameworkCode);
+            const rules = this.parseRules(frameworkCode);
+            const weights = this.parseWeights(frameworkCode);
+
+            // Build vis.js nodes (one per assumption)
+            const visNodes = [];
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+            assumptions.forEach(assumption => {
+                const weight = weights[assumption] || '?';
+                const nodeColor = {
+                    border: '#7c3aed',
+                    background: '#8b5cf6',
+                    highlight: {
+                        border: '#6d28d9',
+                        background: '#7c3aed'
+                    }
+                };
+
+                visNodes.push({
+                    id: assumption,
+                    label: assumption,
+                    size: 20,
+                    color: nodeColor,
+                    title: `Assumption: ${assumption}\nWeight: ${weight}`,
+                    font: {
+                        color: isDark ? '#f1f5f9' : '#1e293b'
+                    }
+                });
+            });
+
+            // Build vis.js edges (attacks between assumptions)
+            const visEdges = [];
+            const jointAttackGroups = new Map(); // Track joint attacks: target -> [{attackers: [...], contrary: ...}]
+
+            // For each contrary relationship, determine how the contrary can be supported
+            contraries.forEach(({ assumption, contrary }) => {
+                // Find rules that derive this contrary
+                const derivingRules = rules.filter(rule => rule.head === contrary);
+
+                if (derivingRules.length === 0) {
+                    // Contrary is a fact or direct assumption - non-derived attack
+                    // Check if contrary is an assumption itself
+                    if (assumptions.includes(contrary)) {
+                        // Direct attack from one assumption to another
+                        const weight = weights[contrary] || 1;
+                        const displayWeight = weight === '?' ? '' : weight;
+                        visEdges.push({
+                            id: `${contrary}-attacks-${assumption}`,
+                            from: contrary,
+                            to: assumption,
+                            label: displayWeight,
+                            width: 2,
+                            color: { color: '#ef4444', highlight: '#dc2626' },
+                            arrows: 'to',
+                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`
+                        });
+                    }
+                } else {
+                    // Contrary is derived by rule(s)
+                    derivingRules.forEach(rule => {
+                        const attackers = rule.body; // Array of atoms in the rule body
+
+                        if (attackers.length === 1) {
+                            // Simple derived attack: single attacker
+                            const attacker = attackers[0];
+                            // Only show if attacker is an assumption
+                            if (assumptions.includes(attacker)) {
+                                const weight = weights[contrary] || 1;
+                                const displayWeight = weight === '?' ? '' : weight;
+                                visEdges.push({
+                                    id: `${attacker}-attacks-${assumption}-via-${contrary}`,
+                                    from: attacker,
+                                    to: assumption,
+                                    label: displayWeight,
+                                    width: 2,
+                                    color: { color: '#f59e0b', highlight: '#d97706' },
+                                    arrows: 'to',
+                                    dashes: false,
+                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`
+                                });
+                            }
+                        } else if (attackers.length > 1) {
+                            // Joint attack: multiple attackers
+                            const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
+
+                            if (assumptionAttackers.length > 0) {
+                                // Track this as a joint attack
+                                if (!jointAttackGroups.has(assumption)) {
+                                    jointAttackGroups.set(assumption, []);
+                                }
+                                jointAttackGroups.get(assumption).push({
+                                    attackers: assumptionAttackers,
+                                    contrary: contrary,
+                                    weight: weights[contrary] || 1
+                                });
+
+                                // Create dashed edges from each attacker to target
+                                assumptionAttackers.forEach(attacker => {
+                                    const weight = weights[contrary] || 1;
+                                    const displayWeight = weight === '?' ? '' : weight;
+                                    const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
+                                    visEdges.push({
+                                        id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
+                                        from: attacker,
+                                        to: assumption,
+                                        label: displayWeight,
+                                        width: 3,
+                                        color: { color: '#10b981', highlight: '#059669' },
+                                        arrows: 'to',
+                                        dashes: [5, 5], // Dashed line to indicate joint attack
+                                        title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Update vis.js network
+            this.networkData.nodes.clear();
+            this.networkData.edges.clear();
+            this.networkData.nodes.add(visNodes);
+            this.networkData.edges.add(visEdges);
+
+            // Store framework code for tooltips
+            this.currentFrameworkCode = frameworkCode;
+
+            // No isolated nodes in assumption-level view (all assumptions shown)
+            this.isolatedNodes = [];
+            this.updateIsolatedAssumptionsOverlay();
+
+            // Run layout and fit to view
+            this.runGraphLayout(true);
+
+            setTimeout(() => {
+                this.network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }, 600);
+
+        } catch (error) {
+            console.error('Error updating assumption-level graph:', error);
+        }
+    }
+
+    parseAssumptions(code) {
+        const assumptions = [];
+        const regex = /assumption\(([^)]+)\)\./g;
+        let match;
+        while ((match = regex.exec(code)) !== null) {
+            assumptions.push(match[1].trim());
+        }
+        return assumptions;
+    }
+
+    parseContraries(code) {
+        const contraries = [];
+        const regex = /contrary\(([^,]+),\s*([^)]+)\)\./g;
+        let match;
+        while ((match = regex.exec(code)) !== null) {
+            contraries.push({
+                assumption: match[1].trim(),
+                contrary: match[2].trim()
+            });
+        }
+        return contraries;
+    }
+
+    parseRules(code) {
+        const rules = [];
+        const ruleMap = new Map(); // rule_id -> {head: ..., body: [...]}
+
+        // Parse head/2 predicates: head(rule_id, head_atom).
+        const headRegex = /head\(([^,]+),\s*([^)]+)\)/g;
+        let match;
+        while ((match = headRegex.exec(code)) !== null) {
+            const ruleId = match[1].trim();
+            const headAtom = match[2].trim();
+            if (!ruleMap.has(ruleId)) {
+                ruleMap.set(ruleId, { head: headAtom, body: [] });
+            } else {
+                ruleMap.get(ruleId).head = headAtom;
+            }
+        }
+
+        // Parse body/2 predicates: body(rule_id, body_atom).
+        const bodyRegex = /body\(([^,]+),\s*([^)]+)\)/g;
+        while ((match = bodyRegex.exec(code)) !== null) {
+            const ruleId = match[1].trim();
+            const bodyAtom = match[2].trim();
+            if (!ruleMap.has(ruleId)) {
+                ruleMap.set(ruleId, { head: null, body: [bodyAtom] });
+            } else {
+                ruleMap.get(ruleId).body.push(bodyAtom);
+            }
+        }
+
+        // Convert map to array
+        ruleMap.forEach((rule, ruleId) => {
+            if (rule.head) {
+                rules.push({
+                    id: ruleId,
+                    head: rule.head,
+                    body: rule.body
+                });
+            }
+        });
+
+        return rules;
+    }
+
+    parseWeights(code) {
+        const weights = {};
+        const regex = /weight\(([^,]+),\s*([^)]+)\)\./g;
+        let match;
+        while ((match = regex.exec(code)) !== null) {
+            const atom = match[1].trim();
+            const weight = match[2].trim();
+            weights[atom] = weight;
+        }
+        return weights;
     }
 
     handleEdgeClick(edgeId) {
