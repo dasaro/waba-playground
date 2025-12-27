@@ -987,18 +987,22 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     if (assumptions.includes(contrary)) {
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
+                        const edgeColor = { color: '#ef4444', highlight: '#dc2626' };
                         visEdges.push({
                             id: `${contrary}-attacks-${assumption}`,
                             from: contrary,
                             to: assumption,
                             label: displayWeight,
                             width: 2,
-                            color: { color: '#ef4444', highlight: '#dc2626' },
+                            color: edgeColor,
                             arrows: 'to',
                             title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
                             attackType: 'direct',
                             attackingElement: contrary,
-                            targetAssumption: assumption
+                            targetAssumption: assumption,
+                            originalWidth: 2,
+                            originalColor: edgeColor,
+                            originalDashes: false
                         });
                     }
                 } else {
@@ -1012,20 +1016,24 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             if (assumptions.includes(attacker)) {
                                 const weight = weights[contrary] || 1;
                                 const displayWeight = weight === '?' ? '' : weight;
+                                const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
                                 visEdges.push({
                                     id: `${attacker}-attacks-${assumption}-via-${contrary}`,
                                     from: attacker,
                                     to: assumption,
                                     label: displayWeight,
                                     width: 2,
-                                    color: { color: '#f59e0b', highlight: '#d97706' },
+                                    color: edgeColor,
                                     arrows: 'to',
                                     dashes: false,
                                     title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
                                     attackType: 'derived',
                                     attackingElement: attacker,
                                     targetAssumption: assumption,
-                                    contrary: contrary
+                                    contrary: contrary,
+                                    originalWidth: 2,
+                                    originalColor: edgeColor,
+                                    originalDashes: false
                                 });
                             }
                         } else if (attackers.length > 1) {
@@ -1038,13 +1046,14 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
                                 assumptionAttackers.forEach(attacker => {
                                     const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
+                                    const edgeColor = { color: '#10b981', highlight: '#059669' };
                                     visEdges.push({
                                         id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
                                         from: attacker,
                                         to: assumption,
                                         label: displayWeight,
                                         width: 3,
-                                        color: { color: '#10b981', highlight: '#059669' },
+                                        color: edgeColor,
                                         arrows: 'to',
                                         dashes: [5, 5],
                                         title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
@@ -1052,7 +1061,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         attackingElement: attacker,
                                         targetAssumption: assumption,
                                         contrary: contrary,
-                                        jointWith: assumptionAttackers
+                                        jointWith: assumptionAttackers,
+                                        originalWidth: 3,
+                                        originalColor: edgeColor,
+                                        originalDashes: [5, 5]
                                     });
                                 });
                             }
@@ -1238,15 +1250,21 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
                                 // Create edges from each attacker to junction (dashed green)
                                 assumptionAttackers.forEach(attacker => {
+                                    const edgeColor = { color: '#10b981', highlight: '#059669' };
                                     const edge = {
                                         id: `${attacker}-to-junction-${junctionId}`,
                                         from: attacker,
                                         to: junctionId,
                                         width: 2,
-                                        color: { color: '#10b981', highlight: '#059669' },
+                                        color: edgeColor,
                                         arrows: 'to',
                                         dashes: [5, 5],
-                                        title: `${attacker} contributes to joint attack`
+                                        title: `${attacker} contributes to joint attack`,
+                                        attackingElement: attacker,
+                                        targetAssumption: assumption,
+                                        originalWidth: 2,
+                                        originalColor: edgeColor,
+                                        originalDashes: [5, 5]
                                     };
                                     console.log(`  Creating edge to junction:`, edge);
                                     visEdges.push(edge);
@@ -1255,16 +1273,20 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 // Create edge from junction to target (solid green, thicker)
                                 const weight = weights[contrary] || 1;
                                 const displayWeight = weight === '?' ? '' : weight;
+                                const edgeColor = { color: '#10b981', highlight: '#059669' };
                                 const finalEdge = {
                                     id: `${junctionId}-attacks-${assumption}`,
                                     from: junctionId,
                                     to: assumption,
                                     label: displayWeight,
                                     width: 4,
-                                    color: { color: '#10b981', highlight: '#059669' },
+                                    color: edgeColor,
                                     arrows: 'to',
                                     dashes: false,
-                                    title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`
+                                    title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
+                                    originalWidth: 4,
+                                    originalColor: edgeColor,
+                                    originalDashes: false
                                 };
                                 console.log(`  Creating junction-to-target edge:`, finalEdge);
                                 visEdges.push(finalEdge);
@@ -2366,46 +2388,81 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
         const nodeUpdates = [];
 
-        nodes.forEach(node => {
-            const nodeAssumptions = node.id === '∅' ? [] : node.id.split(',');
+        if (this.currentGraphMode && this.currentGraphMode.startsWith('assumption')) {
+            // Assumption-level mode: color individual assumptions
+            nodes.forEach(node => {
+                if (node.isJunction) {
+                    // Junction nodes stay green
+                    return;
+                }
 
-            // Check if this set is "in" (all its assumptions are in the extension)
-            const isIn = nodeAssumptions.length > 0 &&
-                         nodeAssumptions.every(a => inAssumptions.includes(a));
+                const isIn = inAssumptions.includes(node.id);
+                let color;
 
-            // Check if this set is "out" (at least one assumption is not in the extension)
-            const isOut = nodeAssumptions.length > 0 &&
-                          nodeAssumptions.some(a => !inAssumptions.includes(a));
+                if (isIn) {
+                    // Green for assumptions in the extension
+                    color = {
+                        border: '#059669',
+                        background: '#10b981',
+                        highlight: { border: '#047857', background: '#059669' }
+                    };
+                } else {
+                    // Gray for assumptions out of the extension
+                    color = {
+                        border: '#64748b',
+                        background: '#94a3b8',
+                        highlight: { border: '#475569', background: '#64748b' }
+                    };
+                }
 
-            let color;
-            if (isIn) {
-                // Green for "in" sets
-                color = {
-                    border: '#059669',
-                    background: '#10b981',
-                    highlight: { border: '#047857', background: '#059669' }
-                };
-            } else if (node.id === '∅') {
-                // Gray for empty set
-                color = {
-                    border: '#64748b',
-                    background: '#94a3b8',
-                    highlight: { border: '#475569', background: '#64748b' }
-                };
-            } else {
-                // Neutral purple for "out" sets
-                color = {
-                    border: '#7c3aed',
-                    background: '#8b5cf6',
-                    highlight: { border: '#6d28d9', background: '#7c3aed' }
-                };
-            }
-
-            nodeUpdates.push({
-                id: node.id,
-                color: color
+                nodeUpdates.push({
+                    id: node.id,
+                    color: color
+                });
             });
-        });
+        } else {
+            // Standard mode: color sets
+            nodes.forEach(node => {
+                const nodeAssumptions = node.id === '∅' ? [] : node.id.split(',');
+
+                // Check if this set is "in" (all its assumptions are in the extension)
+                const isIn = nodeAssumptions.length > 0 &&
+                             nodeAssumptions.every(a => inAssumptions.includes(a));
+
+                // Check if this set is "out" (at least one assumption is not in the extension)
+                const isOut = nodeAssumptions.length > 0 &&
+                              nodeAssumptions.some(a => !inAssumptions.includes(a));
+
+                let color;
+                if (isIn) {
+                    // Green for "in" sets
+                    color = {
+                        border: '#059669',
+                        background: '#10b981',
+                        highlight: { border: '#047857', background: '#059669' }
+                    };
+                } else if (node.id === '∅') {
+                    // Gray for empty set
+                    color = {
+                        border: '#64748b',
+                        background: '#94a3b8',
+                        highlight: { border: '#475569', background: '#64748b' }
+                    };
+                } else {
+                    // Neutral purple for "out" sets
+                    color = {
+                        border: '#7c3aed',
+                        background: '#8b5cf6',
+                        highlight: { border: '#6d28d9', background: '#7c3aed' }
+                    };
+                }
+
+                nodeUpdates.push({
+                    id: node.id,
+                    color: color
+                });
+            });
+        }
 
         // Batch update all nodes at once
         this.networkData.nodes.update(nodeUpdates);
@@ -2416,9 +2473,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         edges.forEach(edge => {
             // Match discarded attacks: attack.source is the attacking element, attack.target is the attacked assumption
+            // Handle both standard mode (attackedAssumption) and assumption-level mode (targetAssumption)
+            const targetAssumption = edge.attackedAssumption || edge.targetAssumption;
             const isDiscarded = discardedAttacks.some(attack =>
                 attack.source === edge.attackingElement &&
-                attack.target === edge.attackedAssumption
+                attack.target === targetAssumption
             );
 
             if (isDiscarded) {
@@ -2437,9 +2496,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Keep active attacks with original style
                 edgeUpdates.push({
                     id: edge.id,
-                    width: edge.width || 2,
-                    dashes: false,
-                    color: edge.color,
+                    width: edge.originalWidth || edge.width || 2,
+                    dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
+                    color: edge.originalColor || edge.color,
                     opacity: 1.0
                 });
             }
@@ -2464,13 +2523,25 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
         const nodeUpdates = [];
 
-        const neutralColor = {
-            border: '#7c3aed',
-            background: '#8b5cf6',
-            highlight: { border: '#6d28d9', background: '#7c3aed' }
-        };
-
         nodes.forEach(node => {
+            let neutralColor;
+
+            if (node.isJunction) {
+                // Junction nodes stay green
+                neutralColor = {
+                    border: '#10b981',
+                    background: '#10b981',
+                    highlight: { border: '#059669', background: '#059669' }
+                };
+            } else {
+                // Regular nodes/assumptions back to purple
+                neutralColor = {
+                    border: '#7c3aed',
+                    background: '#8b5cf6',
+                    highlight: { border: '#6d28d9', background: '#7c3aed' }
+                };
+            }
+
             nodeUpdates.push({
                 id: node.id,
                 color: neutralColor
@@ -2485,13 +2556,15 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const edgeUpdates = [];
 
         edges.forEach(edge => {
-            // Restore original color from edge data
+            // Restore original color and style from edge data
             const originalColor = edge.originalColor || edge.color;
+            const originalDashes = edge.originalDashes !== undefined ? edge.originalDashes :
+                                   (edge.dashes !== undefined ? edge.dashes : false);
 
             edgeUpdates.push({
                 id: edge.id,
                 width: edge.originalWidth || edge.width || 2,
-                dashes: false,
+                dashes: originalDashes,
                 opacity: 1.0,
                 color: originalColor
             });
