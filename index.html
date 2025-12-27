@@ -8,6 +8,22 @@
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
+
+    <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
+    <script>
+        // Tell Emscripten where to find WASM files on GitHub Pages
+        var Module = {
+            locateFile: function(path) {
+                // For WASM files, use the repository root path
+                if (path.endsWith('.wasm') || path.endsWith('.worker.js')) {
+                    // Get the base path (works for both local and GitHub Pages)
+                    const basePath = window.location.pathname.replace(/\/[^\/]*$/, '/');
+                    return basePath + path;
+                }
+                return path;
+            }
+        };
+    </script>
     <script src="clingo.web.js?v=20251227"></script>
 </head>
 <body>
