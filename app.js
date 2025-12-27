@@ -943,6 +943,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             const rules = this.parseRules(frameworkCode);
             const weights = this.parseWeights(frameworkCode);
 
+            // DEBUG: Log parsed data
+            console.log('=== ASSUMPTION-LEVEL GRAPH DEBUG ===');
+            console.log('Assumptions:', assumptions);
+            console.log('Contraries:', contraries);
+            console.log('Rules:', rules);
+            console.log('Weights:', weights);
+
             // Build vis.js nodes (one per assumption)
             const visNodes = [];
             const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -1023,7 +1030,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             }
                         } else if (attackers.length > 1) {
                             // Joint attack: multiple attackers
+                            console.log(`Joint attack detected: ${attackers.join(', ')} -> ${assumption} via ${contrary}`);
                             const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
+                            console.log(`  Assumption attackers: ${assumptionAttackers.join(', ')}`);
 
                             if (assumptionAttackers.length > 0) {
                                 // Track this as a joint attack
@@ -1041,7 +1050,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     const weight = weights[contrary] || 1;
                                     const displayWeight = weight === '?' ? '' : weight;
                                     const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
-                                    visEdges.push({
+                                    const edge = {
                                         id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
                                         from: attacker,
                                         to: assumption,
@@ -1051,13 +1060,19 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         arrows: 'to',
                                         dashes: [5, 5], // Dashed line to indicate joint attack
                                         title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`
-                                    });
+                                    };
+                                    console.log(`  Creating green dashed edge:`, edge);
+                                    visEdges.push(edge);
                                 });
                             }
                         }
                     });
                 }
             });
+
+            console.log('Total edges created:', visEdges.length);
+            console.log('Edges:', visEdges.map(e => `${e.from} -> ${e.to} (${e.dashes ? 'DASHED' : 'SOLID'}, color: ${e.color.color})`));
+            console.log('================================');
 
             // Update vis.js network
             this.networkData.nodes.clear();
