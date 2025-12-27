@@ -56,10 +56,12 @@ class WABAPlayground {
         this.attachEventListeners();
         this.initSimpleMode();
 
-        // Preload simple example on startup
+        // Preload selected example on startup (respects HTML selected attribute)
         setTimeout(() => {
-            this.exampleSelect.value = 'simple';
-            this.loadExample('simple');
+            const selectedExample = this.exampleSelect.value;
+            if (selectedExample) {
+                this.loadExample(selectedExample);
+            }
         }, 100);
     }
 
