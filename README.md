@@ -11,9 +11,20 @@ Try it live: [https://yourusername.github.io/waba-playground](https://youruserna
   - 5 Semirings: Gödel, Tropical, Arctic, Łukasiewicz, Bottleneck-Cost
   - 4 Monoids: MAX, SUM, MIN, COUNT
   - 2 Semantics: Stable, Conflict-Free
-- **📚 Preloaded Examples**: 7 domain-diverse examples ready to run
+- **📊 Interactive Graph Visualization** (powered by vis.js):
+  - **Three visualization modes**:
+    - **Standard**: Set-based view showing all possible assumption sets
+    - **Assumption-Direct**: Assumption-level view with individual dashed edges for joint attacks
+    - **Assumption-Branching**: Assumption-level view with junction nodes (⊗) showing attack convergence
+  - Click nodes/edges for detailed attack information
+  - Click extensions to highlight in/out assumptions and discarded attacks
+  - Live physics simulation with customizable layout
+  - Fullscreen mode and reset layout controls
+- **📚 Preloaded Examples**: 7 topology-focused examples (linear, cycle, tree, complete, mixed, isolated)
 - **⚡ Instant Execution**: Powered by clingo-wasm (WebAssembly)
-- **📊 Clear Output Display**: Formatted extensions with statistics
+- **📋 Sorted Results**: Extensions automatically sorted by cost (lowest to highest)
+- **🎨 Dark/Light Themes**: Toggle between dark and light color schemes
+- **🔍 Font Size Controls**: Adjust text size for better readability
 - **📖 Built-in Documentation**: Quick reference for syntax and semantics
 
 ## Quick Start
@@ -24,7 +35,9 @@ Try it live: [https://yourusername.github.io/waba-playground](https://youruserna
 2. Select a semiring and monoid configuration
 3. Choose a preloaded example or write your own framework
 4. Click "Run WABA" to compute extensions
-5. Explore how different algebraic choices affect reasoning!
+5. Explore the interactive graph visualization with different modes
+6. Click extensions in the results to see them highlighted in the graph
+7. Experiment with different algebraic choices to see how they affect reasoning!
 
 ### Local Development
 
@@ -46,10 +59,10 @@ npx http-server
 
 The playground consists of:
 
-- **`index.html`** - Main UI structure with editor, controls, and output panels
-- **`style.css`** - Modern dark theme with professional styling
-- **`app.js`** - Core application logic and clingo-wasm integration
-- **`examples.js`** - Preloaded WABA framework examples
+- **`index.html`** - Main UI structure with editor, controls, graph container, and output panels
+- **`style.css`** - Modern dark/light theme styling with responsive design
+- **`app.js`** - Core application logic, clingo-wasm integration, and vis.js graph visualization
+- **`examples.js`** - Preloaded topology-focused WABA framework examples
 
 ### How It Works
 
@@ -59,15 +72,50 @@ The playground consists of:
 
 ## Example Frameworks
 
-The playground includes 7 diverse examples:
+The playground includes 7 topology-focused examples demonstrating different argumentation structures:
 
-1. **Simple** - Basic WABA demonstration
-2. **Medical Ethics** - Balancing ethical principles in healthcare
-3. **Cybersecurity** - Network access control decisions
-4. **Legal Reasoning** - Contract dispute resolution
-5. **Scientific Discovery** - Astronomical hypothesis evaluation
-6. **Investment Allocation** - Portfolio construction under uncertainty
-7. **Network Troubleshooting** - Fault diagnosis in IT systems
+1. **Simple** - Mixed attacks (derived and non-derived)
+2. **Linear** - Chain topology: a → b → c → d (sequential attack propagation)
+3. **Cycle** - Circular topology: a → b → c → a (mutual defeat cycles)
+4. **Tree** - Hierarchical topology: root branches to multiple levels
+5. **Complete** - Fully connected topology: all assumptions attack each other jointly *(default)*
+6. **Mixed** - Complex topology combining linear chains, cycles, and branching
+7. **Isolated** - Disconnected components: separate argumentation islands
+
+Each example demonstrates both **derived attacks** (via rules with bodies) and **non-derived attacks** (via facts), highlighting how different topologies affect extension computation and cost aggregation.
+
+## Graph Visualization Modes
+
+The playground offers three complementary visualization modes, accessible via the selector at the top of the graph:
+
+### 1. Standard Mode (Set-Based View)
+- Shows **all possible assumption sets** as nodes
+- Edges represent **attacks between sets**
+- Best for understanding the complete extension space
+- Useful for small frameworks (2-5 assumptions)
+
+### 2. Assumption-Direct Mode *(default)*
+- Shows **individual assumptions** as nodes
+- **Joint attacks** displayed as multiple dashed edges converging on the target
+- Cleaner visualization for assumption-level reasoning
+- Best for understanding direct attack relationships
+
+### 3. Assumption-Branching Mode
+- Shows **individual assumptions** as nodes
+- **Junction nodes** (⊗) represent joint attacks with branching edges
+- Visual convergence shows which assumptions collaborate to attack
+- Best for complex frameworks with many joint attacks
+
+### Interactive Features
+- **Click nodes** to see detailed information (weights, types, connections)
+- **Click edges** to see attack details (direct/derived/joint, weights)
+- **Click extensions** in the results panel to highlight them in the graph:
+  - Green nodes = assumptions IN the extension
+  - Gray nodes = assumptions OUT of the extension
+  - Gray dashed edges = discarded attacks
+- **Double-click** the graph background to reset highlighting
+- **Reset Layout** button to re-center the graph
+- **Fullscreen** button for detailed exploration
 
 ## Semiring & Monoid Combinations
 
@@ -133,6 +181,7 @@ contrary(a, c_a).
 ### Dependencies
 
 - [clingo-wasm](https://github.com/domoritz/clingo-wasm) v1.3.0 - Clingo compiled to WebAssembly
+- [vis.js Network](https://visjs.github.io/vis-network/) - Interactive graph visualization with physics simulation
 - [Google Fonts](https://fonts.google.com) - Inter (UI) and JetBrains Mono (code)
 
 ### Browser Compatibility
