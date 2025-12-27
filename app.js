@@ -3971,6 +3971,22 @@ ${framework}
     `;
         }
 
+    extractCost(predicates) {
+        // Extract extension_cost from predicates array
+        for (const pred of predicates) {
+            const costMatch = pred.match(/^extension_cost\(([^)]+)\)$/);
+            if (costMatch && costMatch[1] !== '#inf') {
+                const cost = costMatch[1];
+                // Handle #sup as infinity for sorting
+                if (cost === '#sup') return Infinity;
+                // Parse numeric cost
+                return parseFloat(cost) || 0;
+            }
+        }
+        // Default to 0 if no cost found
+        return 0;
+    }
+
     displayResults(result, elapsed) {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
@@ -3988,9 +4004,16 @@ ${framework}
             this.log('⚠️ No extensions found', 'warning');
             this.log('Try adjusting the budget or framework constraints', 'info');
         } else {
-            // Display all witnesses
+            // Sort witnesses by cost (ascending order)
+            const sortedWitnesses = witnesses.slice().sort((a, b) => {
+                const costA = this.extractCost(a.Value || []);
+                const costB = this.extractCost(b.Value || []);
+                return costA - costB;
+            });
+
+            // Display all witnesses in sorted order
             console.log('Displaying witnesses...');
-            witnesses.forEach((witness, index) => {
+            sortedWitnesses.forEach((witness, index) => {
                 console.log(`Processing witness ${index + 1}:`, witness);
                 this.appendAnswerSet(witness, index + 1);
             });
