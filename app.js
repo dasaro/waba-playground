@@ -1029,7 +1029,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 });
                             }
                         } else if (attackers.length > 1) {
-                            // Joint attack: multiple attackers
+                            // Joint attack: multiple attackers - use branching visualization
                             console.log(`Joint attack detected: ${attackers.join(', ')} -> ${assumption} via ${contrary}`);
                             const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
                             console.log(`  Assumption attackers: ${assumptionAttackers.join(', ')}`);
@@ -1042,28 +1042,66 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 jointAttackGroups.get(assumption).push({
                                     attackers: assumptionAttackers,
                                     contrary: contrary,
-                                    weight: weights[contrary] || 1
+                                    weight: weights[contrary] || 1,
+                                    ruleId: rule.id
                                 });
 
-                                // Create dashed edges from each attacker to target
+                                // Create junction node for this joint attack
+                                const junctionId = `junction_${rule.id}`;
+                                const junctionNode = {
+                                    id: junctionId,
+                                    label: '⊗', // Multiplication symbol to indicate "joint"
+                                    size: 12,
+                                    shape: 'diamond',
+                                    color: {
+                                        border: '#10b981',
+                                        background: '#10b981',
+                                        highlight: {
+                                            border: '#059669',
+                                            background: '#059669'
+                                        }
+                                    },
+                                    title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
+                                    font: {
+                                        color: isDark ? '#f1f5f9' : '#1e293b',
+                                        size: 14
+                                    }
+                                };
+                                console.log(`  Creating junction node:`, junctionNode);
+                                visNodes.push(junctionNode);
+
+                                // Create edges from each attacker to junction (dashed green)
                                 assumptionAttackers.forEach(attacker => {
-                                    const weight = weights[contrary] || 1;
-                                    const displayWeight = weight === '?' ? '' : weight;
-                                    const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
                                     const edge = {
-                                        id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
+                                        id: `${attacker}-to-junction-${junctionId}`,
                                         from: attacker,
-                                        to: assumption,
-                                        label: displayWeight,
-                                        width: 3,
+                                        to: junctionId,
+                                        width: 2,
                                         color: { color: '#10b981', highlight: '#059669' },
                                         arrows: 'to',
-                                        dashes: [5, 5], // Dashed line to indicate joint attack
-                                        title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`
+                                        dashes: [5, 5],
+                                        title: `${attacker} contributes to joint attack`
                                     };
-                                    console.log(`  Creating green dashed edge:`, edge);
+                                    console.log(`  Creating edge to junction:`, edge);
                                     visEdges.push(edge);
                                 });
+
+                                // Create edge from junction to target (solid green, thicker)
+                                const weight = weights[contrary] || 1;
+                                const displayWeight = weight === '?' ? '' : weight;
+                                const finalEdge = {
+                                    id: `${junctionId}-attacks-${assumption}`,
+                                    from: junctionId,
+                                    to: assumption,
+                                    label: displayWeight,
+                                    width: 4,
+                                    color: { color: '#10b981', highlight: '#059669' },
+                                    arrows: 'to',
+                                    dashes: false,
+                                    title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`
+                                };
+                                console.log(`  Creating junction-to-target edge:`, finalEdge);
+                                visEdges.push(finalEdge);
                             }
                         }
                     });
