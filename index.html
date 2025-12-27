@@ -14,11 +14,12 @@
         // Tell Emscripten where to find WASM files on GitHub Pages
         var Module = {
             locateFile: function(path) {
-                // For WASM files, use the repository root path
+                // For WASM files, use absolute URL (critical for GitHub Pages project repos)
                 if (path.endsWith('.wasm') || path.endsWith('.worker.js')) {
-                    // Get the base path (works for both local and GitHub Pages)
-                    const basePath = window.location.pathname.replace(/\/[^\/]*$/, '/');
-                    return basePath + path;
+                    // Use full absolute URL to handle Web Worker context correctly
+                    const currentUrl = window.location.href;
+                    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+                    return baseUrl + path;
                 }
                 return path;
             }
