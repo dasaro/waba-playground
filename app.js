@@ -4033,6 +4033,29 @@ ${framework}
         `;
     }
 
+    findSupportingAssumptions(element, parsed) {
+        // If element is an assumption in the extension, return it
+        if (parsed.in.includes(element)) {
+            return [element];
+        }
+
+        // Find the rule that derives this element
+        for (const [ruleId, rule] of parsed.rules.entries()) {
+            if (rule.head === element) {
+                // Found the rule, recursively find assumptions supporting the body
+                const assumptions = new Set();
+                for (const bodyElement of rule.body) {
+                    const supporting = this.findSupportingAssumptions(bodyElement, parsed);
+                    supporting.forEach(a => assumptions.add(a));
+                }
+                return Array.from(assumptions).sort();
+            }
+        }
+
+        // Not derived from any rule (fact with empty body)
+        return [];
+    }
+
     appendAnswerSet(witness, answerNumber) {
         // witness is an object with Time and Value properties
         // Value is an array of predicate strings
@@ -4073,8 +4096,19 @@ ${framework}
             parsed.successful.forEach(attack => {
                 const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
                 if (match) {
-                    const [, from, to, weight] = match;
-                    contentHTML += `<div class="attack-item">${from} <span class="attack-arrow">→</span> ${to} <span style="color: var(--warning-color)">(w: ${weight})</span></div>`;
+                    const [, attackingElement, target, weight] = match;
+
+                    // Find assumptions that support the attacking element
+                    const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
+
+                    // Format as "a1, a2, ..., an ⊢ target"
+                    if (supportingAssumptions.length > 0) {
+                        const assumptions = supportingAssumptions.join(', ');
+                        contentHTML += `<div class="attack-item">${assumptions} <span class="attack-arrow">⊢</span> ${target}</div>`;
+                    } else {
+                        // Non-derived attack (no supporting assumptions)
+                        contentHTML += `<div class="attack-item">⊤ <span class="attack-arrow">⊢</span> ${target}</div>`;
+                    }
                 }
             });
             contentHTML += '</div></div>';
@@ -4088,8 +4122,19 @@ ${framework}
             parsed.discarded.forEach(attack => {
                 const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
                 if (match) {
-                    const [, from, to, weight] = match;
-                    contentHTML += `<div class="attack-item discarded">${from} <span class="attack-arrow">⇢</span> ${to} <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                    const [, attackingElement, target, weight] = match;
+
+                    // Find assumptions that support the attacking element
+                    const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
+
+                    // Format as "a1, a2, ..., an ⊢ target (w: weight)"
+                    if (supportingAssumptions.length > 0) {
+                        const assumptions = supportingAssumptions.join(', ');
+                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${target} <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                    } else {
+                        // Non-derived attack (no supporting assumptions)
+                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${target} <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                    }
                 }
             });
             contentHTML += '</div></div>';
