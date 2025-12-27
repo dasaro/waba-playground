@@ -2402,7 +2402,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         }
     }
 
-    highlightExtension(inAssumptions, discardedAttacks) {
+    highlightExtension(inAssumptions, discardedAttacks, successfulAttacks = []) {
         // Batch update node colors based on in/out status
         const nodes = this.networkData.nodes.get();
         const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -2505,6 +2505,16 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 attack.target === targetAssumption
             );
 
+            // Check if this edge is an active (successful) attack
+            const isActive = successfulAttacks.some(attack => {
+                const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+                if (match) {
+                    const [, from, to, weight] = match;
+                    return from === attackElement && to === targetAssumption;
+                }
+                return false;
+            });
+
             if (isDiscarded) {
                 // Style discarded attacks: dashed, thinner, gray
                 edgeUpdates.push({
@@ -2517,8 +2527,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     },
                     opacity: 0.4
                 });
-            } else {
-                // Highlight active attacks: make them more prominent
+            } else if (isActive) {
+                // Highlight ONLY active attacks: make them more prominent
                 const originalWidth = edge.originalWidth || edge.width || 2;
                 const originalColor = edge.originalColor || edge.color;
 
@@ -2548,6 +2558,19 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         x: 0,
                         y: 0
                     }
+                });
+            } else {
+                // Non-applicable attacks: reset to original style (neutral)
+                const originalWidth = edge.originalWidth || edge.width || 2;
+                const originalColor = edge.originalColor || edge.color;
+
+                edgeUpdates.push({
+                    id: edge.id,
+                    width: originalWidth,
+                    dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
+                    color: originalColor,
+                    opacity: 0.3, // Dim non-applicable attacks
+                    shadow: { enabled: false }
                 });
             }
         });
@@ -4243,7 +4266,8 @@ ${framework}
                     };
                 }
                 return null;
-            }).filter(a => a !== null)
+            }).filter(a => a !== null),
+            successfulAttacks: parsed.successful // Add successful attacks for highlighting
         };
 
         // Add click handler to highlight this extension
@@ -4261,7 +4285,7 @@ ${framework}
             header.classList.add('active-extension');
 
             // Highlight in graph
-            this.highlightExtension(extensionData.inAssumptions, extensionData.discardedAttacks);
+            this.highlightExtension(extensionData.inAssumptions, extensionData.discardedAttacks, extensionData.successfulAttacks);
         });
 
         // Add double-click to reset
