@@ -3098,7 +3098,9 @@ ${framework}
             contentHTML += '<span class="section-label">Derived Atoms:</span>';
             contentHTML += '<div class="derived-list" style="display: flex; flex-wrap: wrap; gap: 6px;">';
             parsed.derived.forEach(atom => {
-                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color);">${atom}</span>`;
+                const weight = parsed.weights.get(atom);
+                const weightDisplay = weight !== undefined ? ` (${weight})` : '';
+                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color);">${atom}${weightDisplay}</span>`;
             });
             contentHTML += '</div></div>';
         }
@@ -3189,7 +3191,8 @@ ${framework}
             successful: [],
             supported: [],
             assumptions: new Set(),
-            contraries: new Map()  // Map from assumption to contrary
+            contraries: new Map(),  // Map from assumption to contrary
+            weights: new Map()  // Map from atom to weight
         };
 
         // First pass: collect assumptions and contraries
@@ -3227,6 +3230,15 @@ ${framework}
             const supportedMatch = pred.match(/^supported\(([^)]+)\)$/);
             if (supportedMatch) {
                 result.supported.push(supportedMatch[1]);
+                return;
+            }
+
+            // Extract supported_with_weight predicates
+            const weightMatch = pred.match(/^supported_with_weight\(([^,]+),\s*([^)]+)\)$/);
+            if (weightMatch) {
+                const atom = weightMatch[1];
+                const weight = weightMatch[2];
+                result.weights.set(atom, weight);
                 return;
             }
 
