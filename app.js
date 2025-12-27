@@ -1117,28 +1117,46 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const ruleMap = new Map(); // rule_id -> {head: ..., body: [...]}
 
         // Parse head/2 predicates: head(rule_id, head_atom).
-        const headRegex = /head\(([^,]+),\s*([^)]+)\)/g;
+        // Handle both individual and compact form: head(r1, a). or head(r1, a; r1, b).
+        const headRegex = /head\([^)]+\)\./g;
         let match;
         while ((match = headRegex.exec(code)) !== null) {
-            const ruleId = match[1].trim();
-            const headAtom = match[2].trim();
-            if (!ruleMap.has(ruleId)) {
-                ruleMap.set(ruleId, { head: headAtom, body: [] });
-            } else {
-                ruleMap.get(ruleId).head = headAtom;
-            }
+            const statement = match[0]; // e.g., "head(r1, a; r1, b)."
+            // Split by semicolon to handle compact form
+            const parts = statement.slice(0, -1).split(';'); // Remove trailing '.' and split
+            parts.forEach(part => {
+                const individualMatch = part.trim().match(/head\(([^,]+),\s*([^)]+)\)/);
+                if (individualMatch) {
+                    const ruleId = individualMatch[1].trim();
+                    const headAtom = individualMatch[2].trim();
+                    if (!ruleMap.has(ruleId)) {
+                        ruleMap.set(ruleId, { head: headAtom, body: [] });
+                    } else {
+                        ruleMap.get(ruleId).head = headAtom;
+                    }
+                }
+            });
         }
 
         // Parse body/2 predicates: body(rule_id, body_atom).
-        const bodyRegex = /body\(([^,]+),\s*([^)]+)\)/g;
+        // Handle both individual and compact form: body(r1, a). or body(r1, a; r1, b).
+        const bodyRegex = /body\([^)]+\)\./g;
         while ((match = bodyRegex.exec(code)) !== null) {
-            const ruleId = match[1].trim();
-            const bodyAtom = match[2].trim();
-            if (!ruleMap.has(ruleId)) {
-                ruleMap.set(ruleId, { head: null, body: [bodyAtom] });
-            } else {
-                ruleMap.get(ruleId).body.push(bodyAtom);
-            }
+            const statement = match[0]; // e.g., "body(r1, a; r1, b)."
+            // Split by semicolon to handle compact form
+            const parts = statement.slice(0, -1).split(';'); // Remove trailing '.' and split
+            parts.forEach(part => {
+                const individualMatch = part.trim().match(/body\(([^,]+),\s*([^)]+)\)/);
+                if (individualMatch) {
+                    const ruleId = individualMatch[1].trim();
+                    const bodyAtom = individualMatch[2].trim();
+                    if (!ruleMap.has(ruleId)) {
+                        ruleMap.set(ruleId, { head: null, body: [bodyAtom] });
+                    } else {
+                        ruleMap.get(ruleId).body.push(bodyAtom);
+                    }
+                }
+            });
         }
 
         // Convert map to array
