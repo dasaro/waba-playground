@@ -1171,15 +1171,21 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         // Direct attack from one assumption to another
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
+                        const edgeColor = { color: '#ef4444', highlight: '#dc2626' };
                         visEdges.push({
                             id: `${contrary}-attacks-${assumption}`,
                             from: contrary,
                             to: assumption,
                             label: displayWeight,
                             width: 2,
-                            color: { color: '#ef4444', highlight: '#dc2626' },
+                            color: edgeColor,
                             arrows: 'to',
-                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`
+                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
+                            attackingElement: contrary,
+                            targetAssumption: assumption,
+                            originalWidth: 2,
+                            originalColor: edgeColor,
+                            originalDashes: false
                         });
                     }
                 } else {
@@ -1194,16 +1200,23 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             if (assumptions.includes(attacker)) {
                                 const weight = weights[contrary] || 1;
                                 const displayWeight = weight === '?' ? '' : weight;
+                                const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
                                 visEdges.push({
                                     id: `${attacker}-attacks-${assumption}-via-${contrary}`,
                                     from: attacker,
                                     to: assumption,
                                     label: displayWeight,
                                     width: 2,
-                                    color: { color: '#f59e0b', highlight: '#d97706' },
+                                    color: edgeColor,
                                     arrows: 'to',
                                     dashes: false,
-                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`
+                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
+                                    attackingElement: attacker,
+                                    targetAssumption: assumption,
+                                    contrary: contrary,
+                                    originalWidth: 2,
+                                    originalColor: edgeColor,
+                                    originalDashes: false
                                 });
                             }
                         } else if (attackers.length > 1) {
@@ -1266,6 +1279,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         title: `${attacker} contributes to joint attack`,
                                         attackingElement: attacker,
                                         targetAssumption: assumption,
+                                        contrary: contrary,
                                         originalWidth: 2,
                                         originalColor: edgeColor,
                                         originalDashes: [5, 5]
@@ -1288,6 +1302,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     arrows: 'to',
                                     dashes: false,
                                     title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
+                                    targetAssumption: assumption,
+                                    contrary: contrary,
                                     originalWidth: 4,
                                     originalColor: edgeColor,
                                     originalDashes: false
