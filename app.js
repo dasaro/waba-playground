@@ -1406,8 +1406,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const edge = this.networkData.edges.get(edgeId);
         if (!edge) return;
 
-        // Create tooltip content using stored framework code
-        const tooltipContent = this.createAttackDerivationTooltip(edge, this.currentFrameworkCode);
+        // Create tooltip content based on current graph mode
+        let tooltipContent;
+        if (this.currentGraphMode && this.currentGraphMode.startsWith('assumption')) {
+            tooltipContent = this.createAssumptionLevelAttackTooltip(edge, this.currentFrameworkCode);
+        } else {
+            tooltipContent = this.createAttackDerivationTooltip(edge, this.currentFrameworkCode);
+        }
 
         // Show tooltip at a fixed position (center of screen)
         this.showTooltip(tooltipContent, { x: window.innerWidth / 2, y: window.innerHeight / 2 });
@@ -1553,6 +1558,96 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
     getContrary(assumption, frameworkCode) {
         const contraryMatch = frameworkCode.match(new RegExp(`contrary\\(${assumption}\\s*,\\s*([^)]+)\\)`, 'm'));
         return contraryMatch ? contraryMatch[1].trim() : null;
+    }
+
+    createAssumptionLevelAttackTooltip(edgeData, frameworkCode) {
+        const { attackType, attackingElement, targetAssumption, contrary, label, jointWith } = edgeData;
+
+        let content = `<div class="attack-tooltip">`;
+        content += `<div class="tooltip-header">`;
+        content += `<h4>Attack Information</h4>`;
+        content += `<button class="tooltip-close" onclick="window.playground.hideTooltip()">×</button>`;
+        content += `</div>`;
+        content += `<div class="tooltip-body">`;
+
+        // Attack type badge
+        let typeBadgeColor = '#6366f1';
+        let typeLabel = 'Attack';
+        if (attackType === 'direct') {
+            typeBadgeColor = '#ef4444';
+            typeLabel = 'Direct Attack';
+        } else if (attackType === 'derived') {
+            typeBadgeColor = '#f59e0b';
+            typeLabel = 'Derived Attack';
+        } else if (attackType === 'joint') {
+            typeBadgeColor = '#10b981';
+            typeLabel = 'Joint Attack';
+        }
+
+        content += `<div style="margin-bottom: 15px; padding: 10px; background: rgba(99, 102, 241, 0.1); border-left: 3px solid ${typeBadgeColor}; border-radius: 4px;">`;
+
+        // Type
+        content += `<div style="margin-bottom: 8px;">`;
+        content += `<span class="badge" style="background: ${typeBadgeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Type</span>`;
+        content += `<strong>${typeLabel}</strong>`;
+        content += `</div>`;
+
+        // Attacker(s)
+        if (attackType === 'joint' && jointWith && jointWith.length > 0) {
+            content += `<div style="margin-bottom: 8px;">`;
+            content += `<span class="badge" style="background: #6366f1; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Attackers</span>`;
+            content += jointWith.map(a => `<code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; margin-right: 4px;">${a}</code>`).join('');
+            content += `</div>`;
+        } else if (attackingElement) {
+            content += `<div style="margin-bottom: 8px;">`;
+            content += `<span class="badge" style="background: #6366f1; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Source</span>`;
+            content += `<code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">${attackingElement}</code>`;
+            content += `</div>`;
+        }
+
+        // Target
+        if (targetAssumption) {
+            content += `<div style="margin-bottom: 8px;">`;
+            content += `<span class="badge" style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Target</span>`;
+            content += `<code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">${targetAssumption}</code>`;
+            content += `</div>`;
+        }
+
+        // Via (contrary)
+        if (contrary) {
+            content += `<div style="margin-bottom: 8px;">`;
+            content += `<span class="badge" style="background: #8b5cf6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Via</span>`;
+            content += `<code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">${contrary}</code>`;
+            content += `</div>`;
+        }
+
+        // Weight
+        if (label) {
+            content += `<div>`;
+            content += `<span class="badge" style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 6px;">Weight</span>`;
+            content += `<strong style="font-size: 1.1em; color: #f59e0b;">${label}</strong>`;
+            content += `</div>`;
+        }
+
+        content += `</div>`;
+
+        // Additional info based on attack type
+        if (attackType === 'direct') {
+            content += `<div style="margin-top: 15px; padding: 10px; background: rgba(239, 68, 68, 0.1); border-radius: 4px;">`;
+            content += `<strong>Direct attack:</strong> ${attackingElement || 'source'} directly attacks ${targetAssumption || 'target'} (both are assumptions)`;
+            content += `</div>`;
+        } else if (attackType === 'derived' && contrary) {
+            content += `<div style="margin-top: 15px; padding: 10px; background: rgba(245, 158, 11, 0.1); border-radius: 4px;">`;
+            content += `<strong>Derived attack:</strong> ${attackingElement || 'source'} supports <code>${contrary}</code>, which attacks ${targetAssumption || 'target'}`;
+            content += `</div>`;
+        } else if (attackType === 'joint' && jointWith) {
+            content += `<div style="margin-top: 15px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 4px;">`;
+            content += `<strong>Joint attack:</strong> Multiple assumptions (${jointWith.join(', ')}) work together to support <code>${contrary}</code>, which attacks ${targetAssumption || 'target'}`;
+            content += `</div>`;
+        }
+
+        content += `</div></div>`;
+        return content;
     }
 
     createAttackDerivationTooltip(edgeData, frameworkCode) {
