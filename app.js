@@ -38,12 +38,18 @@ class WABAPlayground {
         this.themeToggleBtn = document.getElementById('theme-toggle-btn');
         this.themeIcon = document.getElementById('theme-icon');
 
+        // Font size controls
+        this.fontIncreaseBtn = document.getElementById('font-increase-btn');
+        this.fontDecreaseBtn = document.getElementById('font-decrease-btn');
+        this.currentFontSize = 100; // Base font size percentage
+
         this.clingoReady = false;
 
         // Show loading message
         this.output.innerHTML = '<div class="info-message">⏳ Loading Clingo WASM library...</div>';
 
         this.initTheme();
+        this.initFontSize();
         this.initClingo();
         this.initGraph();
         this.attachEventListeners();
@@ -86,6 +92,40 @@ class WABAPlayground {
 
         // Update graph colors for new theme
         this.updateGraphTheme();
+    }
+
+    initFontSize() {
+        // Load saved font size or default to 100%
+        const savedFontSize = localStorage.getItem('waba-font-size') || '100';
+        this.currentFontSize = parseInt(savedFontSize);
+        this.setFontSize(this.currentFontSize);
+
+        // Add font size control listeners
+        this.fontIncreaseBtn.addEventListener('click', () => {
+            this.increaseFontSize();
+        });
+
+        this.fontDecreaseBtn.addEventListener('click', () => {
+            this.decreaseFontSize();
+        });
+    }
+
+    setFontSize(percentage) {
+        // Clamp between 60% and 200%
+        percentage = Math.max(60, Math.min(200, percentage));
+        this.currentFontSize = percentage;
+
+        // Apply to document root
+        document.documentElement.style.fontSize = `${percentage}%`;
+        localStorage.setItem('waba-font-size', percentage.toString());
+    }
+
+    increaseFontSize() {
+        this.setFontSize(this.currentFontSize + 10);
+    }
+
+    decreaseFontSize() {
+        this.setFontSize(this.currentFontSize - 10);
     }
 
     updateGraphTheme() {
@@ -451,10 +491,11 @@ class WABAPlayground {
 
         // Add click handler for edges and nodes
         this.network.on('click', (params) => {
-            if (params.edges.length > 0) {
-                this.handleEdgeClick(params.edges[0]);
-            } else if (params.nodes.length > 0) {
+            // Prioritize node clicks over edge clicks
+            if (params.nodes.length > 0) {
                 this.handleNodeClick(params.nodes[0], params.event);
+            } else if (params.edges.length > 0) {
+                this.handleEdgeClick(params.edges[0]);
             } else {
                 // Clicked elsewhere, hide tooltip
                 this.hideTooltip();
@@ -896,11 +937,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
     }
 
     showNodePopup(nodeId, nodeData, position) {
-        // Remove any existing node popup
+        // Remove any existing popups
         const existing = document.getElementById('node-popup');
         if (existing) {
             existing.remove();
         }
+        this.hideTooltip();  // Also hide edge tooltip if open
 
         // Create popup
         const popup = document.createElement('div');
@@ -3354,12 +3396,12 @@ ${framework}
         if (parsed.derived && parsed.derived.length > 0) {
             contentHTML += '<div class="assumption-section">';
             contentHTML += '<span class="section-label">Derived Atoms:</span>';
-            contentHTML += '<div class="attacks-list">';
+            contentHTML += '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
             parsed.derived.forEach(atom => {
                 const weight = parsed.weights.get(atom);
-                const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color)">(w: ${weight})</span>` : '';
+                const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color); font-size: 0.85em;">(w: ${weight})</span>` : '';
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                contentHTML += `<div class="attack-item" style="cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</div>`;
+                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color); cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</span>`;
             });
             contentHTML += '</div></div>';
         }
