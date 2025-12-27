@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- CRITICAL: Set base URL for GitHub Pages project repository -->
-    <base href="/waba-playground/">
+    <!-- CRITICAL: Set base URL for GitHub Pages project repository (conditional) -->
+    <script>
+        // Only set base tag for GitHub Pages, not for localhost
+        if (window.location.hostname === 'dasaro.github.io') {
+            const base = document.createElement('base');
+            base.href = '/waba-playground/';
+            document.head.appendChild(base);
+        }
+    </script>
 
     <title>WABA Playground - Interactive Framework Explorer</title>
     <link rel="stylesheet" href="style.css">
