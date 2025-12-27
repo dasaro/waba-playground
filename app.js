@@ -2479,8 +2479,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Match discarded attacks: attack.source is the attacking element, attack.target is the attacked assumption
             // Handle both standard mode (attackedAssumption) and assumption-level mode (targetAssumption)
             const targetAssumption = edge.attackedAssumption || edge.targetAssumption;
+
+            // For assumption-level modes with derived/joint attacks, the attackingElement is the supporting assumption,
+            // but discarded_attack uses the contrary element. Check edge.contrary first for these cases.
+            const attackElement = edge.contrary || edge.attackingElement;
+
             const isDiscarded = discardedAttacks.some(attack =>
-                attack.source === edge.attackingElement &&
+                attack.source === attackElement &&
                 attack.target === targetAssumption
             );
 
