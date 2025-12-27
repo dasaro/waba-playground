@@ -1,9 +1,10 @@
 // WABA Playground - Example Frameworks
 // Topology-focused examples with both derived and non-derived attacks
+// CRITICAL: contrary is a FUNCTION - each assumption has exactly ONE contrary
 
 const examples = {
     simple: `%% Simple Example - Mixed Attacks
-%% Demonstrates: derived attack (c_a <- b) + non-derived attack (c_c <- d)
+%% Demonstrates: derived attack (c_a <- b) + non-derived attack (c directly)
 %% Shows: not all atoms need weights
 
 assumption(a).
@@ -19,13 +20,14 @@ head(r1, c_a).
 body(r1, b).
 weight(c_a, 70).
 
-% Non-derived attack: d always holds, attacks c
-head(r2, d).
-weight(d, 50).
+% Non-derived attack: c_c always holds and attacks c
+head(r2, c_c).
+weight(c_c, 50).
 
-% Contraries: define attack targets
-contrary(a, c_a).  % c_a attacks a (derived)
-contrary(c, d).    % d attacks c (non-derived)
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % c_a is the contrary of a (derived)
+contrary(b, c_c).   % c_c is the contrary of b (non-derived)
+contrary(c, c_c).   % c_c is the contrary of c (non-derived)
 
 budget(100).
 `,
@@ -45,17 +47,28 @@ weight(c, 50).
 weight(d, 30).
 
 % Linear attack chain
-% b attacks a (non-derived)
-contrary(a, b).
+% Non-derived: c_a always holds, attacks a
+head(r1, c_a).
+weight(c_a, 80).
 
-% c_b <- c (derived attack on b)
-head(r1, c_b).
-body(r1, c).
+% Derived: c_b <- c (c attacks b via derivation)
+head(r2, c_b).
+body(r2, c).
 weight(c_b, 60).
-contrary(b, c_b).
 
-% d attacks c (non-derived)
-contrary(c, d).
+% Non-derived: c_c always holds, attacks c
+head(r3, c_c).
+weight(c_c, 40);
+
+% Non-derived: c_d always holds, attacks d
+head(r4, c_d).
+weight(c_d, 20).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % chain: c_a attacks a
+contrary(b, c_b).   % chain: c attacks b via c_b
+contrary(c, c_c).   % chain: c_c attacks c
+contrary(d, c_d).   % chain: c_d attacks d
 
 budget(80).
 `,
@@ -72,24 +85,32 @@ weight(a, 80).
 weight(b, 70).
 weight(c, 60).
 
-% Cycle: a attacks b, b attacks c, c attacks a
-% b attacks a (non-derived)
-contrary(a, b).
-
-% c_b <- c (derived attack on b)
-head(r1, c_b).
+% Cycle of attacks
+% c_a <- c (c attacks a via derivation)
+head(r1, c_a).
 body(r1, c).
-weight(c_b, 65).
-contrary(b, c_b).
+weight(c_a, 75).
 
-% a attacks c (non-derived)
-contrary(c, a).
+% c_b <- a (a attacks b via derivation)
+head(r2, c_b).
+body(r2, a).
+weight(c_b, 85).
+
+% c_c <- b (b attacks c via derivation)
+head(r3, c_c).
+body(r3, b).
+weight(c_c, 65).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % cycle: c -> a
+contrary(b, c_b).   % cycle: a -> b
+contrary(c, c_c).   % cycle: b -> c
 
 budget(100).
 `,
 
     tree: `%% Tree Topology Example
-%% Structure: root 'a' has children b,c; b has child d
+%% Structure: root 'a' branches to b,c; b branches to d
 %% Shows: hierarchical attack structure
 
 assumption(a).
@@ -102,21 +123,36 @@ weight(b, 80).
 weight(c, 70).
 weight(d, 50).
 
-% Root attacks: a attacks both b and c
-contrary(b, a).  % a attacks b (non-derived)
-contrary(c, a);  % a attacks c (non-derived)
+% Root level: c_a attacks root
+head(r1, c_a).
+weight(c_a, 90).
 
-% Leaf attacks: d attacks b via derived attack
-head(r1, c_b).
-body(r1, d).
-weight(c_b, 60).
-contrary(b, c_b);  % c_b attacks b (derived)
+% Branch 1: c_b <- a (a attacks b, derived)
+head(r2, c_b).
+body(r2, a).
+weight(c_b, 85).
+
+% Branch 2: c_c <- a (a attacks c, derived)
+head(r3, c_c).
+body(r3, a).
+weight(c_c, 75).
+
+% Leaf: c_d <- b (b attacks d, derived)
+head(r4, c_d).
+body(r4, b).
+weight(c_d, 60).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % root is attacked
+contrary(b, c_b).   % a attacks b
+contrary(c, c_c).   % a attacks c
+contrary(d, c_d).   % b attacks d
 
 budget(120).
 `,
 
     complete: `%% Complete Topology Example
-%% Structure: every assumption attacks every other
+%% Structure: mutual attacks between all assumptions
 %% Shows: fully connected conflict graph
 
 assumption(a).
@@ -127,26 +163,26 @@ weight(a, 90).
 weight(b, 80);
 weight(c, 70).
 
-% Non-derived attacks
-contrary(a, b).  % b attacks a
-contrary(b, c).  % c attacks b
+% Complete graph: everyone attacks everyone else
+% c_a <- b,c (both b and c attack a jointly)
+head(r1, c_a).
+body(r1, b; r1, c).
+weight(c_a, 95).
 
-% Derived attacks
-head(r1, c_a).   % c_a <- c (c attacks a indirectly)
-body(r1, c).
-weight(c_a, 75).
-contrary(a, c_a).
+% c_b <- a,c (both a and c attack b jointly)
+head(r2, c_b).
+body(r2, a; r2, c).
+weight(c_b, 90).
 
-head(r2, c_c).   % c_c <- a (a attacks c indirectly)
-body(r2, a).
+% c_c <- a,b (both a and b attack c jointly)
+head(r3, c_c).
+body(r3, a; r3, b).
 weight(c_c, 85).
-contrary(c, c_c).
 
-% More complex: b,c together attack a
-head(r3, c_a2).
-body(r3, b; r3, c).
-weight(c_a2, 95).
-contrary(a, c_a2).
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % b,c jointly attack a
+contrary(b, c_b).   % a,c jointly attack b
+contrary(c, c_c).   % a,b jointly attack c
 
 budget(150).
 `,
@@ -167,25 +203,41 @@ weight(c, 80).
 weight(d, 70).
 weight(e, 60).
 
-% Linear chain: e -> d -> c
-contrary(d, e).  % e attacks d (non-derived)
-contrary(c, d).  % d attacks c (non-derived)
+% Linear segment: e -> d -> c
+% c_e <- (always holds)
+head(r1, c_e).
+weight(c_e, 55).
 
-% Branch: a,b both attack c
-contrary(c, a).  % a attacks c (non-derived)
+% c_d <- e (e attacks d)
+head(r2, c_d).
+body(r2, e).
+weight(c_d, 65).
 
-head(r1, c_c).   % c_c <- b (b attacks c via derivation)
-body(r1, b).
-weight(c_c, 85).
-contrary(c, c_c).
+% c_c <- d (d attacks c)
+head(r3, c_c).
+body(r3, d).
+weight(c_c, 75).
 
-% Cycle: b <-> a
-head(r2, c_a).   % c_a <- b,d (joint attack on a)
-body(r2, b; r2, d).
+% Branching: both a and b attack c
+% Already covered by c_c above
+
+% Cycle segment: a <-> b
+% c_a <- b,d (joint attack from b and d)
+head(r4, c_a).
+body(r4, b; r4, d).
 weight(c_a, 95).
-contrary(a, c_a).
 
-contrary(b, a).  % a attacks b (non-derived, completes cycle)
+% c_b <- a (a attacks b)
+head(r5, c_b).
+body(r5, a).
+weight(c_b, 85).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % b,d attack a
+contrary(b, c_b).   % a attacks b
+contrary(c, c_c).   % d attacks c
+contrary(d, c_d).   % e attacks d
+contrary(e, c_e).   % always attacked
 
 budget(200).
 `,
@@ -205,20 +257,32 @@ weight(b1, 70).
 weight(b2, 60).
 
 % Island 1: a1 <-> a2
-contrary(a1, a2).  % a2 attacks a1 (non-derived)
+% c_a1 <- a2 (a2 attacks a1, derived)
+head(r1, c_a1).
+body(r1, a2).
+weight(c_a1, 85).
 
-head(r1, c_a2).    % c_a2 <- a1 (a1 attacks a2 derived)
-body(r1, a1).
-weight(c_a2, 85).
-contrary(a2, c_a2).
+% c_a2 <- a1 (a1 attacks a2, derived)
+head(r2, c_a2).
+body(r2, a1).
+weight(c_a2, 82).
 
 % Island 2: b1 <-> b2 (completely separate)
-contrary(b1, b2).  % b2 attacks b1 (non-derived)
+% c_b1 <- b2 (b2 attacks b1, derived)
+head(r3, c_b1).
+body(r3, b2).
+weight(c_b1, 65).
 
-head(r2, c_b2).    % c_b2 <- b1 (b1 attacks b2 derived)
-body(r2, b1).
-weight(c_b2, 65).
-contrary(b2, c_b2).
+% c_b2 <- b1 (b1 attacks b2, derived)
+head(r4, c_b2).
+body(r4, b1).
+weight(c_b2, 62).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a1, c_a1).   % island 1: a2 attacks a1
+contrary(a2, c_a2).   % island 1: a1 attacks a2
+contrary(b1, c_b1).   % island 2: b2 attacks b1
+contrary(b2, c_b2).   % island 2: b1 attacks b2
 
 budget(100).
 `
