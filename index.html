@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WABA Playground - Interactive Framework Explorer</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- vis.js for network visualization -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
+    <script src="clingo.web.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <h1>WABA Playground</h1>
+                <p class="subtitle">Interactive Weighted Assumption-Based Argumentation Framework Explorer</p>
+            </div>
+            <div class="header-links">
+                <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                <a href="https://github.com/potassco/clingo" class="link-btn" target="_blank">
+                    <span>📖</span> Clingo Docs
+                </a>
+                <a href="README.md" class="link-btn" target="_blank">
+                    <span>ℹ️</span> About WABA
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel -->
+            <div class="left-panel">
+                <!-- Configuration Panel -->
+                <div class="config-panel">
+                    <h3>Configuration</h3>
+
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="semiring-select">Semiring (Weight Propagation)</label>
+                            <select id="semiring-select" class="select">
+                                <option value="godel">Gödel (⊗=min, ⊕=max)</option>
+                                <option value="tropical">Tropical (⊗=+, ⊕=min)</option>
+                                <option value="arctic">Arctic (⊗=+, ⊕=max)</option>
+                                <option value="lukasiewicz">Łukasiewicz (⊗=bounded sum, ⊕=bounded sum)</option>
+                                <option value="bottleneck_cost">Bottleneck (⊗=max, ⊕=min)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="monoid-select">Monoid (Cost Aggregation)</label>
+                            <select id="monoid-select" class="select">
+                                <option value="max">MAX - Maximum Cost</option>
+                                <option value="sum">SUM - Total Cost</option>
+                                <option value="min">MIN - Minimum Cost</option>
+                                <option value="count">COUNT - Number of Attacks</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="semantics-select">Semantics</label>
+                            <select id="semantics-select" class="select">
+                                <option value="stable">Stable Semantics</option>
+                                <option value="cf">Conflict-Free Semantics</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="optimize-select">Optimization</label>
+                            <select id="optimize-select" class="select">
+                                <option value="none">None (Enumerate All)</option>
+                                <option value="minimize">Minimize Cost</option>
+                                <option value="maximize">Maximize Cost</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="constraint-select">Budget Constraint</label>
+                            <select id="constraint-select" class="select">
+                                <option value="ub">Upper Bound (cost ≤ β)</option>
+                                <option value="lb">Lower Bound (quality ≥ β)</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="budget-input">Budget (β)</label>
+                            <input type="number" id="budget-input" class="select" value="100" min="0" max="1000">
+                        </div>
+                    </div>
+
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="num-models-input">Number of Models (0 = all)</label>
+                            <input type="number" id="num-models-input" class="select" value="0" min="0" max="100">
+                        </div>
+
+                        <div class="config-item">
+                            <label for="example-select">Load Example</label>
+                            <select id="example-select" class="select">
+                                <option value="">-- Select Example --</option>
+                                <option value="simple">Simple Example</option>
+                                <option value="medical">Medical Ethics</option>
+                                <option value="cybersecurity">Cybersecurity Access Control</option>
+                                <option value="legal">Legal Contract Dispute</option>
+                                <option value="scientific">Scientific Hypothesis Evaluation</option>
+                                <option value="investment">Investment Portfolio Allocation</option>
+                                <option value="network">Network Troubleshooting</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item" style="display: flex; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                                <input type="checkbox" id="flat-constraint" style="margin: 0;"> Flat-WABA Constraint
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Editor Container -->
+                <div class="editor-container">
+                    <div class="editor-header">
+                        <div class="editor-controls">
+                            <h3>Framework Definition</h3>
+                            <select id="input-mode" class="select" style="margin-left: 20px;">
+                                <option value="simple">Simple Mode (ABA)</option>
+                                <option value="advanced">Advanced Mode (ASP)</option>
+                            </select>
+                        </div>
+                        <button id="run-btn" class="run-btn">▶️ Run WABA</button>
+                    </div>
+
+                    <!-- Advanced Mode: Code Editor -->
+                    <textarea id="code-editor" class="code-editor" style="display: none;" placeholder="Enter your WABA framework here...
+Example:
+assumption(a).
+assumption(b).
+weight(a, 80).
+weight(b, 60).
+head(r1, c_a). body(r1, b).
+contrary(a, c_a).
+contrary(b, c_b)."></textarea>
+
+                    <!-- Simple Mode: Structured Input -->
+                    <div id="simple-mode" class="simple-mode">
+                        <div class="simple-grid">
+                            <div class="simple-field">
+                                <label>Assumptions (one per line)</label>
+                                <textarea id="assumptions-input" class="simple-textarea" placeholder="a
+b
+c"></textarea>
+                            </div>
+
+                            <div class="simple-field">
+                                <label>Rules (format: head <- body1, body2)</label>
+                                <textarea id="rules-input" class="simple-textarea" placeholder="c_a <- b"></textarea>
+                            </div>
+
+                            <div class="simple-field">
+                                <label>Contraries (format: (assumption, contrary))</label>
+                                <textarea id="contraries-input" class="simple-textarea" placeholder="(a, c_a)
+(b, c_b)"></textarea>
+                            </div>
+
+                            <div class="simple-field">
+                                <label>Weights (format: atom: weight)</label>
+                                <textarea id="weights-input" class="simple-textarea" placeholder="a: 80
+b: 60
+c_a: 70"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+                <!-- Graph Visualization -->
+                <div class="graph-container" id="graph-container">
+                    <div class="graph-header">
+                        <h3>Argumentation Graph</h3>
+                        <div class="graph-controls">
+                            <button id="reset-layout-btn" class="clear-btn">🔄 Reset Layout</button>
+                            <button id="fullscreen-btn" class="clear-btn">⛶ Fullscreen</button>
+                        </div>
+                    </div>
+                    <div id="cy" class="graph-canvas"></div>
+                </div>
+
+                <!-- Output Container -->
+                <div class="output-container">
+                    <div class="output-header">
+                        <h3>Results</h3>
+                        <button id="clear-btn" class="clear-btn">🗑️ Clear Output</button>
+                    </div>
+                    <div id="output" class="output"></div>
+                    <div id="stats" class="stats"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>WABA Playground | Powered by <a href="https://potassco.org/clingo/" target="_blank">Clingo</a> & <a href="https://visjs.github.io/vis-network/" target="_blank">vis.js</a></p>
+        </div>
+    </div>
+
+    <!-- Load example frameworks -->
+    <script src="examples.js"></script>
+    <!-- Load main application -->
+    <script src="app.js"></script>
+</body>
+</html>

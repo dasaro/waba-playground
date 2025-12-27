@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clingo-WASM Test</title>
+</head>
+<body>
+    <h1>Clingo-WASM API Test</h1>
+    <button onclick="testClingo()">Test Clingo</button>
+    <pre id="output"></pre>
+
+    <script src="clingo.web.js"></script>
+    <script>
+        const output = document.getElementById('output');
+
+        async function testClingo() {
+            output.textContent = 'Testing clingo-wasm...\n\n';
+
+            try {
+                // Test 1: Simple program
+                output.textContent += 'Test 1: Simple program\n';
+                const result1 = await clingo.run("a. b :- a.");
+                output.textContent += 'Result: ' + result1 + '\n\n';
+
+                // Test 2: Choice rules
+                output.textContent += 'Test 2: Choice rules\n';
+                const result2 = await clingo.run("{a; b; c}.", 0);
+                output.textContent += 'Result: ' + result2 + '\n\n';
+
+                // Test 3: WABA-like program
+                output.textContent += 'Test 3: WABA-like program\n';
+                const wabaProgram = `
+assumption(a).
+assumption(b).
+in(X) :- assumption(X), not out(X).
+out(X) :- assumption(X), not in(X).
+#show in/1.
+                `;
+                const result3 = await clingo.run(wabaProgram, 0);
+                output.textContent += 'Result: ' + result3 + '\n\n';
+
+                output.textContent += '✅ All tests passed!';
+
+            } catch (error) {
+                output.textContent += '❌ Error: ' + error.message + '\n';
+                output.textContent += 'Stack: ' + error.stack;
+            }
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            setTimeout(testClingo, 1000);
+        });
+    </script>
+</body>
+</html>

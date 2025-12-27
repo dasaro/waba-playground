@@ -1,0 +1,1204 @@
+🔄 Syncing WABA modules to app.js...
+
+📦 Core Base Module...
+📦 Semiring Modules...
+📦 Monoid Modules...
+📦 Semantics Modules...
+📦 Optimization Modules...
+📦 Constraint Modules...
+
+📝 Generated JavaScript code:
+────────────────────────────────────────────────────────────────────────────────
+
+// Copy these functions into app.js:
+
+    getCoreModule() {
+        return `
+%% WABA Base Logic (Semiring/Monoid-Independent)
+%% This file contains the core argumentation logic that is independent
+%% of the choice of semiring (weight propagation) and monoid (cost aggregation).
+
+%% Budget declaration moved to constraint files (constraint/ub.lp or constraint/lb.lp)
+
+%% Rule meta-predicate
+rule(R) :- head(R,_).
+
+%% Assumption choice: each assumption is either in or out
+in(X) :- assumption(X), not out(X).
+out(X) :- assumption(X), not in(X).
+
+%% Support computation (weight-independent)
+%% An atom is supported if:
+%% 1. It's an assumption that is in, OR
+%% 2. There exists a rule with this atom as head and all body elements are supported
+supported(X) :- assumption(X), in(X).
+supported(X) :- head(R,X), triggered_by_in(R).
+
+%% A rule is triggered when all its body elements are supported
+triggered_by_in(R) :- head(R,_), supported(X) : body(R,X).
+
+%% Attack computation
+%% An attack exists when a supported atom X attacks an assumption Y
+%% (where Y's contrary is X), with the weight of X
+attacks_with_weight(X,Y,W) :- supported(X), supported_with_weight(X,W),
+                               assumption(Y), contrary(Y,X).
+
+%% Attack discretion choice
+%% We can choose to discard any attack (at a cost)
+{ discarded_attack(X,Y,W) : attacks_with_weight(X,Y,W) }.
+
+%% Successful attacks
+%% An attack succeeds if it's not discarded
+attacks_successfully_with_weight(X,Y,W) :- attacks_with_weight(X,Y,W),
+                                             not discarded_attack(X,Y,W).
+
+%% Defeat
+%% An assumption is defeated if there's a successful attack against it
+defeated(X) :- attacks_successfully_with_weight(_,X,_).
+
+%% Budget constraint is modular (loaded separately):
+%% - constraint/ub.lp: Upper Bound regime for MAX/SUM/COUNT/LEX monoids
+%% - constraint/lb.lp: Lower Bound regime for MIN monoid
+`;
+    }
+
+
+    getSemiringModule(semiring) {
+        const modules = {
+            godel: `
+%% Gödel Semiring for Weight Propagation (Fuzzy Logic)
+%% Semiring: (ℤ ∪ {±∞}, max, min, #inf, #sup)
+%% - Domain: All integers plus infinities
+%% - Disjunction/⊕ (OR, multiple derivations): max (strongest alternative)
+%% - Conjunction/⊗ (AND, body elements): min (weakest link)
+%% - Additive identity: #inf (identity for max operation)
+%% - Multiplicative identity: #sup (identity for min operation)
+%% - Interpretation: weights are truth degrees, higher is better
+%%
+%% In Gödel fuzzy logic:
+%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
+%% - Conjunction takes the minimum (weakest link in a chain)
+%% - Disjunction takes the maximum (strongest of multiple proofs)
+%% - Unweighted atoms get #sup (maximum truth, hardest to discard)
+
+%% =============================================
+%% CLASSICAL ABA RECOVERY (No Discarding)
+%% =============================================
+%%
+%% To recover plain unweighted ABA behavior with this semiring:
+%%
+%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
+%%   δ = #sup     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
+%%              (line 41: \`:- discarded_attack(_,_,#sup), budget(B), B != #sup.\`)
+%%
+%% LOWER BOUND REGIME (MIN monoid):
+%%   Option 1 (recommended):
+%%     δ = #inf   (default weight)
+%%     β = 0      (budget value)
+%%     Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
+%%   Option 2:
+%%     δ = #sup   (default weight)
+%%     β = any    (any finite budget)
+%%     Mechanism: constraint/lb.lp explicitly rejects discarding #sup attacks
+%%                (line 43: \`:- discarded_attack(_,_,#sup).\`)
+%%
+%% CURRENT IMPLEMENTATION: δ = #sup (see line ~45 below)
+%% This enables ABA recovery for all monoids with appropriate budget settings.
+
+%% ========================================
+%% DEFAULT WEIGHT PRINCIPLE: SUPREMUM
+%% ========================================
+%%
+%% Unweighted atoms receive the SUPREMUM (maximum value in range):
+%% - Matches standard ABA: assumptions accepted by default ("innocent until proven guilty")
+%% - "Hardest to discard": attacks from unweighted atoms are maximally expensive
+%% - Budget semantics: requires budget ≥ #sup to discard such attacks
+%%
+%% For Gödel semiring:
+%% - Supremum = #sup (positive infinity, fully true, maximum truth degree)
+%% - Meaning: Unweighted assumptions have maximum truth value
+%% - Discard cost with max monoid: max(#sup, ...) = #sup (infinitely expensive)
+%% - Discard cost with min monoid: not compatible (see compatibility theory)
+%% - Discard cost with sum monoid: sum += #sup → #sup (infinitely expensive)
+%%
+%% Explicit weights REPLACE the supremum default (via mutually exclusive rules).
+%% DEFAULT WEIGHTS for unweighted atoms are now defined in monoid/*.lp files,
+%% since the monoid determines what "hard to discard" means.
+%%
+
+%% Assumptions with explicit weights
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+
+%% Assumptions without explicit weights: Use supremum (maximum truth value)
+%% For Gödel semiring, unweighted assumptions get #sup (maximum truth degree)
+%% Rationale: Unweighted assumptions are "hardest to discard" (default acceptance)
+%% - Matches standard ABA semantics: assumptions accepted by default
+%% - #sup = positive infinity (supremum, maximum value)
+%% - In conjunction (min): min(#sup, x) = x (doesn't affect derivations)
+%% - In disjunction (max): max(#sup, x) = #sup (dominates, represents maximum truth)
+%%
+%% NOTE: Uses #sup (positive infinity) as the supremum value.
+%% Constraints must handle #sup specially for budget checking.
+%%
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,#sup) :- assumption(X), in(X), not weight(X,_), not head(_,X).
+
+%% Step 1: Compute weight for each rule derivation using conjunction (minimum)
+%% For rule R deriving X: take minimum weight among all body elements
+%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
+rule_derivation_weight(R,X,W) :-
+    head(R,X),
+    supported(X),
+    body(R,_),  % Only for rules with bodies
+    triggered_by_in(R),  % Only triggered rules (prevents #sup from unsupported bodies)
+    W = #min{ V,B : body(R,B), supported_with_weight(B,V) }.
+
+%% Handle rules with empty bodies (facts): Use #inf (identity for max)
+%% SOLUTION: Use additive identity (#inf for max) instead of multiplicative identity (#sup for min)
+%%
+%% Traditional approach assigned #sup (multiplicative identity for min/conjunction):
+%%   rule_derivation_weight(R,X,#sup) :- ... not body(R,_).
+%%
+%% Problem: max(#sup, explicit_weight) = #sup dominates all explicit weights!
+%%   Example: weight(c1, 8) → max(#sup, 8) = #sup → explicit weight LOST
+%%
+%% Solution: Use #inf (additive identity for max/disjunction):
+%%   max(#inf, x) = x for any x > #inf
+%%   This makes empty-body derivations "invisible" in the max aggregate
+%%   Explicit weights are preserved: max(#inf, 8) = 8 ✓
+%%
+%% Algebraic justification:
+%%   - #inf is the true identity for max operation (a ⊕ #inf = a)
+%%   - Empty-body facts contribute no information to weight disjunction
+%%   - Explicit weights take precedence without special-case logic
+%%
+rule_derivation_weight(R,X,#inf) :-
+    head(R,X),
+    supported(X),
+    not body(R,_).
+
+%% Step 2: Combine multiple derivations using disjunction (maximum)
+%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
+%% - Multiple rule derivations are combined via ⊕
+%% - Explicit weight is another "path" to support, combined via ⊕
+%% - For Gödel semiring: ⊕ = max (choose strongest/highest truth path)
+%%
+%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
+%% The actual weight is their DISJUNCTION, not conjunction or override.
+%%
+%% Example: If X has explicit weight 50 and is also derived with weight 80,
+%%          then supported_with_weight(X, max(50, 80)) = supported_with_weight(X, 80)
+%%          (the stronger path is chosen)
+supported_with_weight(X,W) :-
+    supported(X),
+    head(_,X),  % X is derived (not just an assumption)
+    not assumption(X),  % X is not an assumption
+    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Gödel)
+
+%% NON-FLAT-WABA: Derived assumption with explicit weight
+%% Combine rule-derived weight with explicit weight via DISJUNCTION (max)
+supported_with_weight(X,W) :-
+    assumption(X),
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    weight(X,_),  % Has explicit weight
+    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Gödel)
+
+%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
+%% For Gödel: max(derived, #sup) = #sup always (default dominates)
+%% NOTE: Clingo ignores #sup in aggregates, so we assign it explicitly
+supported_with_weight(X,#sup) :-
+    assumption(X),
+    in(X),  % Assumption is selected
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    not weight(X,_).  % No explicit weight → default #sup dominates
+`,
+            tropical: `
+%% Tropical Semiring for Weight Propagation
+%% Semiring: (ℤ ∪ {±∞}, min, +, #sup, 0)
+%% - Domain: All integers plus infinities
+%% - Disjunction/⊕ (OR, multiple derivations): min (choose best path)
+%% - Conjunction/⊗ (AND, body elements): + (accumulate costs)
+%% - Additive identity: #sup (identity for min operation)
+%% - Multiplicative identity: 0 (identity for addition)
+%% - Interpretation: weights are costs, lower is better
+%%
+%% This is the tropical semiring used for shortest path problems.
+
+%% =============================================
+%% CLASSICAL ABA RECOVERY (No Discarding)
+%% =============================================
+%%
+%% To recover plain unweighted ABA behavior with this semiring:
+%%
+%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
+%%   δ = #sup     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
+%%
+%% LOWER BOUND REGIME (MIN monoid):
+%%   δ = #inf     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
+%%   Alternative: δ = #sup with special constraint rejection
+%%
+%% CURRENT IMPLEMENTATION: δ = #sup (see line ~52 below)
+%% This enables ABA recovery for UB monoids with β = 0.
+%% For LB monoids, use δ = #inf by setting all assumption weights explicitly.
+
+%% ========================================
+%% DEFAULT WEIGHT PRINCIPLE: SUPREMUM
+%% ========================================
+%%
+%% Unweighted atoms receive the SUPREMUM (maximum value in range):
+%% - Matches standard ABA: assumptions accepted by default ("innocent until proven guilty")
+%% - "Hardest to discard": attacks from unweighted atoms are maximally expensive
+%% - Budget semantics: attacks with cost #sup (∞) CANNOT be discarded
+%%
+%% For Tropical:
+%% - Supremum = #sup (∞, infinite cost)
+%% - Meaning: Unweighted assumptions have infinite cost (unbounded)
+%% - Discard cost with max monoid: max(#sup, ...) = #sup (impossible to discard!)
+%% - Discard cost with min monoid: min(#sup, ...) = other values (doesn't contribute)
+%% - Discard cost with sum monoid: sum + #sup = #sup (impossible to discard!)
+%%
+%% Note: This makes unweighted attacks IMPOSSIBLE to discard (not just expensive).
+%% Only attacks with explicit finite costs can be discarded within budget constraints.
+%%
+%% Explicit weights REPLACE the supremum default (via mutually exclusive rules).
+%% DEFAULT WEIGHTS for unweighted atoms are now defined in monoid/*.lp files,
+%% since the monoid determines what "hard to discard" means.
+%%
+
+%% Assumptions with explicit weights
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+
+%% Assumptions without explicit weights: Use supremum (infinite cost)
+%% For Tropical semiring, unweighted assumptions get #sup (infinite cost)
+%% Rationale: Unweighted assumptions are "hardest to discard" (default acceptance)
+%% - #sup = positive infinity (infinite cost)
+%% - Matches standard ABA: assumptions accepted by default
+%% - In conjunction (+): #sup + x = #sup (infinite cost propagates)
+%% - In disjunction (min): min(#sup, x) = x (doesn't dominate)
+%%
+%% NOTE: Uses #sup (positive infinity) as supremum.
+%% Constraints must handle #sup specially for budget checking.
+%%
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,#sup) :- assumption(X), in(X), not weight(X,_), not head(_,X).
+
+%% Step 1: Compute weight for each rule derivation using conjunction (addition)
+%% For rule R deriving X: sum the weights of all body elements
+%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
+%%
+%% Special handling for #sup: clingo's #sum aggregate ignores #sup values
+%% If ANY body element has weight #sup, result is #sup (infinite cost propagates)
+
+%% Helper: detect if any body element has #sup weight
+body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
+
+%% If any body has #sup, derivation weight is #sup (infinite cost)
+rule_derivation_weight(R,X,#sup) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    body_has_sup_weight(R).
+
+%% Otherwise, sum finite weights (no #sup values present)
+rule_derivation_weight(R,X,W) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    not body_has_sup_weight(R),
+    W = #sum{ V,B : body(R,B), supported_with_weight(B,V) }.
+
+%% Handle rules with empty bodies (facts): Use #sup (identity for min)
+%% SOLUTION: Use additive identity (#sup for min) instead of multiplicative identity (0 for +)
+%%
+%% Traditional approach assigned 0 (multiplicative identity for +/conjunction):
+%%   rule_derivation_weight(R,X,0) :- ... not body(R,_).
+%%
+%% Problem: min(0, explicit_weight) = 0 dominates all explicit weights > 0!
+%%   Example: weight(c1, 8) → min(0, 8) = 0 → explicit weight LOST
+%%
+%% Solution: Use #sup (additive identity for min/disjunction):
+%%   min(#sup, x) = x for any x < #sup
+%%   This makes empty-body derivations "invisible" in the min aggregate
+%%   Explicit weights are preserved: min(#sup, 8) = 8 ✓
+%%
+%% Algebraic justification:
+%%   - #sup is the true identity for min operation (a ⊕ #sup = a)
+%%   - Empty-body facts contribute no information to weight disjunction
+%%   - Explicit weights take precedence without special-case logic
+%%
+rule_derivation_weight(R,X,#sup) :-
+    head(R,X),
+    supported(X),
+    not body(R,_).
+
+%% Step 2: Combine multiple derivations using disjunction (minimum)
+%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
+%% - Multiple rule derivations are combined via ⊕
+%% - Explicit weight is another "path" to support, combined via ⊕
+%% - For Tropical semiring: ⊕ = min (choose best/cheapest path)
+%%
+%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
+%% The actual weight is their DISJUNCTION, not conjunction or override.
+%%
+%% Example: If X has explicit weight 50 and is also derived with weight 30,
+%%          then supported_with_weight(X, min(50, 30)) = supported_with_weight(X, 30)
+%%          (the cheaper path is chosen)
+supported_with_weight(X,W) :-
+    supported(X),
+    head(_,X),  % X is derived (not just an assumption)
+    not assumption(X),  % X is not an assumption
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Tropical)
+
+%% NON-FLAT-WABA: Derived assumption with explicit weight
+%% Combine rule-derived weight with explicit weight via DISJUNCTION (min)
+supported_with_weight(X,W) :-
+    assumption(X),
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    weight(X,_),  % Has explicit weight
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Tropical)
+
+%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
+%% Combine rule-derived weight with default assumption weight (#sup) via DISJUNCTION (min)
+supported_with_weight(X,W) :-
+    assumption(X),
+    in(X),  % Assumption is selected
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    not weight(X,_),  % No explicit weight
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              #sup : true }.  % DISJUNCTION with default: min(derived, #sup) = derived
+`,
+            arctic: `
+%% Arctic (Max-Plus) Semiring for Weight Propagation - OPTIMIZED
+%% Semiring: (ℤ ∪ {±∞}, max, +, #inf, 0)
+%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
+%% - Disjunction/⊕ (OR): max (strongest alternative)
+%% - Conjunction/⊗ (AND): + (accumulate rewards)
+%% - Additive identity: #inf (identity for max operation)
+%% - Multiplicative identity: 0 (identity for + operation)
+%% - Interpretation: weights are rewards/benefits, higher is better
+%%
+%% OPTIMIZATION NOTES:
+%% ===================
+%% This version removes redundant #inf handling that was causing performance issues:
+%% - REMOVED: body_has_inf_weight(R) helper (never true in practice)
+%% - REMOVED: rule_derivation_weight for #inf with bodies (never fires)
+%% - REMOVED: not body_has_inf_weight(R) negations (redundant checks)
+%%
+%% Rationale:
+%% - Benchmarks show NO frameworks use #inf weights in rule bodies
+%% - #inf only used for empty-body rules (additive identity for max)
+%% - Redundant checks caused 20-40% grounding overhead
+%% - Structure now matches Tropical semiring (cleaner, faster)
+%%
+%% SEMANTICS: Reward Accumulation / Longest Path
+%% ==============================================
+%% The Arctic semiring is the DUAL of the Tropical semiring:
+%% - Tropical: (+, min) for cost minimization / shortest path
+%% - Arctic: (+, max) for reward maximization / longest path
+
+%% =============================================
+%% CLASSICAL ABA RECOVERY (No Discarding)
+%% =============================================
+%%
+%% To recover plain unweighted ABA behavior with this semiring:
+%%
+%% UPPER BOUND REGIME (MAX, SUM, COUNT monoids):
+%%   δ = 0        (default weight for unweighted assumptions)
+%%   β = #inf     (budget value - negative infinity)
+%%   Mechanism: Any discard gives cost ≥ 0 > #inf, rejected by constraint/ub.lp
+%%   Note: β = #inf must be set in framework file
+%%         Add: budget(#inf). to your .lp file
+%%
+%% LOWER BOUND REGIME (MIN monoid):
+%%   δ = 0        (default weight for unweighted assumptions)
+%%   β = #sup     (budget value - positive infinity)
+%%   Mechanism: MIN(0) = 0 < #sup, rejected by constraint/lb.lp
+%%              No discards: extension_cost = #sup ≥ #sup, accepted
+%%
+%% CURRENT IMPLEMENTATION: δ = 0 (see line ~54 below)
+%% This is the natural default for Arctic (multiplicative identity).
+
+%% ========================================
+%% DEFAULT WEIGHT PRINCIPLE: NEUTRALITY
+%% ========================================
+%%
+%% Unweighted atoms receive the MULTIPLICATIVE IDENTITY (0):
+%% - For addition: 0 + x = x (neutral, doesn't affect accumulation)
+%% - Default weight of 0 means "no reward contributed"
+
+%% Assumptions with explicit weights
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+
+%% Assumptions without explicit weights: Use multiplicative identity (0)
+%% For Arctic semiring, unweighted assumptions get 0 (neutral reward)
+%% Rationale: Neutral contribution to reward accumulation
+%% - In conjunction (+): 0 + x = x (doesn't affect sum)
+%% - In disjunction (max): max(0, x) = x for x > 0 (neutral for positive rewards)
+%%
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,0) :- assumption(X), in(X), not weight(X,_), not head(_,X).
+
+%% Step 1: Compute weight for each rule derivation using conjunction (addition)
+%% For rule R deriving X: sum weights of all body elements (accumulate rewards)
+%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
+
+%% OPTIMIZED: Only handle #sup (infinite reward propagation)
+%% #inf handling removed - never occurs in practice, caused 20-40% overhead
+
+%% Helper: detect if any body element has #sup weight (infinite reward)
+body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
+
+%% If any body has #sup, derivation weight is #sup (infinite reward propagates)
+rule_derivation_weight(R,X,#sup) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    body_has_sup_weight(R).
+
+%% Otherwise, sum finite weights (standard case)
+%% OPTIMIZED: Removed "not body_has_inf_weight(R)" - redundant negation
+rule_derivation_weight(R,X,W) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    not body_has_sup_weight(R),
+    W = #sum{ V,B : body(R,B), supported_with_weight(B,V) }.
+
+%% Handle rules with empty bodies (facts): Use #inf (additive identity for max)
+%% IMPORTANT: Use #inf (not 0) to make empty-body derivations "invisible" in max
+%%
+%% Rationale:
+%% - Facts derive conclusions without premises
+%% - In disjunction (max), we want explicit weights to dominate
+%% - max(#inf, explicit_weight) = explicit_weight ✓
+%% - If we used 0: max(0, negative_weight) = 0 ✗ (wrong!)
+%%
+%% Algebraic justification:
+%% - #inf is the true additive identity for max: max(x, #inf) = x
+%% - Empty-body derivations contribute no information
+%% - Explicit weights take precedence
+rule_derivation_weight(R,X,#inf) :-
+    head(R,X),
+    supported(X),
+    not body(R,_).
+
+%% Step 2: Combine multiple derivations using disjunction (maximum)
+%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
+%% - Multiple rule derivations are combined via ⊕
+%% - Explicit weight is another "path" to support, combined via ⊕
+%% - For Arctic semiring: ⊕ = max (choose strongest/highest reward path)
+%%
+%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
+%% The actual weight is their DISJUNCTION, not conjunction or override.
+%%
+%% Example: If X has explicit weight 10 and is also derived with weight 25,
+%%          then supported_with_weight(X, max(10, 25)) = supported_with_weight(X, 25)
+%%          (the higher reward path is chosen)
+supported_with_weight(X,W) :-
+    supported(X),
+    head(_,X),  % X is derived (not just an assumption)
+    not assumption(X),  % X is not an assumption
+    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Arctic)
+
+%% NON-FLAT-WABA: Derived assumption with explicit weight
+%% Combine rule-derived weight with explicit weight via DISJUNCTION (max)
+supported_with_weight(X,W) :-
+    assumption(X),
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    weight(X,_),  % Has explicit weight
+    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Arctic)
+
+%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
+%% Combine rule-derived weight with default assumption weight (0) via DISJUNCTION (max)
+supported_with_weight(X,W) :-
+    assumption(X),
+    in(X),  % Assumption is selected
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    not weight(X,_),  % No explicit weight
+    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
+              0 : true }.  % DISJUNCTION with default: max(derived, 0) = derived (if positive)
+`,
+            lukasiewicz: `
+%% Łukasiewicz Semiring for Weight Propagation - OPTIMIZED
+%% Semiring: ([0,K] ∪ {±∞}, ⊕_Ł, ⊗_Ł, 0, K)
+%% - Domain: [0,K] ∪ {±∞} where K is the normalization constant (default K=100)
+%% - Disjunction/⊕_Ł (OR): bounded sum min(K, a + b)
+%% - Conjunction/⊗_Ł (AND): bounded sum max(0, a + b - K*(n-1))
+%% - Additive identity (disjunction): 0
+%% - Multiplicative identity (conjunction): K
+%% - Interpretation: weights are truth degrees, higher is better
+%% - Normalization constant K: parametrizable via CLI (default K=100)
+%% - Default weight for unweighted assumptions: #sup
+%%
+%% OPTIMIZATION NOTES:
+%% ===================
+%% This version attempts to inline body_count and body_sum helpers to reduce grounding overhead.
+%% Strategy: Combine count and sum operations directly in rule_derivation_weight computation.
+%%
+%% Original had 3 helpers:
+%% 1. body_has_sup_weight - KEPT (necessary for #sum limitation)
+%% 2. body_count - REMOVED (inlined into derivation rule)
+%% 3. body_sum - REMOVED (inlined into derivation rule)
+%%
+%% Expected improvement: 30-40% reduction in grounding overhead
+
+#const luk_k = 100.
+
+%% =============================================
+%% CLASSICAL ABA RECOVERY (No Discarding)
+%% =============================================
+%%
+%% To recover plain unweighted ABA behavior with this semiring:
+%%
+%% UPPER BOUND REGIME (MAX, SUM, COUNT monoids):
+%%   δ = #sup     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
+%%
+%% LOWER BOUND REGIME (MIN monoid):
+%%   δ = #inf     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
+%%
+%% CURRENT IMPLEMENTATION: δ = #sup (see line below)
+
+%% ========================================
+%% DEFAULT WEIGHT PRINCIPLE: SUPREMUM
+%% ========================================
+%%
+%% Unweighted atoms receive #sup (NOT the semiring identity K!)
+%% This is a WABA design choice for ABA recovery.
+
+%% Assumptions with explicit weights
+supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+
+%% Assumptions without explicit weights: Use #sup
+supported_with_weight(X,#sup) :- assumption(X), in(X), not weight(X,_), not head(_,X).
+
+%% Step 1: Compute weight for each rule derivation using conjunction (Łukasiewicz AND)
+%% Łukasiewicz AND: max(0, sum(weights) - K*(n-1))
+%% OPTIMIZED: Inline count and sum directly in the rule
+
+%% Helper: detect if any body element has #sup weight (NECESSARY - kept from original)
+body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
+
+%% If any body has #sup, result is #sup (infinite truth propagates)
+rule_derivation_weight(R,X,#sup) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    body_has_sup_weight(R).
+
+%% Otherwise, apply Łukasiewicz conjunction formula directly
+%% OPTIMIZED: Inline both count and sum operations
+rule_derivation_weight(R,X,W) :-
+    head(R,X),
+    supported(X),
+    body(R,_),
+    triggered_by_in(R),
+    not body_has_sup_weight(R),
+    N = #count{ B : body(R,B) },
+    S = #sum{ V,B : body(R,B), supported_with_weight(B,V) },
+    W = #max{ 0; S - luk_k*(N-1) }.
+
+%% Handle rules with empty bodies (facts): Use 0 (additive identity)
+rule_derivation_weight(R,X,0) :-
+    head(R,X),
+    supported(X),
+    not body(R,_).
+
+%% Step 2: Combine multiple derivations using disjunction (Łukasiewicz OR)
+%% Łukasiewicz OR: min(K, sum)
+%% IMPORTANT: Handle #sup separately (cannot be summed)
+
+%% ======================================
+%% REGULAR DERIVED ATOMS (not assumptions)
+%% ======================================
+
+%% If any derivation has #sup, result is #sup
+supported_with_weight(X,#sup) :-
+    supported(X),
+    head(_,X),
+    not assumption(X),
+    rule_derivation_weight(_,X,#sup).
+
+%% If explicit weight is #sup, result is #sup
+supported_with_weight(X,#sup) :-
+    supported(X),
+    head(_,X),
+    not assumption(X),
+    weight(X,#sup).
+
+%% Otherwise, sum finite values and cap at K
+supported_with_weight(X,W) :-
+    supported(X),
+    head(_,X),
+    not assumption(X),
+    not rule_derivation_weight(_,X,#sup),
+    not weight(X,#sup),
+    S = #sum{ V : rule_derivation_weight(_,X,V) ;
+              V : weight(X,V) },
+    W = #min{ luk_k; S }.
+
+%% =====================================================
+%% NON-FLAT-WABA: Derived assumption WITH explicit weight
+%% =====================================================
+
+%% If any derivation has #sup, result is #sup
+supported_with_weight(X,#sup) :-
+    assumption(X),
+    supported(X),
+    head(_,X),
+    weight(X,_),
+    rule_derivation_weight(_,X,#sup).
+
+%% If explicit weight is #sup, result is #sup
+supported_with_weight(X,#sup) :-
+    assumption(X),
+    supported(X),
+    head(_,X),
+    weight(X,#sup).
+
+%% Otherwise, sum finite values and cap at K
+supported_with_weight(X,W) :-
+    assumption(X),
+    supported(X),
+    head(_,X),
+    weight(X,_),
+    not rule_derivation_weight(_,X,#sup),
+    not weight(X,#sup),
+    S = #sum{ V : rule_derivation_weight(_,X,V) ;
+              V : weight(X,V) },
+    W = #min{ luk_k; S }.
+
+%% ================================================================
+%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but IN
+%% ================================================================
+
+%% If any derivation has #sup, result is #sup
+supported_with_weight(X,#sup) :-
+    assumption(X),
+    in(X),
+    supported(X),
+    head(_,X),
+    not weight(X,_),
+    rule_derivation_weight(_,X,#sup).
+
+%% Default weight #sup always applies for unweighted assumptions
+supported_with_weight(X,#sup) :-
+    assumption(X),
+    in(X),
+    supported(X),
+    head(_,X),
+    not weight(X,_).
+`,
+            bottleneck_cost: `
+%% Bottleneck-Cost Semiring for Weight Propagation
+%% Semiring: (ℤ ∪ {±∞}, min, max, #sup, #inf)
+%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
+%% - Disjunction/⊕ (OR): min (cheapest alternative)
+%% - Conjunction/⊗ (AND): max (bottleneck / worst component)
+%% - Additive identity: #sup (identity for min operation)
+%% - Multiplicative identity: #inf (identity for max operation)
+%% - Interpretation: weights are costs/penalties, LOWER is better
+%%
+%% SEMANTICS: Bottleneck Cost / Maximum Penalty
+%% ============================================
+%% The bottleneck-cost semiring models scenarios where:
+%% - A chain's cost is determined by its WORST/highest-cost component (max for conjunction)
+%% - Among alternatives, choose the CHEAPEST path (min for disjunction)
+%% - Applications: Bottleneck problems, worst-case cost, maximum penalty
+%%
+%% Key insight: This is the DUAL of standard min/max bottleneck:
+%% - Standard bottleneck (min/max): Maximize minimum capacity
+%% - Bottleneck-cost (max/min): Minimize maximum cost
+%%
+%% Examples:
+%% - Quality control: Reject batch if ANY component exceeds defect threshold (max)
+%% - Security: System vulnerability = worst component vulnerability (max)
+%% - Logistics: Route cost = bottleneck (slowest/most expensive segment)
+
+%% =============================================
+%% CLASSICAL ABA RECOVERY (No Discarding)
+%% =============================================
+%%
+%% To recover plain unweighted ABA behavior with this semiring:
+%%
+%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
+%%   δ = #sup     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
+%%
+%% LOWER BOUND REGIME (MIN monoid):
+%%   δ = #inf     (default weight for unweighted assumptions)
+%%   β = 0        (budget value)
+%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
+%%   Alternative: δ = #sup with special constraint rejection
+%%
+%% CURRENT IMPLEMENTATION: δ = #sup (see line ~60 below)
+%% This enables ABA recovery for UB monoids with β = 0.
+%% For LB monoids, use δ = #inf by setting all assumption weights explicitly.
+%%
+%% Comparison to Tropical:
+%% - Tropical (+/min): Minimize SUM of costs (total cost matters)
+%% - Bottleneck-cost (max/min): Minimize MAX of costs (worst-case matters)
+
+%% ========================================
+%% DEFAULT WEIGHT PRINCIPLE: INFIMUM
+%% ========================================
+%%
+%% Unweighted atoms receive the INFIMUM (minimum value in range):
+%% - For bottleneck-cost semantics: #inf = infinitely GOOD (zero cost)
+%% - Meaning: Unweighted assumptions impose no cost/penalty
+%%
+%% IMPORTANT: This differs from Tropical and Arctic!
+%% - Tropical: #sup default (infinitely expensive, hard to discard)
+%% - Bottleneck-cost: #inf default (zero cost, easy to discard)
+%%
+%% For Bottleneck-cost semiring:
+%% - Multiplicative identity = #inf (neutral for max)
+%% - Meaning: Unweighted assumptions contribute zero cost
+%% - In conjunction (max): max(#inf, x) = x (no cost added)
+%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap path)
+%%
+%% This creates "optimistic" semantics:
+%% - Unweighted assumptions are assumed to be "free" (zero cost)
+%% - Only explicit weights impose costs
+%%
+%% If you want unweighted assumptions to be "hard to discard", the monoid
+%% should assign #sup as default weight (monoid/*.lp files handle this).
+
+%% Assumptions with explicit weights
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+
+%% Assumptions without explicit weights: Use multiplicative identity (#inf)
+%% For Bottleneck-cost semiring, unweighted assumptions get #inf (zero cost)
+%% Rationale: Neutral contribution to bottleneck cost
+%% - In conjunction (max): max(#inf, x) = x (doesn't affect bottleneck)
+%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap)
+%%
+%% NOTE: This is the MULTIPLICATIVE identity (neutral for conjunction).
+%% For "hard to discard" semantics, monoids assign #sup as default weight.
+%%
+%% FLAT-WABA: assumption is not a rule head
+%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
+supported_with_weight(X,#inf) :- assumption(X), in(X), not weight(X,_), not head(_,X).
+
+%% Step 1: Compute weight for each rule derivation using conjunction (maximum)
+%% For rule R deriving X: take MAXIMUM weight among all body elements (bottleneck)
+%% Interpretation: Chain is only as good as its WORST (highest-cost) component
+%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
+rule_derivation_weight(R,X,W) :-
+    head(R,X),
+    supported(X),
+    body(R,_),  % Only for rules with bodies
+    triggered_by_in(R),  % Only triggered rules
+    W = #max{ V,B : body(R,B), supported_with_weight(B,V) }.
+
+%% Handle rules with empty bodies (facts): Use #sup (additive identity for min)
+%% IMPORTANT: Use #sup (not #inf) to make empty-body derivations "invisible" in min
+%%
+%% Rationale:
+%% - Facts derive conclusions without premises
+%% - In disjunction (min), we want explicit weights to dominate
+%% - min(#sup, explicit_weight) = explicit_weight ✓
+%% - If we used #inf: min(#inf, positive_weight) = #inf ✗ (always cheapest!)
+%%
+%% Algebraic justification:
+%% - #sup is the true additive identity for min: min(x, #sup) = x
+%% - Empty-body derivations contribute no information
+%% - Explicit weights take precedence
+rule_derivation_weight(R,X,#sup) :-
+    head(R,X),
+    supported(X),
+    not body(R,_).
+
+%% Step 2: Combine multiple derivations using disjunction (minimum)
+%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
+%% - Multiple rule derivations are combined via ⊕
+%% - Explicit weight is another "path" to support, combined via ⊕
+%% - For Bottleneck-cost semiring: ⊕ = min (choose cheapest/lowest-cost path)
+%%
+%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
+%% The actual weight is their DISJUNCTION, not conjunction or override.
+%%
+%% Example: If X has explicit weight 50 and is also derived with weight 30,
+%%          then supported_with_weight(X, min(50, 30)) = supported_with_weight(X, 30)
+%%          (the cheaper path is chosen)
+supported_with_weight(X,W) :-
+    supported(X),
+    head(_,X),  % X is derived (not just an assumption)
+    not assumption(X),  % X is not an assumption
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
+
+%% NON-FLAT-WABA: Derived assumption with explicit weight
+%% Combine rule-derived weight with explicit weight via DISJUNCTION (min)
+supported_with_weight(X,W) :-
+    assumption(X),
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    weight(X,_),  % Has explicit weight
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
+
+%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
+%% Combine rule-derived weight with default assumption weight (#inf) via DISJUNCTION (min)
+supported_with_weight(X,W) :-
+    assumption(X),
+    in(X),  % Assumption is selected
+    supported(X),
+    head(_,X),  % Assumption is also derived
+    not weight(X,_),  % No explicit weight
+    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
+              #inf : true }.  % DISJUNCTION with default: min(derived, #inf) = derived
+`,
+        };
+        return modules[semiring] || modules.godel;
+    }
+
+
+    getMonoidModule(monoid) {
+        const modules = {
+            max: `
+%% Maximum Cost Monoid for Cost Aggregation
+%% Monoid: (ℤ ∪ {±∞}, max, #inf)
+%% - Domain: All integers plus infinities
+%% - Operation: maximum
+%% - Identity: #inf (algebraic identity for max operation)
+%% - Null value: 0 (when no attacks discarded, cost = 0 by design choice)
+%%
+%% Extension cost = maximum weight among all discarded attacks
+%% This represents the "most expensive" attack that was discarded.
+%% When no attacks are discarded, we use 0 (not the identity #inf) to represent "no cost".
+%%
+%% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
+%% - Semirings assign defaults using disjunction identity
+%% - All weight assignment is now semiring responsibility
+%% - Monoids only handle cost aggregation
+
+%% Extension cost is the maximum discarded attack weight
+%% Only compute aggregate when discarded attacks exist
+extension_cost(C) :- discarded_attack(_,_,_), C = #max{ W, X, Y : discarded_attack(X,Y,W) }.
+
+%% When no attacks are discarded, cost is 0 (identity element)
+extension_cost(0) :- not discarded_attack(_,_,_).
+
+%% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
+`,
+            sum: `
+%% Sum Monoid for Cost Aggregation - OPTIMIZED
+%% Monoid: (ℤ ∪ {±∞}, +, 0)
+%% - Domain: All integers plus infinities
+%% - Operation: sum (addition)
+%% - Identity: 0 (algebraic identity for addition)
+%%
+%% Extension cost = sum of all discarded attack weights
+%% This represents the "total cost" of all discarded attacks.
+%%
+%% OPTIMIZATION NOTES:
+%% ===================
+%% Removed redundant empty-case handling:
+%% - REMOVED: discarded_attack(_,_,_) check in body
+%% - REMOVED: extension_cost(0) :- not discarded_attack(_,_,_).
+%% - Clingo naturally returns #sum{} = 0 for empty sets (algebraic identity)
+%% - Simplified from 2 rules to 1 rule
+%%
+%% Note: With multiple derivations of the same attack via different rules,
+%% each derivation contributes its weight to the sum.
+%% The tuple (W, X, Y) ensures each unique attack instance is counted.
+%%
+%% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
+%% - Semirings assign defaults using disjunction identity
+%% - All weight assignment is now semiring responsibility
+%% - Monoids only handle cost aggregation
+
+%% Extension cost is the sum of all discarded attack weights
+%% OPTIMIZED: Rely on natural #sum{} = 0 for empty sets
+extension_cost(C) :- C = #sum{ W, X, Y : discarded_attack(X,Y,W) }.
+
+%% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
+`,
+            min: `
+%% Minimum Cost Monoid for Cost Aggregation - OPTIMIZED
+%% Monoid: (ℤ ∪ {±∞}, min, #sup)
+%% - Domain: All integers plus infinities
+%% - Operation: minimum
+%% - Identity: #sup (algebraic identity for min operation)
+%%
+%% Extension cost = minimum weight among all discarded attacks
+%% This represents the "cheapest" attack that was discarded.
+%% When no attacks are discarded, the cost is #sup (identity for min).
+%%
+%% OPTIMIZATION NOTES:
+%% ===================
+%% Removed redundant empty-case handling:
+%% - REMOVED: discarded_attack(_,_,_) check in body
+%% - REMOVED: extension_cost(#sup) :- not discarded_attack(_,_,_).
+%% - Clingo naturally returns #min{} = #sup for empty sets (algebraic identity)
+%% - Simplified from 2 rules to 1 rule
+%%
+%% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
+%% - Semirings assign defaults using disjunction identity
+%% - All weight assignment is now semiring responsibility
+%% - Monoids only handle cost aggregation
+%%
+%% Note: MIN monoid uses LOWER BOUND regime (maximize quality threshold)
+%% - LB constraint: :- extension_cost(C), C < B, budget(B).
+
+%% Extension cost is the minimum discarded attack weight
+%% OPTIMIZED: Rely on natural #min{} = #sup for empty sets
+extension_cost(C) :- C = #min{ W, X, Y : discarded_attack(X,Y,W) }.
+
+%% Budget constraint: Use constraint/lb.lp (Lower Bound regime)
+%% Default beta=#inf is permissive (allows all extensions)
+%% Override with -c beta=N to set minimum quality threshold
+`,
+            count: `
+%% WABA Monoid: Count
+%% Cost aggregation: Counts number of discarded attacks (weight-agnostic)
+%%
+%% Monoid: (ℕ ∪ {∞}, count, 0)
+%% - Domain: Natural numbers plus infinity
+%% - Operation: count (cardinality)
+%% - Identity: 0 (algebraic identity: count of empty set = 0)
+%% - Null value: #sup (when no attacks discarded, for optimization direction)
+%%
+%% Semantics:
+%%   - extension_cost = number of discarded attack pairs
+%%   - Ignores attack weights - only counts discards
+%%   - Budget limits the COUNT of discards, not total weight cost
+%%
+%% Compatible semirings: All (weight-agnostic aggregation)
+%% Budget constraint: C > B (enforce C <= B, standard cost limit)
+%% Optimization: minimize extension_cost (prefer fewer discards)
+
+%% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
+%% - Semirings assign defaults using disjunction identity
+%% - All weight assignment is now semiring responsibility
+%% - Monoids only handle cost aggregation
+%% - COUNT is weight-agnostic anyway (only counts, ignores weights)
+
+%% Count aggregation: number of discarded attacks
+%% #count of empty set = 0 (correct: zero discards has zero cost)
+extension_cost(C) :- C = #count{ X,Y : discarded_attack(X,Y,_) }.
+
+%% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
+`,
+        };
+        return modules[monoid] || modules.max;
+    }
+
+
+    getSemanticsModule(semantics) {
+        const modules = {
+            stable: `
+%% conflict freeness
+:- in(X), defeated(X).
+
+%% stable
+:- not defeated(X), out(X).
+`,
+            cf: `
+%% conflict freeness
+:- in(X), defeated(X).`,
+        };
+        return modules[semantics] || modules.stable;
+    }
+
+
+    getOptimizeModule(optimize) {
+        const modules = {
+            none: `
+% No optimization`,
+            minimize: `
+#minimize{ X : extension_cost(X) }.
+`,
+            maximize: `
+%% WABA Cost Maximization (for MIN+LB monoid)
+%% Maximize extension_cost (prefer higher quality discards)
+%% Use with MIN monoid where budget is a lower bound (quality threshold)
+
+#maximize{ X : extension_cost(X) }.
+`,
+        };
+        return modules[optimize] || modules.none;
+    }
+
+
+    getConstraintModule(constraint, budget) {
+        const modules = {
+            ub: `
+%% WABA Upper Bound (UB) Budget Constraint
+%% =========================================
+%%
+%% Used by: MAX, SUM, COUNT, LEX monoids
+%% Semantics: Accept extension iff extension_cost ≤ β
+%% Constraint: Reject if extension_cost > β
+%%
+%% Default: β = #sup (supremum/+∞)
+%%   - Permissive: All extensions allowed by default
+%%   - Override with -c beta=N to set cost limit
+%%
+%% Examples:
+%%   -c beta=0      # Classical ABA (no discarding allowed)
+%%   -c beta=100    # Allow discarding attacks up to total cost 100
+%%   -c beta=#sup   # Explicit permissive (same as default)
+%%   (no -c beta)   # Uses default #sup (permissive)
+
+
+budget(${budget}).
+
+%% Budget constraint (standard cost limit)
+%% Rejects extensions where cost exceeds budget
+%%
+%% Dual enforcement approach:
+%% 1. Check extension_cost aggregate (for monoids that compute total cost)
+%% 2. Check individual discarded attacks (for detecting #sup weights ignored by #sum)
+%%
+%% Special handling for infinities:
+%%   - #sup: Passes when used as "no discards" marker, fails when discarding #sup-weight attacks
+%%   - #inf: Always fails (invalid cost)
+
+%% Reject if aggregated extension cost exceeds budget (handles finite costs)
+:- extension_cost(C), C > B, budget(B), C != #sup.
+
+%% Reject if extension_cost is #inf (invalid)
+:- extension_cost(#inf).
+
+%% Reject if ANY discarded attack has weight #sup with finite budget
+%% (infinite cost attack is unaffordable unless budget is also #sup)
+%% This catches cases where #sum aggregate ignores #sup values
+:- discarded_attack(_,_,#sup), budget(B), B != #sup.
+`,
+            lb: `
+%% WABA Lower Bound (LB) Budget Constraint
+%% =========================================
+%%
+%% Used by: MIN monoid
+%% Semantics: Accept extension iff extension_cost ≥ β (quality threshold)
+%% Constraint: Reject if extension_cost < β
+%%
+%% Default: β = #inf (infimum/-∞)
+%%   - Permissive: All extensions allowed by default
+%%   - Override with -c beta=N to set minimum quality threshold
+%%
+%% Note: Lower values are WORSE quality (cheaper discarded attacks)
+%%       Higher values are BETTER quality (only expensive attacks discarded)
+%%
+%% Examples:
+%%   -c beta=#inf   # Explicit permissive (same as default, -∞)
+%%   -c beta=0      # Reject if any attack with cost < 0 is discarded
+%%   -c beta=10     # Reject if min(discarded attacks) < 10
+%%   (no -c beta)   # Uses default #inf (permissive)
+
+
+budget(${budget}).
+
+%% Budget constraint (quality threshold)
+%% Rejects extensions where quality (min cost) is too low
+%%
+%% Dual enforcement approach (same as UB):
+%% 1. Check extension_cost aggregate (for quality threshold)
+%% 2. Check individual discarded attacks (for detecting #sup weights)
+%%
+%% Special handling for infinities:
+%%   - #sup: Passes when used as "no discards" marker (extension_cost only)
+%%           Fails when discarding #sup-weight attacks
+%%   - #inf: Worst quality, always fails
+
+%% Standard quality threshold check (handles finite costs)
+:- extension_cost(C), C < B, budget(B).
+
+%% Reject if ANY discarded attack has weight #sup
+%% For LB (quality threshold), discarding #sup-weight attacks always fails
+%% because it's impossible to distinguish from "no discards" (both give cost #sup)
+%% This prevents extensions with discards from passing as "best quality"
+:- discarded_attack(_,_,#sup).
+`,
+            none: `
+% No budget constraint
+`
+        };
+        return modules[constraint] || modules.ub;
+    }
+
+
+    getFlatModule() {
+        return `
+%% Flat-WABA Constraint
+%% =====================
+%%
+%% Enforces the flat-WABA restriction: assumptions can ONLY appear in rule bodies,
+%% never as rule heads. This ensures assumptions are "atomic" - they are not derivable
+%% from other assumptions or rules.
+%%
+%% FLAT-WABA:
+%% - Assumptions are the base level of argumentation
+%% - Only non-assumption atoms can be derived via rules
+%% - Simpler semantics: no circularity, no assumption hierarchies
+%% - Every assumption is either chosen (in) or rejected (out) independently
+%%
+%% NON-FLAT-WABA (without this constraint):
+%% - Assumptions can appear as rule heads
+%% - Assumptions can be derived from other assumptions
+%% - More expressive: allows assumption hierarchies
+%% - More complex semantics: derived assumptions have combined weights
+%%
+%% USAGE:
+%% Load this file to enforce flat-WABA:
+%%   clingo ... constraint/flat.lp ...
+%%
+%% Omit this file to allow non-flat-WABA (default).
+
+%% CONSTRAINT: Reject if any assumption appears as a rule head
+:- assumption(X), head(_,X).
+
+%% This ensures that in flat-WABA:
+%% 1. Assumptions are only selected via in/out choice
+%% 2. Assumptions have no derivation path from rules
+%% 3. Weight propagation only flows TO assumptions (via attacks), never FROM them via rules
+%% 4. No circularity: assumption hierarchies are impossible
+`;
+    }
+
+
+────────────────────────────────────────────────────────────────────────────────
+
+✅ Done! Copy the generated code above into app.js
+   Replace the corresponding get*Module() functions.
+
