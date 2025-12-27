@@ -16,11 +16,20 @@
             locateFile: function(path) {
                 // For WASM files, use absolute URL (critical for GitHub Pages project repos)
                 if (path.endsWith('.wasm') || path.endsWith('.worker.js')) {
-                    // Use full absolute URL to handle Web Worker context correctly
+                    // HARDCODED for GitHub Pages project repo (most reliable)
+                    // Change this if deploying elsewhere
+                    const isGitHubPages = window.location.hostname === 'dasaro.github.io';
+                    if (isGitHubPages) {
+                        const fullUrl = 'https://dasaro.github.io/waba-playground/' + path;
+                        console.log('[Module.locateFile] GitHub Pages mode:', path, '→', fullUrl);
+                        return fullUrl;
+                    }
+
+                    // Fallback for local development
                     const currentUrl = window.location.href;
                     const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
                     const fullUrl = baseUrl + path;
-                    console.log('[Module.locateFile] Resolving:', path, '→', fullUrl);
+                    console.log('[Module.locateFile] Local mode:', path, '→', fullUrl);
                     return fullUrl;
                 }
                 console.log('[Module.locateFile] Passthrough:', path);
