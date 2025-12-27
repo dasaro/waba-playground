@@ -649,8 +649,10 @@ class WABAPlayground {
 
         const graphMode = this.graphModeSelect.value;
 
-        if (graphMode === 'assumption') {
-            await this.updateGraphAssumptionLevel(frameworkCode);
+        if (graphMode === 'assumption-direct') {
+            await this.updateGraphAssumptionLevelDirect(frameworkCode);
+        } else if (graphMode === 'assumption-branching') {
+            await this.updateGraphAssumptionLevelBranching(frameworkCode);
         } else {
             await this.updateGraphStandard(frameworkCode);
         }
@@ -907,8 +909,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Store framework code for edge click handler
+            // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
+            this.currentGraphMode = 'standard';
 
             // Update banner with isolated assumptions
             this.updateIsolatedAssumptionsOverlay();
@@ -931,7 +934,165 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         }
     }
 
-    async updateGraphAssumptionLevel(frameworkCode) {
+    async updateGraphAssumptionLevelDirect(frameworkCode) {
+        if (!this.clingoReady) {
+            return;
+        }
+
+        try {
+            // Parse framework to extract assumptions, contraries, rules, and weights
+            const assumptions = this.parseAssumptions(frameworkCode);
+            const contraries = this.parseContraries(frameworkCode);
+            const rules = this.parseRules(frameworkCode);
+            const weights = this.parseWeights(frameworkCode);
+
+            // Build vis.js nodes (one per assumption)
+            const visNodes = [];
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+            assumptions.forEach(assumption => {
+                const weight = weights[assumption] || '?';
+                const nodeColor = {
+                    border: '#7c3aed',
+                    background: '#8b5cf6',
+                    highlight: {
+                        border: '#6d28d9',
+                        background: '#7c3aed'
+                    }
+                };
+
+                visNodes.push({
+                    id: assumption,
+                    label: assumption,
+                    size: 20,
+                    color: nodeColor,
+                    title: `Assumption: ${assumption}\nWeight: ${weight}`,
+                    font: {
+                        color: isDark ? '#f1f5f9' : '#1e293b'
+                    },
+                    isAssumption: true
+                });
+            });
+
+            // Build vis.js edges (attacks between assumptions) - DIRECT MODE
+            const visEdges = [];
+
+            // For each contrary relationship, determine how the contrary can be supported
+            contraries.forEach(({ assumption, contrary }) => {
+                // Find rules that derive this contrary
+                const derivingRules = rules.filter(rule => rule.head === contrary);
+
+                if (derivingRules.length === 0) {
+                    // Contrary is a fact or direct assumption - non-derived attack
+                    if (assumptions.includes(contrary)) {
+                        const weight = weights[contrary] || 1;
+                        const displayWeight = weight === '?' ? '' : weight;
+                        visEdges.push({
+                            id: `${contrary}-attacks-${assumption}`,
+                            from: contrary,
+                            to: assumption,
+                            label: displayWeight,
+                            width: 2,
+                            color: { color: '#ef4444', highlight: '#dc2626' },
+                            arrows: 'to',
+                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
+                            attackType: 'direct',
+                            attackingElement: contrary,
+                            targetAssumption: assumption
+                        });
+                    }
+                } else {
+                    // Contrary is derived by rule(s)
+                    derivingRules.forEach(rule => {
+                        const attackers = rule.body;
+
+                        if (attackers.length === 1) {
+                            // Simple derived attack
+                            const attacker = attackers[0];
+                            if (assumptions.includes(attacker)) {
+                                const weight = weights[contrary] || 1;
+                                const displayWeight = weight === '?' ? '' : weight;
+                                visEdges.push({
+                                    id: `${attacker}-attacks-${assumption}-via-${contrary}`,
+                                    from: attacker,
+                                    to: assumption,
+                                    label: displayWeight,
+                                    width: 2,
+                                    color: { color: '#f59e0b', highlight: '#d97706' },
+                                    arrows: 'to',
+                                    dashes: false,
+                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
+                                    attackType: 'derived',
+                                    attackingElement: attacker,
+                                    targetAssumption: assumption,
+                                    contrary: contrary
+                                });
+                            }
+                        } else if (attackers.length > 1) {
+                            // Joint attack - use individual dashed edges
+                            const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
+
+                            if (assumptionAttackers.length > 0) {
+                                const weight = weights[contrary] || 1;
+                                const displayWeight = weight === '?' ? '' : weight;
+
+                                assumptionAttackers.forEach(attacker => {
+                                    const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
+                                    visEdges.push({
+                                        id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
+                                        from: attacker,
+                                        to: assumption,
+                                        label: displayWeight,
+                                        width: 3,
+                                        color: { color: '#10b981', highlight: '#059669' },
+                                        arrows: 'to',
+                                        dashes: [5, 5],
+                                        title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
+                                        attackType: 'joint',
+                                        attackingElement: attacker,
+                                        targetAssumption: assumption,
+                                        contrary: contrary,
+                                        jointWith: assumptionAttackers
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Update vis.js network
+            this.networkData.nodes.clear();
+            this.networkData.edges.clear();
+            this.networkData.nodes.add(visNodes);
+            this.networkData.edges.add(visEdges);
+
+            // Store framework code and mode
+            this.currentFrameworkCode = frameworkCode;
+            this.currentGraphMode = 'assumption-direct';
+
+            // No isolated nodes in assumption-level view
+            this.isolatedNodes = [];
+            this.updateIsolatedAssumptionsOverlay();
+
+            // Run layout and fit to view
+            this.runGraphLayout(true);
+
+            setTimeout(() => {
+                this.network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }, 600);
+
+        } catch (error) {
+            console.error('Error updating assumption-level graph (direct):', error);
+        }
+    }
+
+    async updateGraphAssumptionLevelBranching(frameworkCode) {
         if (!this.clingoReady) {
             return;
         }
@@ -944,7 +1105,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             const weights = this.parseWeights(frameworkCode);
 
             // DEBUG: Log parsed data
-            console.log('=== ASSUMPTION-LEVEL GRAPH DEBUG ===');
+            console.log('=== ASSUMPTION-LEVEL GRAPH DEBUG (BRANCHING) ===');
             console.log('Assumptions:', assumptions);
             console.log('Contraries:', contraries);
             console.log('Rules:', rules);
@@ -973,7 +1134,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
                         color: isDark ? '#f1f5f9' : '#1e293b'
-                    }
+                    },
+                    isAssumption: true
                 });
             });
 
@@ -1065,7 +1227,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     font: {
                                         color: isDark ? '#f1f5f9' : '#1e293b',
                                         size: 14
-                                    }
+                                    },
+                                    isJunction: true,
+                                    attackers: assumptionAttackers,
+                                    target: assumption,
+                                    contrary: contrary
                                 };
                                 console.log(`  Creating junction node:`, junctionNode);
                                 visNodes.push(junctionNode);
@@ -1118,8 +1284,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Store framework code for tooltips
+            // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
+            this.currentGraphMode = 'assumption-branching';
 
             // No isolated nodes in assumption-level view (all assumptions shown)
             this.isolatedNodes = [];
@@ -1281,47 +1448,69 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             font-size: 0.9em;
         `;
 
-        // Build popup content
-        let content = `<div style="margin-bottom: 8px;">`;
-        content += `<strong style="color: var(--primary-color);">Assumption: <code>${nodeId}</code></strong>`;
-        content += `</div>`;
+        let content = '';
 
-        // Get weight from framework code
-        const weight = this.getElementWeight(nodeId, this.currentFrameworkCode);
-        if (weight && weight !== '?') {
-            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(245, 158, 11, 0.05); border-left: 2px solid #f59e0b; border-radius: 4px;">`;
-            content += `<span class="badge" style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Weight</span>`;
-            content += `<strong style="color: #f59e0b;">${weight}</strong>`;
+        // Check if this is a junction node (branching mode)
+        if (nodeData.isJunction) {
+            content += `<div style="margin-bottom: 8px;">`;
+            content += `<strong style="color: var(--primary-color);">Junction Node</strong>`;
             content += `</div>`;
-        }
 
-        // Find contrary
-        const contrary = this.getContrary(nodeId, this.currentFrameworkCode);
-        if (contrary) {
-            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(239, 68, 68, 0.05); border-left: 2px solid #ef4444; border-radius: 4px;">`;
-            content += `<span class="badge" style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Contrary</span>`;
-            content += `<code style="font-size: 0.85em;">${contrary}</code>`;
+            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(16, 185, 129, 0.05); border-left: 2px solid #10b981; border-radius: 4px;">`;
+            content += `<span class="badge" style="background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Joint Attack</span>`;
+            content += `<div style="margin-top: 6px; font-size: 0.9em;">`;
+            content += `<strong>Attackers:</strong> ${nodeData.attackers.join(', ')}<br>`;
+            content += `<strong>Target:</strong> ${nodeData.target}<br>`;
+            content += `<strong>via:</strong> <code>${nodeData.contrary}</code>`;
             content += `</div>`;
-        }
+            content += `</div>`;
+        } else {
+            // Standard node or assumption node (in all modes)
+            content += `<div style="margin-bottom: 8px;">`;
+            if (nodeData.isAssumption || (this.currentGraphMode && this.currentGraphMode.startsWith('assumption'))) {
+                content += `<strong style="color: var(--primary-color);">Assumption: <code>${nodeId}</code></strong>`;
+            } else {
+                content += `<strong style="color: var(--primary-color);">Node: <code>${nodeId}</code></strong>`;
+            }
+            content += `</div>`;
 
-        // Count incoming and outgoing attacks
-        const incomingAttacks = this.networkData.edges.get({
-            filter: edge => edge.to === nodeId
-        });
-        const outgoingAttacks = this.networkData.edges.get({
-            filter: edge => edge.from === nodeId
-        });
+            // Get weight from framework code
+            const weight = this.getElementWeight(nodeId, this.currentFrameworkCode);
+            if (weight && weight !== '?') {
+                content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(245, 158, 11, 0.05); border-left: 2px solid #f59e0b; border-radius: 4px;">`;
+                content += `<span class="badge" style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Weight</span>`;
+                content += `<strong style="color: #f59e0b;">${weight}</strong>`;
+                content += `</div>`;
+            }
 
-        if (incomingAttacks.length > 0 || outgoingAttacks.length > 0) {
-            content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.05); border-left: 2px solid #6366f1; border-radius: 4px;">`;
-            content += `<div style="font-size: 0.85em; margin-bottom: 4px;">`;
-            content += `<span class="badge" style="background: #6366f1; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Attacks</span>`;
-            content += `</div>`;
-            content += `<div style="font-size: 0.85em; color: var(--text-muted);">`;
-            content += `Incoming: <strong>${incomingAttacks.length}</strong> | `;
-            content += `Outgoing: <strong>${outgoingAttacks.length}</strong>`;
-            content += `</div>`;
-            content += `</div>`;
+            // Find contrary
+            const contrary = this.getContrary(nodeId, this.currentFrameworkCode);
+            if (contrary) {
+                content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(239, 68, 68, 0.05); border-left: 2px solid #ef4444; border-radius: 4px;">`;
+                content += `<span class="badge" style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Contrary</span>`;
+                content += `<code style="font-size: 0.85em;">${contrary}</code>`;
+                content += `</div>`;
+            }
+
+            // Count incoming and outgoing attacks
+            const incomingAttacks = this.networkData.edges.get({
+                filter: edge => edge.to === nodeId
+            });
+            const outgoingAttacks = this.networkData.edges.get({
+                filter: edge => edge.from === nodeId
+            });
+
+            if (incomingAttacks.length > 0 || outgoingAttacks.length > 0) {
+                content += `<div style="margin-bottom: 8px; padding: 8px; background: rgba(99, 102, 241, 0.05); border-left: 2px solid #6366f1; border-radius: 4px;">`;
+                content += `<div style="font-size: 0.85em; margin-bottom: 4px;">`;
+                content += `<span class="badge" style="background: #6366f1; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-right: 4px;">Attacks</span>`;
+                content += `</div>`;
+                content += `<div style="font-size: 0.85em; color: var(--text-muted);">`;
+                content += `Incoming: <strong>${incomingAttacks.length}</strong> | `;
+                content += `Outgoing: <strong>${outgoingAttacks.length}</strong>`;
+                content += `</div>`;
+                content += `</div>`;
+            }
         }
 
         content += `<button onclick="document.getElementById('node-popup').remove()" style="background: #10b981; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Close</button>`;
