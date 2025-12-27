@@ -980,6 +980,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
             // Build vis.js edges (attacks between assumptions) - DIRECT MODE
             const visEdges = [];
+            const factBasedAttacks = []; // Track attacks from facts (via ⊤)
 
             // For each contrary relationship, determine how the contrary can be supported
             contraries.forEach(({ assumption, contrary }) => {
@@ -987,8 +988,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
                 if (derivingRules.length === 0) {
-                    // Contrary is a fact or direct assumption - non-derived attack
+                    // Contrary is a fact or direct assumption
                     if (assumptions.includes(contrary)) {
+                        // Direct attack from one assumption to another
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
                         const edgeColor = { color: '#ef4444', highlight: '#dc2626' };
@@ -1008,6 +1010,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalColor: edgeColor,
                             originalDashes: false
                         });
+                    } else {
+                        // Fact-based attack (contrary is not an assumption) - attack via ⊤
+                        const weight = weights[contrary] || 1;
+                        factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
                     // Contrary is derived by rule(s)
@@ -1077,6 +1083,70 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 }
             });
 
+            // Add ⊤ (top) node for fact-based attacks
+            if (factBasedAttacks.length > 0) {
+                const topNodeColor = {
+                    border: '#64748b',
+                    background: '#94a3b8',
+                    highlight: {
+                        border: '#475569',
+                        background: '#64748b'
+                    }
+                };
+                visNodes.push({
+                    id: '⊤',
+                    label: '⊤',
+                    size: 15,
+                    shape: 'box',
+                    color: topNodeColor,
+                    title: 'Top element (⊤): represents fact-based attacks',
+                    font: {
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        size: 16
+                    },
+                    isTop: true
+                });
+
+                // Create edges from ⊤ to attacked assumptions
+                factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
+                    const displayWeight = weight === '?' ? '' : weight;
+                    const edgeColor = { color: '#94a3b8', highlight: '#64748b' };
+                    visEdges.push({
+                        id: `top-attacks-${assumption}-via-${contrary}`,
+                        from: '⊤',
+                        to: assumption,
+                        label: displayWeight,
+                        width: 2,
+                        color: edgeColor,
+                        arrows: 'to',
+                        title: `Fact ${contrary} attacks ${assumption}\nType: Fact-based\nWeight: ${weight}`,
+                        attackType: 'fact',
+                        attackingElement: contrary,
+                        targetAssumption: assumption,
+                        originalWidth: 2,
+                        originalColor: edgeColor,
+                        originalDashes: false
+                    });
+                });
+            }
+
+            // Track isolated assumptions (no incoming or outgoing attacks)
+            const isolatedAssumptions = [];
+            const connectedAssumptions = new Set();
+            visEdges.forEach(edge => {
+                if (edge.from !== '⊤' && assumptions.includes(edge.from)) {
+                    connectedAssumptions.add(edge.from);
+                }
+                if (assumptions.includes(edge.to)) {
+                    connectedAssumptions.add(edge.to);
+                }
+            });
+            assumptions.forEach(assumption => {
+                if (!connectedAssumptions.has(assumption)) {
+                    isolatedAssumptions.push(assumption);
+                }
+            });
+
             // Update vis.js network
             this.networkData.nodes.clear();
             this.networkData.edges.clear();
@@ -1087,8 +1157,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.currentFrameworkCode = frameworkCode;
             this.currentGraphMode = 'assumption-direct';
 
-            // No isolated nodes in assumption-level view
-            this.isolatedNodes = [];
+            // Store isolated assumptions for display
+            this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
             this.updateIsolatedAssumptionsOverlay();
 
             // Run layout and fit to view
@@ -1158,6 +1228,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Build vis.js edges (attacks between assumptions)
             const visEdges = [];
             const jointAttackGroups = new Map(); // Track joint attacks: target -> [{attackers: [...], contrary: ...}]
+            const factBasedAttacks = []; // Track attacks from facts (via ⊤)
 
             // For each contrary relationship, determine how the contrary can be supported
             contraries.forEach(({ assumption, contrary }) => {
@@ -1165,8 +1236,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
                 if (derivingRules.length === 0) {
-                    // Contrary is a fact or direct assumption - non-derived attack
-                    // Check if contrary is an assumption itself
+                    // Contrary is a fact or direct assumption
                     if (assumptions.includes(contrary)) {
                         // Direct attack from one assumption to another
                         const weight = weights[contrary] || 1;
@@ -1187,6 +1257,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalColor: edgeColor,
                             originalDashes: false
                         });
+                    } else {
+                        // Fact-based attack (contrary is not an assumption) - attack via ⊤
+                        const weight = weights[contrary] || 1;
+                        factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
                     // Contrary is derived by rule(s)
@@ -1320,6 +1394,71 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             console.log('Edges:', visEdges.map(e => `${e.from} -> ${e.to} (${e.dashes ? 'DASHED' : 'SOLID'}, color: ${e.color.color})`));
             console.log('================================');
 
+            // Add ⊤ (top) node for fact-based attacks
+            if (factBasedAttacks.length > 0) {
+                const topNodeColor = {
+                    border: '#64748b',
+                    background: '#94a3b8',
+                    highlight: {
+                        border: '#475569',
+                        background: '#64748b'
+                    }
+                };
+                visNodes.push({
+                    id: '⊤',
+                    label: '⊤',
+                    size: 15,
+                    shape: 'box',
+                    color: topNodeColor,
+                    title: 'Top element (⊤): represents fact-based attacks',
+                    font: {
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        size: 16
+                    },
+                    isTop: true
+                });
+
+                // Create edges from ⊤ to attacked assumptions
+                factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
+                    const displayWeight = weight === '?' ? '' : weight;
+                    const edgeColor = { color: '#94a3b8', highlight: '#64748b' };
+                    visEdges.push({
+                        id: `top-attacks-${assumption}-via-${contrary}`,
+                        from: '⊤',
+                        to: assumption,
+                        label: displayWeight,
+                        width: 2,
+                        color: edgeColor,
+                        arrows: 'to',
+                        title: `Fact ${contrary} attacks ${assumption}\nType: Fact-based\nWeight: ${weight}`,
+                        attackType: 'fact',
+                        attackingElement: contrary,
+                        targetAssumption: assumption,
+                        originalWidth: 2,
+                        originalColor: edgeColor,
+                        originalDashes: false
+                    });
+                });
+                console.log(`Added ⊤ node with ${factBasedAttacks.length} fact-based attacks`);
+            }
+
+            // Track isolated assumptions (no incoming or outgoing attacks)
+            const isolatedAssumptions = [];
+            const connectedAssumptions = new Set();
+            visEdges.forEach(edge => {
+                if (edge.from !== '⊤' && !edge.from.startsWith('junction_') && assumptions.includes(edge.from)) {
+                    connectedAssumptions.add(edge.from);
+                }
+                if (assumptions.includes(edge.to)) {
+                    connectedAssumptions.add(edge.to);
+                }
+            });
+            assumptions.forEach(assumption => {
+                if (!connectedAssumptions.has(assumption)) {
+                    isolatedAssumptions.push(assumption);
+                }
+            });
+
             // Update vis.js network
             this.networkData.nodes.clear();
             this.networkData.edges.clear();
@@ -1330,8 +1469,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.currentFrameworkCode = frameworkCode;
             this.currentGraphMode = 'assumption-branching';
 
-            // No isolated nodes in assumption-level view (all assumptions shown)
-            this.isolatedNodes = [];
+            // Store isolated assumptions for display
+            this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
             this.updateIsolatedAssumptionsOverlay();
 
             // Run layout and fit to view
@@ -2528,7 +2667,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     opacity: 0.4
                 });
             } else if (isActive) {
-                // Highlight ONLY active attacks: make them more prominent with orange color
+                // Highlight ONLY active attacks: make them more prominent with cyan color
                 const originalWidth = edge.originalWidth || edge.width || 2;
 
                 edgeUpdates.push({
@@ -2536,13 +2675,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     width: originalWidth + 1.5, // Make active attacks thicker
                     dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
                     color: {
-                        color: '#f97316',        // Bright orange
-                        highlight: '#fb923c'     // Lighter orange for hover
+                        color: '#06b6d4',        // Bright cyan
+                        highlight: '#22d3ee'     // Lighter cyan for hover
                     },
                     opacity: 1.0,
                     shadow: {
                         enabled: true,
-                        color: 'rgba(249, 115, 22, 0.5)',  // Orange glow
+                        color: 'rgba(6, 182, 212, 0.5)',  // Cyan glow
                         size: 8,
                         x: 0,
                         y: 0
