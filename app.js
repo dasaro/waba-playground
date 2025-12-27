@@ -2518,13 +2518,36 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     opacity: 0.4
                 });
             } else {
-                // Keep active attacks with original style
+                // Highlight active attacks: make them more prominent
+                const originalWidth = edge.originalWidth || edge.width || 2;
+                const originalColor = edge.originalColor || edge.color;
+
+                // Create highlighted color (brighter version)
+                let highlightColor;
+                if (typeof originalColor === 'object' && originalColor.color) {
+                    // Extract the base color and create a brighter highlight
+                    const baseColor = originalColor.color;
+                    highlightColor = {
+                        color: baseColor,
+                        highlight: originalColor.highlight || baseColor
+                    };
+                } else {
+                    highlightColor = originalColor;
+                }
+
                 edgeUpdates.push({
                     id: edge.id,
-                    width: edge.originalWidth || edge.width || 2,
+                    width: originalWidth + 1.5, // Make active attacks thicker
                     dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
-                    color: edge.originalColor || edge.color,
-                    opacity: 1.0
+                    color: highlightColor,
+                    opacity: 1.0,
+                    shadow: {
+                        enabled: true,
+                        color: 'rgba(16, 185, 129, 0.4)',
+                        size: 8,
+                        x: 0,
+                        y: 0
+                    }
                 });
             }
         });
@@ -2591,7 +2614,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 width: edge.originalWidth || edge.width || 2,
                 dashes: originalDashes,
                 opacity: 1.0,
-                color: originalColor
+                color: originalColor,
+                shadow: false
             });
         });
 
