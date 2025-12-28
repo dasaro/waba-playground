@@ -982,6 +982,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             const visEdges = [];
             const factBasedAttacks = []; // Track attacks from facts (via ⊤)
 
+            console.log('=== FACT-BASED ATTACK DETECTION (DIRECT) ===');
+            console.log('Total contraries:', contraries.length);
+            console.log('Assumptions:', assumptions);
+            console.log('Rules:', rules);
+
             // For each contrary relationship, determine how the contrary can be supported
             contraries.forEach(({ assumption, contrary }) => {
                 // Find rules that derive this contrary
@@ -1013,6 +1018,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     } else {
                         // Fact-based attack (contrary is not an assumption) - attack via ⊤
                         const weight = weights[contrary] || 1;
+                        console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
@@ -1082,6 +1088,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     });
                 }
             });
+
+            console.log(`Total fact-based attacks detected: ${factBasedAttacks.length}`);
+            if (factBasedAttacks.length > 0) {
+                console.log('Fact-based attacks:', factBasedAttacks);
+            }
 
             // Add ⊤ (top) node for fact-based attacks
             if (factBasedAttacks.length > 0) {
@@ -1230,6 +1241,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             const jointAttackGroups = new Map(); // Track joint attacks: target -> [{attackers: [...], contrary: ...}]
             const factBasedAttacks = []; // Track attacks from facts (via ⊤)
 
+            console.log('=== FACT-BASED ATTACK DETECTION (BRANCHING) ===');
+            console.log('Total contraries:', contraries.length);
+            console.log('Assumptions:', assumptions);
+            console.log('Rules:', rules);
+
             // For each contrary relationship, determine how the contrary can be supported
             contraries.forEach(({ assumption, contrary }) => {
                 // Find rules that derive this contrary
@@ -1260,6 +1276,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     } else {
                         // Fact-based attack (contrary is not an assumption) - attack via ⊤
                         const weight = weights[contrary] || 1;
+                        console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
@@ -1392,6 +1409,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
             console.log('Total edges created:', visEdges.length);
             console.log('Edges:', visEdges.map(e => `${e.from} -> ${e.to} (${e.dashes ? 'DASHED' : 'SOLID'}, color: ${e.color.color})`));
+            console.log(`Total fact-based attacks detected: ${factBasedAttacks.length}`);
+            if (factBasedAttacks.length > 0) {
+                console.log('Fact-based attacks:', factBasedAttacks);
+            }
             console.log('================================');
 
             // Add ⊤ (top) node for fact-based attacks
@@ -2667,7 +2688,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     opacity: 0.4
                 });
             } else if (isActive) {
-                // Highlight ONLY active attacks: make them more prominent with cyan color
+                // Highlight ONLY active attacks: make them more prominent with red color
                 const originalWidth = edge.originalWidth || edge.width || 2;
 
                 edgeUpdates.push({
@@ -2675,13 +2696,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     width: originalWidth + 1.5, // Make active attacks thicker
                     dashes: edge.originalDashes !== undefined ? edge.originalDashes : false,
                     color: {
-                        color: '#06b6d4',        // Bright cyan
-                        highlight: '#22d3ee'     // Lighter cyan for hover
+                        color: '#ef4444',        // Bright red
+                        highlight: '#dc2626'     // Darker red for hover
                     },
                     opacity: 1.0,
                     shadow: {
                         enabled: true,
-                        color: 'rgba(6, 182, 212, 0.5)',  // Cyan glow
+                        color: 'rgba(239, 68, 68, 0.5)',  // Red glow
                         size: 8,
                         x: 0,
                         y: 0
