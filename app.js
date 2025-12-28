@@ -4663,6 +4663,136 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ===================================
+    // Graph Export (PNG & PDF)
+    // ===================================
+    const exportPngBtn = document.getElementById('export-png-btn');
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+
+    // Export as high-resolution PNG (300 DPI)
+    if (exportPngBtn) {
+        exportPngBtn.addEventListener('click', () => {
+            if (!window.playground || !window.playground.network) {
+                alert('No graph to export. Please run WABA first.');
+                return;
+            }
+
+            try {
+                // Get the canvas from vis.js network
+                const canvas = window.playground.network.canvas.frame.canvas;
+
+                // Calculate scale factor for 300 DPI (standard is 96 DPI)
+                // 300/96 = 3.125x scale
+                const scaleFactor = 3.125;
+
+                // Create high-resolution canvas
+                const highResCanvas = document.createElement('canvas');
+                const ctx = highResCanvas.getContext('2d');
+
+                highResCanvas.width = canvas.width * scaleFactor;
+                highResCanvas.height = canvas.height * scaleFactor;
+
+                // Scale context and draw
+                ctx.scale(scaleFactor, scaleFactor);
+                ctx.drawImage(canvas, 0, 0);
+
+                // Generate filename with timestamp
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                const filename = `waba-graph-${timestamp}.png`;
+
+                // Convert to blob and download
+                highResCanvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+
+                console.log(`Exported graph as PNG (300 DPI): ${filename}`);
+            } catch (error) {
+                console.error('Error exporting PNG:', error);
+                alert('Failed to export PNG. Please try again.');
+            }
+        });
+    }
+
+    // Export as PDF
+    if (exportPdfBtn) {
+        exportPdfBtn.addEventListener('click', () => {
+            if (!window.playground || !window.playground.network) {
+                alert('No graph to export. Please run WABA first.');
+                return;
+            }
+
+            try {
+                // Get the canvas from vis.js network
+                const canvas = window.playground.network.canvas.frame.canvas;
+
+                // Convert canvas to data URL
+                const imgData = canvas.toDataURL('image/png');
+
+                // Calculate PDF dimensions (A4 landscape, preserving aspect ratio)
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+                const aspectRatio = imgWidth / imgHeight;
+
+                // A4 landscape dimensions in mm
+                const pdfWidth = 297;
+                const pdfHeight = 210;
+
+                let finalWidth, finalHeight;
+                if (aspectRatio > pdfWidth / pdfHeight) {
+                    // Image is wider - fit to width
+                    finalWidth = pdfWidth - 20; // 10mm margins
+                    finalHeight = finalWidth / aspectRatio;
+                } else {
+                    // Image is taller - fit to height
+                    finalHeight = pdfHeight - 20; // 10mm margins
+                    finalWidth = finalHeight * aspectRatio;
+                }
+
+                // Center the image
+                const xOffset = (pdfWidth - finalWidth) / 2;
+                const yOffset = (pdfHeight - finalHeight) / 2;
+
+                // Create PDF using jsPDF
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // Add title
+                pdf.setFontSize(16);
+                pdf.text('WABA Argumentation Graph', pdfWidth / 2, 10, { align: 'center' });
+
+                // Add graph image
+                pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalWidth, finalHeight);
+
+                // Add footer with timestamp
+                pdf.setFontSize(8);
+                const timestamp = new Date().toLocaleString();
+                pdf.text(`Generated: ${timestamp}`, 10, pdfHeight - 5);
+                pdf.text('WABA Playground', pdfWidth - 10, pdfHeight - 5, { align: 'right' });
+
+                // Generate filename with timestamp
+                const filenameTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                const filename = `waba-graph-${filenameTimestamp}.pdf`;
+
+                // Save PDF
+                pdf.save(filename);
+
+                console.log(`Exported graph as PDF: ${filename}`);
+            } catch (error) {
+                console.error('Error exporting PDF:', error);
+                alert('Failed to export PDF. Please try again.');
+            }
+        });
+    }
+
+    // ===================================
     // Loading Overlay Management
     // ===================================
     window.showLoadingOverlay = (text = 'Running WABA...', subtext = 'Computing extensions and visualizing results') => {

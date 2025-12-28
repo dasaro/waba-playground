@@ -20,6 +20,9 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
 
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
     <script>
         // Tell Emscripten where to find WASM files on GitHub Pages
@@ -259,6 +262,8 @@ c_a: 70"></textarea>
                             <button id="reset-layout-btn" class="clear-btn" aria-label="Reset graph layout">🔄 Reset Layout</button>
                             <button id="fullscreen-btn" class="clear-btn" aria-label="Toggle fullscreen mode">⛶ Fullscreen</button>
                             <button id="legend-toggle-btn" class="clear-btn" aria-label="Toggle graph legend" aria-expanded="false">📖 Legend</button>
+                            <button id="export-png-btn" class="clear-btn" aria-label="Export graph as PNG">💾 PNG</button>
+                            <button id="export-pdf-btn" class="clear-btn" aria-label="Export graph as PDF">📄 PDF</button>
                         </div>
                     </div>
 
