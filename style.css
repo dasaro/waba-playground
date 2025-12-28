@@ -756,20 +756,28 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 /* ===================================
-   Attack Tooltip (Unified)
+   Popup Panels (Unified for all popups)
    =================================== */
 
-.attack-tooltip {
+/* Base popup panel styling - used by attack tooltips, derivation chains, etc. */
+.popup-panel,
+.attack-tooltip,
+#derivation-popup {
     background: var(--bg-secondary);
     border: 2px solid var(--primary-color);
     border-radius: var(--radius-lg);
     padding: 0;
     min-width: 300px;
     max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: var(--shadow-lg);
     font-family: 'Inter', sans-serif;
+    font-size: var(--text-sm);
 }
 
+/* Popup header */
+.popup-header,
 .tooltip-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     padding: var(--space-md) var(--space-lg);
@@ -779,6 +787,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     align-items: center;
 }
 
+.popup-header h4,
 .tooltip-header h4 {
     margin: 0;
     color: white;
@@ -786,6 +795,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     font-weight: 600;
 }
 
+/* Popup close button */
+.popup-close,
 .tooltip-close {
     background: rgba(255, 255, 255, 0.2);
     border: none;
@@ -801,43 +812,115 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     justify-content: center;
 }
 
+.popup-close:hover,
 .tooltip-close:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: scale(1.1);
 }
 
+/* Popup body */
+.popup-body,
 .tooltip-body {
     padding: var(--space-lg);
     color: var(--text-primary);
+    line-height: 1.6;
 }
 
+.popup-body p,
 .tooltip-body p {
     margin: var(--space-xs) 0;
-    line-height: 1.6;
     font-size: var(--text-sm);
 }
 
+.popup-body strong,
 .tooltip-body strong {
     color: var(--primary-color);
+    font-weight: 600;
 }
 
+.popup-body code,
 .tooltip-body code {
-    background: var(--bg-primary);
+    background: var(--bg-tertiary);
     padding: 2px var(--space-xs);
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: var(--text-sm);
-    color: var(--success-color);
+    font-size: 0.85em;
+    color: var(--text-primary);
 }
 
+.popup-body ul,
 .tooltip-body ul {
     margin: var(--space-xs) 0;
     padding-left: 20px;
 }
 
+.popup-body li,
 .tooltip-body li {
     margin: var(--space-xs) 0;
-    font-size: var(--text-sm);
+}
+
+/* Derivation tree styling */
+.derivation-tree {
+    margin: var(--space-sm) 0;
+}
+
+.derivation-item {
+    margin-bottom: var(--space-xs);
+    padding: var(--space-xs);
+    border-radius: var(--radius-sm);
+    transition: background 0.2s;
+}
+
+.derivation-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.derivation-connector {
+    color: var(--text-muted);
+    margin-right: var(--space-xs);
+}
+
+.derivation-atom {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    color: var(--text-primary);
+}
+
+.derivation-weight {
+    color: var(--warning-color);
+    font-size: 0.85em;
+    margin-left: var(--space-xs);
+}
+
+/* Badges - used for assumption/rule labels */
+.badge {
+    display: inline-block;
+    padding: 2px var(--space-sm);
+    border-radius: 10px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-assumption {
+    background: var(--success-color);
+    color: white;
+}
+
+.badge-derived {
+    background: var(--primary-color);
+    color: white;
+}
+
+.badge-rule {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.badge-fact {
+    background: var(--text-muted);
+    color: white;
 }
 
 /* ===================================
@@ -894,7 +977,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
         height: 300px; /* Smaller on mobile */
     }
 
-    .attack-tooltip {
+    .popup-panel,
+    .attack-tooltip,
+    #derivation-popup {
         min-width: 280px;
         max-width: 90vw;
     }

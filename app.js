@@ -2282,24 +2282,14 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         // Get element position
         const rect = triggerElement.getBoundingClientRect();
 
-        // Create popup
+        // Create popup using unified CSS classes
         const popup = document.createElement('div');
         popup.id = 'derivation-popup';
         popup.style.cssText = `
             position: fixed;
             left: -9999px;
             top: -9999px;
-            background: var(--bg-secondary);
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             z-index: 10001;
-            min-width: 300px;
-            max-width: 500px;
-            font-size: 0.9em;
-            max-height: 80vh;
-            overflow-y: auto;
         `;
 
         // Build derivation tree recursively
@@ -2307,14 +2297,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             if (visited.has(currentAtom) || depth > 10) return '';
             visited.add(currentAtom);
 
-            const indent = '  '.repeat(depth);
             const weight = parsed.weights.get(currentAtom);
-            const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color)">(w: ${weight})</span>` : '';
+            const weightDisplay = weight !== undefined ? ` <span class="derivation-weight">(w: ${weight})</span>` : '';
 
-            let html = `<div style="margin-left: ${depth * 16}px; margin-bottom: 4px;">`;
+            let html = `<div class="derivation-item" style="margin-left: ${depth * 16}px;">`;
 
             if (depth > 0) {
-                html += `<span style="color: var(--text-muted)">└─</span> `;
+                html += `<span class="derivation-connector">└─</span> `;
             }
 
             // Find rules that derive this atom
@@ -2327,19 +2316,19 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
             if (parsed.assumptions.has(currentAtom)) {
                 // It's an assumption
-                html += `<code style="font-size: 0.85em; color: var(--success-color)">${currentAtom}</code>${weightDisplay} `;
-                html += `<span class="badge" style="background: var(--success-color); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em;">assumption</span>`;
+                html += `<code class="derivation-atom">${currentAtom}</code>${weightDisplay} `;
+                html += `<span class="badge badge-assumption">assumption</span>`;
             } else if (derivingRules.length > 0) {
                 // It's derived by rules
-                html += `<code style="font-size: 0.85em; color: var(--info-color)">${currentAtom}</code>${weightDisplay}`;
+                html += `<code class="derivation-atom">${currentAtom}</code>${weightDisplay}`;
                 html += '</div>';
 
                 // Show each deriving rule
                 derivingRules.forEach(({ ruleId, rule }) => {
-                    html += `<div style="margin-left: ${(depth + 1) * 16}px; margin-bottom: 4px; font-size: 0.85em; color: var(--text-muted);">`;
-                    html += `<span class="badge" style="background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7em;">${ruleId}</span> `;
+                    html += `<div class="derivation-item" style="margin-left: ${(depth + 1) * 16}px;">`;
+                    html += `<span class="badge badge-rule">${ruleId}</span> `;
                     if (rule.body.length > 0) {
-                        html += `← <code style="font-size: 0.85em;">${rule.body.join(', ')}</code>`;
+                        html += `← <code class="derivation-atom">${rule.body.join(', ')}</code>`;
                         html += '</div>';
 
                         // Recursively show body atoms
@@ -2347,25 +2336,30 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             html += buildTree(bodyAtom, depth + 2, new Set(visited));
                         });
                     } else {
-                        html += `(fact)`;
+                        html += `<span class="badge badge-fact">fact</span>`;
                         html += '</div>';
                     }
                 });
                 return html;
             } else {
                 // Unknown derivation
-                html += `<code style="font-size: 0.85em;">${currentAtom}</code>${weightDisplay}`;
+                html += `<code class="derivation-atom">${currentAtom}</code>${weightDisplay}`;
             }
 
             html += '</div>';
             return html;
         };
 
-        let content = `<div style="margin-bottom: 8px;">`;
-        content += `<strong style="color: var(--primary-color);">Derivation Chain for <code>${atom}</code></strong>`;
+        // Build popup content with unified structure
+        let content = `<div class="popup-header">`;
+        content += `<h4>Derivation Chain for <code>${atom}</code></h4>`;
+        content += `<button class="popup-close" onclick="document.getElementById('derivation-popup').remove()">×</button>`;
         content += `</div>`;
+        content += `<div class="popup-body">`;
+        content += `<div class="derivation-tree">`;
         content += buildTree(atom);
-        content += `<button onclick="document.getElementById('derivation-popup').remove()" style="background: #3b82f6; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; margin-top: 8px;">Close</button>`;
+        content += `</div>`;
+        content += `</div>`;
 
         popup.innerHTML = content;
         document.body.appendChild(popup);
