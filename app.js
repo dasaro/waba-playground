@@ -1071,7 +1071,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         from: attacker,
                                         to: assumption,
                                         label: displayWeight,
-                                        width: 3,
+                                        width: 2,
                                         color: edgeColor,
                                         arrows: 'to',
                                         dashes: [5, 5],
@@ -1081,7 +1081,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         targetAssumption: assumption,
                                         contrary: contrary,
                                         jointWith: assumptionAttackers,
-                                        originalWidth: 3,
+                                        originalWidth: 2,
                                         originalColor: edgeColor,
                                         originalDashes: [5, 5]
                                     });
@@ -1394,14 +1394,14 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     from: junctionId,
                                     to: assumption,
                                     label: displayWeight,
-                                    width: 4,
+                                    width: 2,
                                     color: edgeColor,
                                     arrows: 'to',
                                     dashes: false,
                                     title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
                                     targetAssumption: assumption,
                                     contrary: contrary,
-                                    originalWidth: 4,
+                                    originalWidth: 2,
                                     originalColor: edgeColor,
                                     originalDashes: false
                                 };
