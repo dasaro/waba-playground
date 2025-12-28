@@ -1254,7 +1254,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     display: none !important;
 }
 
-/* Output empty state - inside output panel, centered with flexbox */
+/* Output empty state - inside output panel, appears below log messages */
 .output-empty-state {
     display: flex;
     flex-direction: column;
@@ -1262,8 +1262,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     justify-content: center;
     text-align: center;
     color: var(--text-secondary);
-    flex: 1; /* Fill available space */
-    padding: var(--space-xl);
+    margin-top: auto; /* Push to bottom if there are messages above */
+    padding: var(--space-lg);
+    min-height: 150px; /* Ensure it's visible even with messages */
 }
 
 .output-empty-state[hidden] {
