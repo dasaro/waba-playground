@@ -338,8 +338,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border-radius: var(--radius-md);
     padding: var(--space-md);
     resize: vertical;
-    min-height: 300px;
-    flex: 1;
+    height: 400px; /* Fixed height with manual resize capability */
     tab-size: 4;
 }
 
@@ -383,13 +382,12 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    min-height: 250px;
+    height: 400px;
     max-height: 500px;
     overflow-y: auto;
     font-family: 'JetBrains Mono', monospace;
     font-size: var(--text-sm);
     line-height: 1.7;
-    flex: 1;
 }
 
 .output::-webkit-scrollbar {
@@ -664,8 +662,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    flex: 1;
-    min-height: 400px;
+    height: 500px; /* Fixed height for consistent display */
     position: relative;
 }
 
@@ -885,12 +882,16 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     }
 
     .code-editor {
-        min-height: 250px;
+        height: 300px; /* Smaller on mobile */
         font-size: var(--text-xs);
     }
 
     .graph-canvas {
-        min-height: 300px;
+        height: 350px; /* Smaller on mobile */
+    }
+
+    .output {
+        height: 300px; /* Smaller on mobile */
     }
 
     .attack-tooltip {
