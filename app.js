@@ -913,6 +913,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
+            // Hide graph empty state after successful render
+            if (window.hideGraphEmptyState) {
+                window.hideGraphEmptyState();
+            }
+
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
             this.currentGraphMode = 'standard';
@@ -1166,6 +1171,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.edges.clear();
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
+
+            // Hide graph empty state after successful render
+            if (window.hideGraphEmptyState) {
+                window.hideGraphEmptyState();
+            }
 
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
@@ -1491,6 +1501,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.edges.clear();
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
+
+            // Hide graph empty state after successful render
+            if (window.hideGraphEmptyState) {
+                window.hideGraphEmptyState();
+            }
 
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
@@ -2908,8 +2923,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         // Update graph visualization
         await this.updateGraph(framework);
 
+        // Show loading overlay
+        if (window.showLoadingOverlay) {
+            window.showLoadingOverlay('Running WABA...', 'Computing extensions and visualizing results');
+        }
+
         this.runBtn.disabled = true;
-        this.runBtn.innerHTML = '<span class="loading"></span> Running...';
         this.clearOutput();
 
         try {
@@ -2934,11 +2953,23 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Parse and display results
             this.displayResults(result, elapsed);
 
+            // Hide output empty state after successful run
+            if (window.hideOutputEmptyState) {
+                window.hideOutputEmptyState();
+            }
+
         } catch (error) {
             this.log(`❌ Error: ${error.message}`, 'error');
+            // Hide output empty state even on error (error message is displayed)
+            if (window.hideOutputEmptyState) {
+                window.hideOutputEmptyState();
+            }
         } finally {
+            // Hide loading overlay
+            if (window.hideLoadingOverlay) {
+                window.hideLoadingOverlay();
+            }
             this.runBtn.disabled = false;
-            this.runBtn.innerHTML = '▶️ Run WABA';
         }
     }
 
@@ -4599,6 +4630,10 @@ ${framework}
     clearOutput() {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
+        // Show output empty state after clearing
+        if (window.showOutputEmptyState) {
+            window.showOutputEmptyState();
+        }
         // Note: Don't clear isolatedNodes here - they're populated by updateGraph()
         // and needed for displayResults()
     }
@@ -4607,4 +4642,80 @@ ${framework}
 // Initialize the playground when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.playground = new WABAPlayground();
+
+    // ===================================
+    // Graph Legend Toggle
+    // ===================================
+    const legendToggleBtn = document.getElementById('legend-toggle-btn');
+    const graphLegend = document.getElementById('graph-legend');
+
+    if (legendToggleBtn && graphLegend) {
+        legendToggleBtn.addEventListener('click', () => {
+            const isHidden = graphLegend.hasAttribute('hidden');
+            if (isHidden) {
+                graphLegend.removeAttribute('hidden');
+                legendToggleBtn.setAttribute('aria-expanded', 'true');
+            } else {
+                graphLegend.setAttribute('hidden', '');
+                legendToggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // ===================================
+    // Loading Overlay Management
+    // ===================================
+    window.showLoadingOverlay = (text = 'Running WABA...', subtext = 'Computing extensions and visualizing results') => {
+        const overlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const loadingSubtext = document.getElementById('loading-subtext');
+
+        if (overlay) {
+            if (loadingText) loadingText.textContent = text;
+            if (loadingSubtext) loadingSubtext.textContent = subtext;
+            overlay.removeAttribute('hidden');
+        }
+    };
+
+    window.hideLoadingOverlay = () => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.setAttribute('hidden', '');
+        }
+    };
+
+    // ===================================
+    // Empty State Management
+    // ===================================
+    window.showGraphEmptyState = () => {
+        const emptyState = document.getElementById('graph-empty-state');
+        const canvas = document.getElementById('cy');
+        if (emptyState) emptyState.removeAttribute('hidden');
+        if (canvas) canvas.style.opacity = '0.3';
+    };
+
+    window.hideGraphEmptyState = () => {
+        const emptyState = document.getElementById('graph-empty-state');
+        const canvas = document.getElementById('cy');
+        if (emptyState) emptyState.setAttribute('hidden', '');
+        if (canvas) canvas.style.opacity = '1';
+    };
+
+    window.showOutputEmptyState = () => {
+        const emptyState = document.getElementById('output-empty-state');
+        const output = document.getElementById('output');
+        if (emptyState) emptyState.removeAttribute('hidden');
+        if (output) output.style.display = 'none';
+    };
+
+    window.hideOutputEmptyState = () => {
+        const emptyState = document.getElementById('output-empty-state');
+        const output = document.getElementById('output');
+        if (emptyState) emptyState.setAttribute('hidden', '');
+        if (output) output.style.display = 'block';
+    };
+
+    // Show empty states initially
+    showGraphEmptyState();
+    showOutputEmptyState();
 });

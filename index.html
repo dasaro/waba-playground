@@ -74,14 +74,14 @@
                 <p class="subtitle">Interactive Weighted Assumption-Based Argumentation Framework Explorer</p>
             </div>
             <div class="header-links">
-                <button id="font-decrease-btn" class="link-btn" title="Decrease font size">
-                    <span style="font-size: 1.2em; font-weight: bold;">−</span>
+                <button id="font-decrease-btn" class="link-btn" title="Decrease font size" aria-label="Decrease font size">
+                    <span style="font-size: 1.2em; font-weight: bold;" aria-hidden="true">−</span>
                 </button>
-                <button id="font-increase-btn" class="link-btn" title="Increase font size">
-                    <span style="font-size: 1.2em; font-weight: bold;">+</span>
+                <button id="font-increase-btn" class="link-btn" title="Increase font size" aria-label="Increase font size">
+                    <span style="font-size: 1.2em; font-weight: bold;" aria-hidden="true">+</span>
                 </button>
-                <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode">
-                    <span id="theme-icon">🌙</span>
+                <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
+                    <span id="theme-icon" aria-hidden="true">🌙</span>
                 </button>
             </div>
         </div>
@@ -184,12 +184,12 @@
                     <div class="editor-header">
                         <div class="editor-controls">
                             <h3>Framework Definition</h3>
-                            <select id="input-mode" class="select" style="margin-left: 20px;">
+                            <select id="input-mode" class="select" style="margin-left: 20px;" aria-label="Select input mode">
                                 <option value="simple">Simple Mode (ABA)</option>
                                 <option value="advanced">Advanced Mode (ASP)</option>
                             </select>
                         </div>
-                        <button id="run-btn" class="run-btn">▶️ Run WABA</button>
+                        <button id="run-btn" class="run-btn" aria-label="Execute WABA framework">▶️ Run WABA</button>
                     </div>
 
                     <!-- Advanced Mode: Code Editor -->
@@ -256,21 +256,89 @@ c_a: 70"></textarea>
                             </label>
                         </div>
                         <div class="graph-controls">
-                            <button id="reset-layout-btn" class="clear-btn">🔄 Reset Layout</button>
-                            <button id="fullscreen-btn" class="clear-btn">⛶ Fullscreen</button>
+                            <button id="reset-layout-btn" class="clear-btn" aria-label="Reset graph layout">🔄 Reset Layout</button>
+                            <button id="fullscreen-btn" class="clear-btn" aria-label="Toggle fullscreen mode">⛶ Fullscreen</button>
+                            <button id="legend-toggle-btn" class="clear-btn" aria-label="Toggle graph legend" aria-expanded="false">📖 Legend</button>
                         </div>
                     </div>
-                    <div id="cy" class="graph-canvas"></div>
+
+                    <!-- Graph Legend (Collapsible) -->
+                    <div id="graph-legend" class="graph-legend" role="region" aria-label="Graph visualization legend" hidden>
+                        <div class="legend-section">
+                            <h4>Node Types</h4>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <span class="legend-symbol node-assumption" aria-hidden="true"></span>
+                                    <span>Assumption</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-symbol node-derived" aria-hidden="true"></span>
+                                    <span>Derived Element</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-symbol node-top" aria-hidden="true"></span>
+                                    <span>⊤ (Facts)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="legend-section">
+                            <h4>Edge Types</h4>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <span class="legend-symbol edge-derived" aria-hidden="true"></span>
+                                    <span>Derived Attack</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-symbol edge-joint" aria-hidden="true"></span>
+                                    <span>Joint Attack</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-symbol edge-fact" aria-hidden="true"></span>
+                                    <span>Fact-Based Attack</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="legend-section">
+                            <h4>Attack States</h4>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <span class="legend-symbol edge-active" aria-hidden="true"></span>
+                                    <span>Active Attack</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-symbol edge-discarded" aria-hidden="true"></span>
+                                    <span>Discarded Attack</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="cy" class="graph-canvas" role="img" aria-label="Argumentation graph visualization"></div>
+
+                    <!-- Empty State -->
+                    <div id="graph-empty-state" class="graph-empty-state" role="status" hidden>
+                        <div class="empty-state-icon" aria-hidden="true">📊</div>
+                        <h3>No Graph to Display</h3>
+                        <p>Run a WABA framework to visualize the argumentation graph.</p>
+                        <p class="empty-state-hint">Click "▶️ Run WABA" above to get started.</p>
+                    </div>
                 </div>
 
                 <!-- Output Container -->
                 <div class="output-container">
                     <div class="output-header">
                         <h3>Results</h3>
-                        <button id="clear-btn" class="clear-btn">🗑️ Clear Output</button>
+                        <button id="clear-btn" class="clear-btn" aria-label="Clear output results">🗑️ Clear Output</button>
                     </div>
-                    <div id="output" class="output"></div>
-                    <div id="stats" class="stats"></div>
+                    <div id="output" class="output" role="log" aria-live="polite" aria-atomic="false"></div>
+                    <div id="stats" class="stats" role="status" aria-live="polite"></div>
+
+                    <!-- Output Empty State -->
+                    <div id="output-empty-state" class="output-empty-state" role="status" hidden>
+                        <div class="empty-state-icon" aria-hidden="true">📋</div>
+                        <h3>No Results Yet</h3>
+                        <p>Run a WABA framework to see the output here.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,6 +346,15 @@ c_a: 70"></textarea>
         <!-- Footer -->
         <div class="footer">
             <p>WABA Playground | Powered by <a href="https://potassco.org/clingo/" target="_blank">Clingo</a> & <a href="https://visjs.github.io/vis-network/" target="_blank">vis.js</a></p>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" role="status" aria-live="assertive" hidden>
+        <div class="loading-content">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <h3 id="loading-text">Running WABA...</h3>
+            <p id="loading-subtext">Computing extensions and visualizing results</p>
         </div>
     </div>
 
