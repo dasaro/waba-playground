@@ -177,17 +177,12 @@ class WABAPlayground {
                     // Test that clingo.run is available
                     if (typeof clingo.run === 'function') {
                         this.clingoReady = true;
-                        // Clear loading message and show welcome
-                        this.output.innerHTML = `
-                            <div class="welcome-message">
-                                <h4>Welcome to WABA Playground! 🎮</h4>
-                                <p>✅ Clingo WASM loaded successfully</p>
-                                <p>1. Select a semiring and monoid configuration</p>
-                                <p>2. Choose an example or write your own framework</p>
-                                <p>3. Click "Run WABA" to compute extensions</p>
-                                <p>4. Explore how different algebraic choices affect reasoning!</p>
-                            </div>
-                        `;
+                        // Update intro status
+                        const introStatus = document.getElementById('intro-status');
+                        if (introStatus) {
+                            introStatus.textContent = '✅ Clingo WASM loaded successfully';
+                            introStatus.style.color = 'var(--success-color)';
+                        }
                         return;
                     }
                 } catch (e) {
@@ -201,8 +196,11 @@ class WABAPlayground {
         }
 
         // If we get here, clingo didn't load
-        this.log('❌ Failed to load Clingo: Timeout waiting for library', 'error');
-        this.log('Please refresh the page or check your internet connection', 'error');
+        const introStatus = document.getElementById('intro-status');
+        if (introStatus) {
+            introStatus.textContent = '❌ Failed to load Clingo - Please refresh the page';
+            introStatus.style.color = 'var(--error-color)';
+        }
         this.runBtn.disabled = true;
     }
 
