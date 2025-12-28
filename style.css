@@ -382,7 +382,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    height: 400px;
+    min-height: 100px;
     max-height: 500px;
     overflow-y: auto;
     font-family: 'JetBrains Mono', monospace;
@@ -974,7 +974,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     }
 
     .output {
-        height: 300px; /* Smaller on mobile */
+        min-height: 80px; /* Smaller on mobile */
+        max-height: 300px;
     }
 
     .popup-panel,
@@ -1183,7 +1184,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     text-align: center;
     color: var(--text-secondary);
     max-width: 400px;
-    padding: var(--space-xl);
+    padding: var(--space-lg);
+    pointer-events: none; /* Don't block clicks */
 }
 
 .graph-empty-state[hidden],
@@ -1196,9 +1198,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 .empty-state-icon {
-    font-size: 4rem;
-    margin-bottom: var(--space-md);
-    opacity: 0.5;
+    font-size: 3rem;
+    margin-bottom: var(--space-sm);
+    opacity: 0.3;
 }
 
 .graph-empty-state h3,
@@ -1223,6 +1225,12 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .output-container {
     position: relative;
+    min-height: 300px; /* Ensure space for empty state */
+}
+
+/* When output has content, remove min-height */
+.output-container:has(#output:not(:empty)) {
+    min-height: auto;
 }
 
 /* ===================================
