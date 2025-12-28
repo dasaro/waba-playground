@@ -4827,16 +4827,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.showOutputEmptyState = () => {
         const emptyState = document.getElementById('output-empty-state');
-        const output = document.getElementById('output');
         if (emptyState) emptyState.removeAttribute('hidden');
-        if (output) output.style.display = 'none';
     };
 
     window.hideOutputEmptyState = () => {
         const emptyState = document.getElementById('output-empty-state');
-        const output = document.getElementById('output');
         if (emptyState) emptyState.setAttribute('hidden', '');
-        if (output) output.style.display = 'block';
     };
 
     // Show empty states initially

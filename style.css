@@ -382,12 +382,14 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    min-height: 100px;
+    min-height: 250px;
     max-height: 500px;
     overflow-y: auto;
     font-family: 'JetBrains Mono', monospace;
     font-size: var(--text-sm);
     line-height: 1.7;
+    display: flex;
+    flex-direction: column;
 }
 
 .output::-webkit-scrollbar {
@@ -1175,8 +1177,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Empty States
    =================================== */
 
-.graph-empty-state,
-.output-empty-state {
+.graph-empty-state {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1186,15 +1187,27 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     max-width: 400px;
     padding: var(--space-lg);
     pointer-events: none; /* Don't block clicks */
+    z-index: 1;
 }
 
-.graph-empty-state[hidden],
-.output-empty-state[hidden] {
+.graph-empty-state[hidden] {
     display: none !important;
 }
 
-.graph-empty-state {
-    z-index: 1;
+/* Output empty state - inside output panel, centered with flexbox */
+.output-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    flex: 1; /* Fill available space */
+    padding: var(--space-xl);
+}
+
+.output-empty-state[hidden] {
+    display: none !important;
 }
 
 .empty-state-icon {
@@ -1208,14 +1221,14 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     font-size: var(--text-lg);
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: var(--space-sm);
+    margin: 0 0 var(--space-sm) 0;
 }
 
 .graph-empty-state p,
 .output-empty-state p {
     font-size: var(--text-sm);
     line-height: 1.6;
-    margin-bottom: var(--space-xs);
+    margin: 0 0 var(--space-xs) 0;
 }
 
 .empty-state-hint {
@@ -1225,12 +1238,6 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .output-container {
     position: relative;
-    min-height: 300px; /* Ensure space for empty state */
-}
-
-/* When output has content, remove min-height */
-.output-container:has(#output:not(:empty)) {
-    min-height: auto;
 }
 
 /* ===================================

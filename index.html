@@ -335,15 +335,15 @@ c_a: 70"></textarea>
                         <h3>Results</h3>
                         <button id="clear-btn" class="clear-btn" aria-label="Clear output results">🗑️ Clear Output</button>
                     </div>
-                    <div id="output" class="output" role="log" aria-live="polite" aria-atomic="false"></div>
-                    <div id="stats" class="stats" role="status" aria-live="polite"></div>
-
-                    <!-- Output Empty State -->
-                    <div id="output-empty-state" class="output-empty-state" role="status" hidden>
-                        <div class="empty-state-icon" aria-hidden="true">📋</div>
-                        <h3>No Results Yet</h3>
-                        <p>Run a WABA framework to see the output here.</p>
+                    <div id="output" class="output" role="log" aria-live="polite" aria-atomic="false">
+                        <!-- Output Empty State (inside output panel) -->
+                        <div id="output-empty-state" class="output-empty-state" role="status">
+                            <div class="empty-state-icon" aria-hidden="true">📋</div>
+                            <h3>No Results Yet</h3>
+                            <p>Run a WABA framework to see the output here.</p>
+                        </div>
                     </div>
+                    <div id="stats" class="stats" role="status" aria-live="polite"></div>
                 </div>
             </div>
         </div>
