@@ -321,6 +321,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     transition: all 0.2s;
     min-height: 42px; /* Ensure consistent height across all selects */
     line-height: 1.5; /* Prevent text wrapping from changing height */
+    width: 100%; /* Ensure all selects fill their container equally */
 }
 
 .select:hover {
