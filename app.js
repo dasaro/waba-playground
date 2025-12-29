@@ -26,6 +26,10 @@ class WABAPlayground {
         this.contrariesInput = document.getElementById('contraries-input');
         this.weightsInput = document.getElementById('weights-input');
 
+        // File upload elements
+        this.fileUploadBtn = document.getElementById('file-upload-btn');
+        this.fileUploadInput = document.getElementById('file-upload-input');
+
         // Graph visualization elements
         this.graphCanvas = document.getElementById('cy');
         this.graphContainer = document.getElementById('graph-container');
@@ -208,6 +212,10 @@ class WABAPlayground {
         this.runBtn.addEventListener('click', () => this.runWABA());
         this.clearBtn.addEventListener('click', () => this.clearOutput());
         this.exampleSelect.addEventListener('change', (e) => this.loadExample(e.target.value));
+
+        // File upload handlers
+        this.fileUploadBtn.addEventListener('click', () => this.fileUploadInput.click());
+        this.fileUploadInput.addEventListener('change', (e) => this.handleFileUpload(e));
 
         // Regenerate graph when configuration changes
         this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
@@ -2891,6 +2899,110 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         }
 
         return clingoCode;
+    }
+
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const fileName = file.name;
+        const fileExtension = fileName.split('.').pop().toLowerCase();
+
+        try {
+            const content = await file.text();
+
+            if (fileExtension === 'lp') {
+                // .lp file: switch to Advanced Mode and load directly
+                this.inputMode.value = 'advanced';
+                this.simpleMode.style.display = 'none';
+                this.editor.style.display = 'block';
+                this.editor.value = content;
+
+                // Update graph visualization
+                await this.updateGraph(content);
+
+                this.log(`📁 Loaded .lp file: ${fileName}`, 'info');
+
+            } else if (fileExtension === 'waba') {
+                // .waba file: parse and load into Simple Mode
+                const parsed = this.parseWabaFile(content);
+
+                // Switch to Simple Mode
+                this.inputMode.value = 'simple';
+                this.simpleMode.style.display = 'block';
+                this.editor.style.display = 'none';
+
+                // Populate fields
+                this.assumptionsInput.value = parsed.assumptions.join('\n');
+                this.rulesInput.value = parsed.rules.join('\n');
+                this.contrariesInput.value = parsed.contraries.join('\n');
+                this.weightsInput.value = parsed.weights.join('\n');
+
+                // Generate ASP code and update graph
+                const aspCode = this.parseSimpleABA();
+                await this.updateGraph(aspCode);
+
+                this.log(`📁 Loaded .waba file: ${fileName}`, 'info');
+
+            } else {
+                this.log(`❌ Unsupported file type: ${fileExtension}. Please use .lp or .waba files.`, 'error');
+            }
+
+            // Reset file input for subsequent uploads
+            this.fileUploadInput.value = '';
+
+        } catch (error) {
+            this.log(`❌ Error loading file: ${error.message}`, 'error');
+            console.error('File upload error:', error);
+            this.fileUploadInput.value = '';
+        }
+    }
+
+    parseWabaFile(content) {
+        const lines = content.split('\n').map(l => l.trim());
+
+        const assumptions = [];
+        const rules = [];
+        const contraries = [];
+        const weights = [];
+
+        for (const line of lines) {
+            // Skip empty lines and comments
+            if (!line || line.startsWith('#')) continue;
+
+            // Check for rule: "a <- b,d" or "d <- c"
+            const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
+            if (ruleMatch) {
+                rules.push(line);
+                continue;
+            }
+
+            // Check for contrary: "(b, c_b)"
+            const contraryMatch = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+            if (contraryMatch) {
+                contraries.push(line);
+                continue;
+            }
+
+            // Check for weight: "d : 10" or "a: 80"
+            const weightMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
+            if (weightMatch) {
+                weights.push(line);
+                continue;
+            }
+
+            // Otherwise treat as assumption (single atom)
+            const assumptionMatch = line.match(/^[a-z_][a-z0-9_]*$/i);
+            if (assumptionMatch) {
+                assumptions.push(line);
+                continue;
+            }
+
+            // Unrecognized line format - log warning
+            console.warn(`Unrecognized .waba line format: "${line}"`);
+        }
+
+        return { assumptions, rules, contraries, weights };
     }
 
     async runWABA() {
