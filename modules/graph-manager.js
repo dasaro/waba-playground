@@ -120,35 +120,48 @@ export class GraphManager {
             return null;
         }).filter(a => a !== null);
 
-        // Highlight edges (successful = green bold, discarded = red dashed)
+        // Highlight edges (successful = red bold, discarded = grey dashed)
         const edgeUpdates = [];
         edges.forEach(edge => {
-            // Check if this edge is a discarded attack
-            const isDiscarded = discardedAttacks.some(da =>
-                (edge.attackingElement === da.source || edge.from === da.source) &&
-                (edge.attackedAssumption === da.via || edge.to === da.target)
-            );
+            // Check if this edge matches a discarded attack
+            // Works for all graph modes by checking properties and edge ID
+            const isDiscarded = discardedAttacks.some(da => {
+                // Standard mode: check attackingElement/attackedAssumption properties
+                if (edge.attackingElement && edge.attackedAssumption) {
+                    return edge.attackingElement === da.source && edge.attackedAssumption === da.via;
+                }
+                // Assumption-level modes: check from/to and edge ID pattern
+                const matches = edge.from === da.source && edge.to === da.via;
+                const idMatches = edge.id && edge.id.includes(`${da.source}-`) && edge.id.includes(`-${da.via}`);
+                return matches || idMatches;
+            });
 
-            // Check if this edge is a successful attack
-            const isSuccessful = parsedSuccessful.some(sa =>
-                (edge.attackingElement === sa.source || edge.from === sa.source) &&
-                (edge.attackedAssumption === sa.target || edge.to === sa.target)
-            );
+            // Check if this edge matches a successful attack
+            const isSuccessful = parsedSuccessful.some(sa => {
+                // Standard mode: check attackingElement/attackedAssumption properties
+                if (edge.attackingElement && edge.attackedAssumption) {
+                    return edge.attackingElement === sa.source && edge.attackedAssumption === sa.target;
+                }
+                // Assumption-level modes: check from/to and edge ID pattern
+                const matches = edge.from === sa.source && edge.to === sa.target;
+                const idMatches = edge.id && edge.id.includes(`${sa.source}-`) && edge.id.includes(`-${sa.target}`);
+                return matches || idMatches;
+            });
 
             if (isDiscarded) {
-                // Discarded attacks: red and dashed
+                // Discarded attacks: grey and dashed
                 edgeUpdates.push({
                     id: edge.id,
-                    color: { color: '#ef4444', highlight: '#dc2626' },
-                    width: 4,
+                    color: { color: '#9ca3af', highlight: '#6b7280' },
+                    width: 3,
                     dashes: true
                 });
             } else if (isSuccessful) {
-                // Successful attacks: green and bold
+                // Active attacks: red and bold
                 edgeUpdates.push({
                     id: edge.id,
-                    color: { color: '#10b981', highlight: '#059669' },
-                    width: 4,
+                    color: { color: '#ef4444', highlight: '#dc2626' },
+                    width: 5,
                     dashes: false
                 });
             }

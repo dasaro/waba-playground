@@ -1171,20 +1171,20 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .edge-active {
     background: #ef4444;
-    height: 4px;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    height: 5px;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
 }
 
 .edge-discarded {
     background: repeating-linear-gradient(
         to right,
-        #64748b 0px,
-        #64748b 5px,
+        #9ca3af 0px,
+        #9ca3af 5px,
         transparent 5px,
         transparent 10px
     );
-    height: 2px;
-    opacity: 0.6;
+    height: 3px;
+    opacity: 0.7;
 }
 
 /* ===================================

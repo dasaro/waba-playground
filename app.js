@@ -56,6 +56,10 @@ class WABAPlayground {
         this.downloadLpBtn = document.getElementById('download-lp-btn');
         this.downloadWabaBtn = document.getElementById('download-waba-btn');
 
+        // Legend
+        this.legendToggleBtn = document.getElementById('legend-toggle-btn');
+        this.graphLegend = document.getElementById('graph-legend');
+
         // Theme toggle
         this.themeToggleBtn = document.getElementById('theme-toggle-btn');
         this.themeIcon = document.getElementById('theme-icon');
@@ -235,6 +239,20 @@ class WABAPlayground {
         // Fullscreen button
         this.fullscreenBtn.addEventListener('click', () => this.uiManager.toggleFullscreen());
         document.addEventListener('fullscreenchange', () => this.uiManager.updateFullscreenButton());
+
+        // Legend toggle button
+        this.legendToggleBtn.addEventListener('click', () => this.toggleLegend());
+    }
+
+    toggleLegend() {
+        const isHidden = this.graphLegend.hasAttribute('hidden');
+        if (isHidden) {
+            this.graphLegend.removeAttribute('hidden');
+            this.legendToggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            this.graphLegend.setAttribute('hidden', '');
+            this.legendToggleBtn.setAttribute('aria-expanded', 'false');
+        }
     }
 
     // ===================================
