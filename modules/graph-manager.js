@@ -84,8 +84,7 @@ export class GraphManager {
         console.log('Discarded attacks detail:', discardedAttacks.map(da => `${da.source} → ${da.via} (weight: ${da.weight})`));
         console.log('Successful attacks:', successfulAttacks);
 
-        // Reset colors first
-        this.resetGraphColors();
+        // Note: Reset is now handled by caller (output-manager.js) to avoid double-reset
 
         // Get all nodes and edges
         const nodes = this.networkData.nodes.get();
