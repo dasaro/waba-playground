@@ -105,7 +105,8 @@ export class ClingoManager {
             semantics,
             constraint,
             budget,
-            filterType
+            filterType,
+            optMode
         } = config;
 
         // Get modules from waba-modules.js
@@ -126,14 +127,15 @@ ${coreModule}
 %% Semiring module
 ${semiringModule}
 
-%% Constraint module (if using constraints)
+%% Constraint module (only in enumeration mode)
 `;
 
-        // Add constraint module if specified
-        if (constraint && constraint !== 'none' && budget !== undefined) {
+        // Add constraint module ONLY in enumeration mode (optMode === 'ignore')
+        // In optimization mode, weak constraints guide the search
+        if (optMode === 'ignore' && constraint && constraint !== 'none' && budget !== undefined) {
             const constraintModule = this.getConstraintModule(monoid, constraint);
             program += `
-%% Budget constraint (${constraint} ${monoid})
+%% Budget constraint (${constraint} ${monoid}) - enumeration mode only
 #const beta = ${budget}.
 ${constraintModule}
 `;
