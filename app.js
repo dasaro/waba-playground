@@ -4848,6 +4848,10 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
         // Parse the predicates
         const parsed = this.parseAnswerSet(predicates);
 
+        // Extract cost from witness.Optimization field
+        const cost = this.extractCost(witness);
+        parsed.cost = (cost !== 0 || witness.Optimization !== undefined) ? cost : null;
+
         const answerDiv = document.createElement('div');
         answerDiv.className = 'answer-set';
 
