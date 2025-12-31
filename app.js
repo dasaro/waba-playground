@@ -282,16 +282,17 @@ class WABAPlayground {
                 // Clear previous output
                 this.clearOutput();
 
-                // Display results
+                // Update graph visualization FIRST (before displaying results)
+                // This ensures the graph is ready when click handlers are set up
+                await this.updateGraph(framework);
+
+                // THEN display results (with click handlers that reference the now-ready graph)
                 this.outputManager.displayResults(
                     result.result,
                     result.elapsed,
                     (inAssumptions, discarded, successful) => this.graphManager.highlightExtension(inAssumptions, discarded, successful),
                     () => this.graphManager.resetGraphColors()
                 );
-
-                // Update graph visualization
-                await this.updateGraph(framework);
 
                 // Hide output empty state
                 UIManager.hideOutputEmptyState();
