@@ -1029,10 +1029,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 set.attacks.forEach(attack => {
                     const { assumption, attackingElement, weight, derivedBy } = attack;
                     const displayWeight = weight === Infinity ? '#sup' : (weight === -Infinity ? '#inf' : weight);
-                    const normalizedWidth = weight === Infinity ? 5 : (weight === -Infinity ? 1 : Math.min(5, 1 + (weight / 25)));
-                    const colorIntensity = weight === Infinity ? 255 : (weight === -Infinity ? 100 : Math.min(255, Math.floor(weight * 2.55)));
+                    const normalizedWidth = weight === Infinity ? 5 : (weight === -Infinity ? 1 : 2);
                     const color = weight === Infinity ? '#ff6b6b' :
-                                 (weight === -Infinity ? '#888' : `rgb(${colorIntensity}, ${100}, ${150})`);
+                                 (weight === -Infinity ? '#888' : '#f59e0b');
 
                     // Attack edge from set to assumption (shown as attacking any set containing that assumption)
                     // For visualization, we'll create edges to all sets that contain the attacked assumption
@@ -1101,13 +1100,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     // It's a node
                     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
-                    // Neutral purple color for all nodes
+                    // Consistent assumption color for all nodes
                     const nodeColor = {
-                        border: '#7c3aed',
-                        background: '#8b5cf6',
+                        border: '#5568d3',
+                        background: '#667eea',
                         highlight: {
-                            border: '#6d28d9',
-                            background: '#7c3aed'
+                            border: '#4557c2',
+                            background: '#5568d3'
                         }
                     };
 
@@ -1194,11 +1193,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             assumptions.forEach(assumption => {
                 const weight = weights[assumption] || '?';
                 const nodeColor = {
-                    border: '#7c3aed',
-                    background: '#8b5cf6',
+                    border: '#5568d3',
+                    background: '#667eea',
                     highlight: {
-                        border: '#6d28d9',
-                        background: '#7c3aed'
+                        border: '#4557c2',
+                        background: '#5568d3'
                     }
                 };
 
@@ -1460,11 +1459,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             assumptions.forEach(assumption => {
                 const weight = weights[assumption] || '?';
                 const nodeColor = {
-                    border: '#7c3aed',
-                    background: '#8b5cf6',
+                    border: '#5568d3',
+                    background: '#667eea',
                     highlight: {
-                        border: '#6d28d9',
-                        background: '#7c3aed'
+                        border: '#4557c2',
+                        background: '#5568d3'
                     }
                 };
 
