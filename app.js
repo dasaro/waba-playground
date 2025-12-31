@@ -1085,7 +1085,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         width: 2,
                                         color: edgeColor,
                                         arrows: 'to',
-                                        dashes: [5, 5],
+                                        dashes: false,
                                         title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
                                         attackType: 'joint',
                                         attackingElement: attacker,
@@ -1094,7 +1094,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         jointWith: assumptionAttackers,
                                         originalWidth: 2,
                                         originalColor: edgeColor,
-                                        originalDashes: [5, 5]
+                                        originalDashes: false
                                     });
                                 });
                             }
@@ -1111,18 +1111,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Add ⊤ (top) node for fact-based attacks
             if (factBasedAttacks.length > 0) {
                 const topNodeColor = {
-                    border: '#64748b',
-                    background: '#94a3b8',
+                    border: '#5568d3',
+                    background: '#667eea',
                     highlight: {
-                        border: '#475569',
-                        background: '#64748b'
+                        border: '#4557c2',
+                        background: '#5568d3'
                     }
                 };
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
                     size: 15,
-                    shape: 'box',
+                    shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
@@ -1135,7 +1135,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Create edges from ⊤ to attacked assumptions
                 factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
                     const displayWeight = weight === '?' ? '' : weight;
-                    const edgeColor = { color: '#94a3b8', highlight: '#64748b' };
+                    const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
                     visEdges.push({
                         id: `top-attacks-${assumption}-via-${contrary}`,
                         from: '⊤',
@@ -1354,7 +1354,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 const junctionId = `junction_${rule.id}`;
                                 const junctionNode = {
                                     id: junctionId,
-                                    label: '⊗', // Multiplication symbol to indicate "joint"
+                                    label: '',
                                     size: 12,
                                     shape: 'diamond',
                                     color: {
@@ -1388,14 +1388,14 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                         width: 2,
                                         color: edgeColor,
                                         arrows: 'to',
-                                        dashes: [5, 5],
+                                        dashes: false,
                                         title: `${attacker} contributes to joint attack`,
                                         attackingElement: attacker,
                                         targetAssumption: assumption,
                                         contrary: contrary,
                                         originalWidth: 2,
                                         originalColor: edgeColor,
-                                        originalDashes: [5, 5]
+                                        originalDashes: false
                                     };
                                     console.log(`  Creating edge to junction:`, edge);
                                     visEdges.push(edge);
@@ -1440,18 +1440,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Add ⊤ (top) node for fact-based attacks
             if (factBasedAttacks.length > 0) {
                 const topNodeColor = {
-                    border: '#64748b',
-                    background: '#94a3b8',
+                    border: '#5568d3',
+                    background: '#667eea',
                     highlight: {
-                        border: '#475569',
-                        background: '#64748b'
+                        border: '#4557c2',
+                        background: '#5568d3'
                     }
                 };
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
                     size: 15,
-                    shape: 'box',
+                    shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
@@ -1464,7 +1464,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Create edges from ⊤ to attacked assumptions
                 factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
                     const displayWeight = weight === '?' ? '' : weight;
-                    const edgeColor = { color: '#94a3b8', highlight: '#64748b' };
+                    const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
                     visEdges.push({
                         id: `top-attacks-${assumption}-via-${contrary}`,
                         from: '⊤',

@@ -1133,8 +1133,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .node-derived {
     width: 20px;
     height: 20px;
-    background: #a855f7;
-    border: 2px solid #a855f7;
+    background: #10b981;
+    border: 2px solid #10b981;
     transform: rotate(45deg);
 }
 
@@ -1143,7 +1143,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-bottom: 17px solid #94a3b8;
+    border-bottom: 17px solid #667eea;
 }
 
 /* Edge symbols */
@@ -1166,7 +1166,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 .edge-fact {
-    background: #94a3b8;
+    background: #f59e0b;
 }
 
 .edge-active {
