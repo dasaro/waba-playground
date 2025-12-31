@@ -81,6 +81,7 @@ export class GraphManager {
         console.log('=== HIGHLIGHTING EXTENSION ===');
         console.log('In assumptions:', inAssumptions);
         console.log('Discarded attacks:', discardedAttacks);
+        console.log('Discarded attacks detail:', discardedAttacks.map(da => `${da.source} → ${da.via} (weight: ${da.weight})`));
         console.log('Successful attacks:', successfulAttacks);
 
         // Reset colors first
@@ -153,10 +154,19 @@ export class GraphManager {
             for (const da of discardedAttacks) {
                 // For assumption-level modes, the contrary property stores the attacking element
                 // For standard mode, attackingElement IS the attacking element
-                const fromMatch = edge.contrary === da.source || edge.attackingElement === da.source;
+                const contraryMatch = edge.contrary === da.source;
+                const attackingMatch = edge.attackingElement === da.source;
+                const fromMatch = contraryMatch || attackingMatch;
                 const toMatch = edge.to === da.via || edge.attackedAssumption === da.via || edge.targetAssumption === da.via;
 
-                console.log(`  Checking discarded ${da.source} → ${da.via}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
+                console.log(`  Checking discarded ${da.source} → ${da.via}:`, {
+                    'edge.contrary': edge.contrary,
+                    'da.source': da.source,
+                    'contraryMatch': contraryMatch,
+                    'attackingMatch': attackingMatch,
+                    'fromMatch': fromMatch,
+                    'toMatch': toMatch
+                });
 
                 if (fromMatch && toMatch) {
                     console.log(`  ✓ MATCHED DISCARDED: ${da.source} → ${da.via}`);
