@@ -264,15 +264,63 @@ class WABAPlayground {
         }
     }
 
+    addWatermark(sourceCanvas) {
+        // Create a new canvas with watermark
+        const watermarkedCanvas = document.createElement('canvas');
+        watermarkedCanvas.width = sourceCanvas.width;
+        watermarkedCanvas.height = sourceCanvas.height;
+        const ctx = watermarkedCanvas.getContext('2d');
+
+        // Draw original canvas
+        ctx.drawImage(sourceCanvas, 0, 0);
+
+        // Add watermark in bottom-right corner
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
+
+        // Text settings
+        const fontSize = Math.max(14, Math.floor(sourceCanvas.height / 40));
+        ctx.font = `${fontSize}px Arial`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+
+        // Watermark text
+        const line1 = 'WABA Playground';
+        const line2 = 'https://github.com/dasaro/waba-playground';
+        const line3 = 'Author: Fabio D\'Asaro';
+
+        const padding = 10;
+        const lineHeight = fontSize + 4;
+        const x = watermarkedCanvas.width - padding;
+        const y3 = watermarkedCanvas.height - padding;
+        const y2 = y3 - lineHeight;
+        const y1 = y2 - lineHeight;
+
+        // Draw text with outline for better visibility
+        ctx.strokeText(line1, x, y1);
+        ctx.fillText(line1, x, y1);
+        ctx.strokeText(line2, x, y2);
+        ctx.fillText(line2, x, y2);
+        ctx.strokeText(line3, x, y3);
+        ctx.fillText(line3, x, y3);
+
+        ctx.restore();
+        return watermarkedCanvas;
+    }
+
     exportGraphAsPng() {
         if (!this.graphManager.network) {
             alert('No graph to export. Please run WABA first.');
             return;
         }
 
-        // Use vis.js built-in canvas export
-        const canvas = this.graphManager.network.canvas.frame.canvas;
-        canvas.toBlob((blob) => {
+        // Get canvas and add watermark
+        const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
+        const watermarkedCanvas = this.addWatermark(sourceCanvas);
+
+        watermarkedCanvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -288,13 +336,14 @@ class WABAPlayground {
             return;
         }
 
-        // Export as high-resolution PNG (PDF generation would require external library)
-        const canvas = this.graphManager.network.canvas.frame.canvas;
+        // Get canvas and add watermark
+        const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
+        const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
-        canvas.toBlob((blob) => {
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        watermarkedCanvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             link.href = url;
             link.download = `waba-graph-${timestamp}.png`;
             link.click();
