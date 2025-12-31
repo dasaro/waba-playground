@@ -147,7 +147,7 @@ export class GraphManager {
             // Check for discarded attack match
             for (const da of discardedAttacks) {
                 const fromMatch = edge.from === da.source || edge.attackingElement === da.source;
-                const toMatch = edge.to === da.via || edge.attackedAssumption === da.via;
+                const toMatch = edge.to === da.via || edge.attackedAssumption === da.via || edge.targetAssumption === da.via;
 
                 if (fromMatch && toMatch) {
                     console.log(`  → MATCHED DISCARDED: ${da.source} → ${da.via}`);
@@ -165,7 +165,7 @@ export class GraphManager {
             // Check for successful attack match
             for (const sa of parsedSuccessful) {
                 const fromMatch = edge.from === sa.source || edge.attackingElement === sa.source;
-                const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target;
+                const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target || edge.targetAssumption === sa.target;
 
                 if (fromMatch && toMatch) {
                     console.log(`  → MATCHED SUCCESSFUL: ${sa.source} → ${sa.target}`);
