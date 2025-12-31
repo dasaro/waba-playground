@@ -33,20 +33,32 @@ export class OutputManager {
             const monoid = this.monoidSelect.value;
             const isMinimization = monoid.includes('minimization');
 
-            // Sort witnesses by cost/reward
+            // Pre-compute costs for all witnesses (parse predicates to get discarded attacks)
+            const witnessesWithCosts = witnesses.map(witness => {
+                const predicates = witness.Value || [];
+                const parsed = this.parseAnswerSet(predicates);
+
+                // Extract cost from Optimization field, or compute from discarded attacks
+                let cost = this.extractCost(witness);
+                if (witness.Optimization === undefined && parsed.discarded.length > 0) {
+                    cost = this.computeCostFromDiscarded(parsed.discarded);
+                }
+
+                return { witness, cost, parsed };
+            });
+
+            // Sort by pre-computed costs
             // Minimization: ascending (lower cost = better)
             // Maximization: descending (higher reward = better)
-            const sortedWitnesses = witnesses.slice().sort((a, b) => {
-                const costA = this.extractCost(a);
-                const costB = this.extractCost(b);
-                return isMinimization ? (costA - costB) : (costB - costA);
+            witnessesWithCosts.sort((a, b) => {
+                return isMinimization ? (a.cost - b.cost) : (b.cost - a.cost);
             });
 
             // Display all witnesses in sorted order
             console.log('Displaying witnesses...');
-            sortedWitnesses.forEach((witness, index) => {
-                console.log(`Processing witness ${index + 1}:`, witness);
-                this.appendAnswerSet(witness, index + 1, onHighlightExtension, onResetGraph);
+            witnessesWithCosts.forEach((item, index) => {
+                console.log(`Processing witness ${index + 1}:`, item.witness, 'cost:', item.cost);
+                this.appendAnswerSet(item.witness, index + 1, onHighlightExtension, onResetGraph, item.cost);
             });
 
             if (result.Result === 'OPTIMUM FOUND') {
@@ -64,7 +76,7 @@ export class OutputManager {
         `;
     }
 
-    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph) {
+    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null) {
         // witness is an object with Time and Value properties
         // Value is an array of predicate strings
         const predicates = witness.Value || [];
@@ -72,11 +84,15 @@ export class OutputManager {
         // Parse the predicates
         const parsed = this.parseAnswerSet(predicates);
 
-        // Extract cost from witness.Optimization field, or compute from discarded attacks
-        let cost = this.extractCost(witness);
-        if (witness.Optimization === undefined && parsed.discarded.length > 0) {
-            // Manually compute cost from discarded attacks based on monoid
-            cost = this.computeCostFromDiscarded(parsed.discarded);
+        // Use pre-computed cost if available, otherwise compute it
+        let cost;
+        if (precomputedCost !== null) {
+            cost = precomputedCost;
+        } else {
+            cost = this.extractCost(witness);
+            if (witness.Optimization === undefined && parsed.discarded.length > 0) {
+                cost = this.computeCostFromDiscarded(parsed.discarded);
+            }
         }
         parsed.cost = cost;
 
