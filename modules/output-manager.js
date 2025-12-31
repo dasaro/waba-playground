@@ -29,11 +29,17 @@ export class OutputManager {
             this.log('⚠️ No extensions found', 'warning');
             this.log('Try adjusting the budget or framework constraints', 'info');
         } else {
-            // Sort witnesses by cost (ascending order)
+            // Determine sort direction based on monoid type
+            const monoid = this.monoidSelect.value;
+            const isMinimization = monoid.includes('minimization');
+
+            // Sort witnesses by cost/reward
+            // Minimization: ascending (lower cost = better)
+            // Maximization: descending (higher reward = better)
             const sortedWitnesses = witnesses.slice().sort((a, b) => {
                 const costA = this.extractCost(a);
                 const costB = this.extractCost(b);
-                return costA - costB;
+                return isMinimization ? (costA - costB) : (costB - costA);
             });
 
             // Display all witnesses in sorted order

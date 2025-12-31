@@ -107,20 +107,49 @@ export class GraphManager {
             this.networkData.nodes.update(nodeUpdates);
         }
 
-        // Highlight discarded edges (make them red and thicker)
+        // Parse successful attacks from string format
+        const parsedSuccessful = successfulAttacks.map(attack => {
+            const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+            if (match) {
+                return {
+                    source: match[1],      // attacking element
+                    target: match[2],      // attacked assumption
+                    weight: match[3]
+                };
+            }
+            return null;
+        }).filter(a => a !== null);
+
+        // Highlight edges (successful = green bold, discarded = red dashed)
         const edgeUpdates = [];
         edges.forEach(edge => {
+            // Check if this edge is a discarded attack
             const isDiscarded = discardedAttacks.some(da =>
                 (edge.attackingElement === da.source || edge.from === da.source) &&
                 (edge.attackedAssumption === da.via || edge.to === da.target)
             );
 
+            // Check if this edge is a successful attack
+            const isSuccessful = parsedSuccessful.some(sa =>
+                (edge.attackingElement === sa.source || edge.from === sa.source) &&
+                (edge.attackedAssumption === sa.target || edge.to === sa.target)
+            );
+
             if (isDiscarded) {
+                // Discarded attacks: red and dashed
                 edgeUpdates.push({
                     id: edge.id,
                     color: { color: '#ef4444', highlight: '#dc2626' },
                     width: 4,
                     dashes: true
+                });
+            } else if (isSuccessful) {
+                // Successful attacks: green and bold
+                edgeUpdates.push({
+                    id: edge.id,
+                    color: { color: '#10b981', highlight: '#059669' },
+                    width: 4,
+                    dashes: false
                 });
             }
         });
