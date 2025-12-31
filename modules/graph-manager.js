@@ -141,16 +141,21 @@ export class GraphManager {
                 from: edge.from,
                 to: edge.to,
                 attackingElement: edge.attackingElement,
-                attackedAssumption: edge.attackedAssumption
+                attackedAssumption: edge.attackedAssumption,
+                targetAssumption: edge.targetAssumption
             });
+
+            let matched = false;
 
             // Check for discarded attack match
             for (const da of discardedAttacks) {
                 const fromMatch = edge.from === da.source || edge.attackingElement === da.source;
                 const toMatch = edge.to === da.via || edge.attackedAssumption === da.via || edge.targetAssumption === da.via;
 
+                console.log(`  Checking discarded ${da.source} → ${da.via}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
+
                 if (fromMatch && toMatch) {
-                    console.log(`  → MATCHED DISCARDED: ${da.source} → ${da.via}`);
+                    console.log(`  ✓ MATCHED DISCARDED: ${da.source} → ${da.via}`);
                     edgeUpdates.push({
                         id: edge.id,
                         color: { color: '#9ca3af', highlight: '#6b7280' },
@@ -158,6 +163,7 @@ export class GraphManager {
                         dashes: true
                     });
                     discardedCount++;
+                    matched = true;
                     return; // Skip checking successful
                 }
             }
@@ -167,8 +173,10 @@ export class GraphManager {
                 const fromMatch = edge.from === sa.source || edge.attackingElement === sa.source;
                 const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target || edge.targetAssumption === sa.target;
 
+                console.log(`  Checking successful ${sa.source} → ${sa.target}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
+
                 if (fromMatch && toMatch) {
-                    console.log(`  → MATCHED SUCCESSFUL: ${sa.source} → ${sa.target}`);
+                    console.log(`  ✓ MATCHED SUCCESSFUL: ${sa.source} → ${sa.target}`);
                     edgeUpdates.push({
                         id: edge.id,
                         color: { color: '#ef4444', highlight: '#dc2626' },
@@ -176,8 +184,13 @@ export class GraphManager {
                         dashes: false
                     });
                     successfulCount++;
+                    matched = true;
                     return;
                 }
+            }
+
+            if (!matched) {
+                console.log(`  ✗ No match for this edge`);
             }
         });
 
