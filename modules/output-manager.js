@@ -8,6 +8,7 @@ export class OutputManager {
         this.semiringSelect = semiringSelect;
         this.monoidSelect = monoidSelect;
         this.optimizeSelect = optimizeSelect;
+        this.activeExtensionId = null;  // Track currently highlighted extension
     }
 
     // ===================================
@@ -18,6 +19,9 @@ export class OutputManager {
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
                             result.Result === 'OPTIMUM FOUND';
+
+        // Reset active extension when displaying new results
+        this.activeExtensionId = null;
 
         // Debug logging
         console.log('Result:', result.Result);
@@ -242,31 +246,33 @@ export class OutputManager {
             successfulAttacks: parsed.successful // Add successful attacks for highlighting
         };
 
-        // Add click handler to highlight this extension
+        // Add click handler to toggle highlight for this extension
         const header = answerDiv.querySelector('.answer-header');
         header.addEventListener('click', () => {
-            // Remove previous highlights
-            document.querySelectorAll('.answer-header').forEach(h => {
-                h.classList.remove('active-extension');
-            });
+            // Check if clicking the already-active extension (toggle off)
+            if (this.activeExtensionId === answerNumber) {
+                // Turn off highlighting
+                document.querySelectorAll('.answer-header').forEach(h => {
+                    h.classList.remove('active-extension');
+                });
+                onResetGraph();
+                this.activeExtensionId = null;
+            } else {
+                // Turn on highlighting for this extension (turn off others)
+                document.querySelectorAll('.answer-header').forEach(h => {
+                    h.classList.remove('active-extension');
+                });
 
-            // Reset previous highlighting first
-            onResetGraph();
+                // Reset previous highlighting first
+                onResetGraph();
 
-            // Add highlight to this extension
-            header.classList.add('active-extension');
+                // Add highlight to this extension
+                header.classList.add('active-extension');
+                this.activeExtensionId = answerNumber;
 
-            // Highlight in graph
-            onHighlightExtension(extensionData.inAssumptions, extensionData.discardedAttacks, extensionData.successfulAttacks);
-        });
-
-        // Add double-click to reset
-        header.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-            document.querySelectorAll('.answer-header').forEach(h => {
-                h.classList.remove('active-extension');
-            });
-            onResetGraph();
+                // Highlight in graph
+                onHighlightExtension(extensionData.inAssumptions, extensionData.discardedAttacks, extensionData.successfulAttacks);
+            }
         });
 
         // Add click handlers for derived atoms to show derivation chain

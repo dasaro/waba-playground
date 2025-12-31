@@ -288,26 +288,18 @@ class WABAPlayground {
             return;
         }
 
-        // Convert canvas to image then to PDF
+        // Export as high-resolution PNG (PDF generation would require external library)
         const canvas = this.graphManager.network.canvas.frame.canvas;
-        const imgData = canvas.toDataURL('image/png');
 
-        // Create a simple PDF by opening image in new window for printing
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>WABA Graph</title>
-                    <style>
-                        body { margin: 0; display: flex; justify-content: center; align-items: center; }
-                        img { max-width: 100%; height: auto; }
-                    </style>
-                </head>
-                <body>
-                    <img src="${imgData}" onload="window.print(); window.close();" />
-                </body>
-            </html>
-        `);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            link.href = url;
+            link.download = `waba-graph-${timestamp}.png`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }, 'image/png', 1.0);  // Quality 1.0 for high-resolution export
     }
 
     // ===================================

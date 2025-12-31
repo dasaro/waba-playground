@@ -28,7 +28,8 @@ export class GraphManager {
         // Add reset layout button handler
         if (this.resetLayoutBtn) {
             this.resetLayoutBtn.addEventListener('click', () => {
-                this.runGraphLayout(false);
+                this.resetGraphColors();  // Reset colors first
+                this.runGraphLayout(false);  // Then re-layout
             });
         }
 
