@@ -48,6 +48,12 @@ class WABAPlayground {
         this.fontDecreaseBtn = document.getElementById('font-decrease-btn');
         this.currentFontSize = 100; // Base font size percentage
 
+        // Syntax guide and download
+        this.syntaxGuideBtn = document.getElementById('syntax-guide-btn');
+        this.syntaxGuideModal = document.getElementById('syntax-guide-modal');
+        this.syntaxGuideClose = document.getElementById('syntax-guide-close');
+        this.downloadLpBtn = document.getElementById('download-lp-btn');
+
         this.clingoReady = false;
 
         // Show loading message
@@ -133,6 +139,52 @@ class WABAPlayground {
 
     decreaseFontSize() {
         this.setFontSize(this.currentFontSize - 10);
+    }
+
+    openSyntaxGuide() {
+        this.syntaxGuideModal.hidden = false;
+        this.syntaxGuideModal.setAttribute('aria-hidden', 'false');
+        // Trap focus in modal
+        this.syntaxGuideModal.querySelector('button').focus();
+    }
+
+    closeSyntaxGuide() {
+        this.syntaxGuideModal.hidden = true;
+        this.syntaxGuideModal.setAttribute('aria-hidden', 'true');
+        // Return focus to syntax guide button
+        this.syntaxGuideBtn.focus();
+    }
+
+    downloadCurrentFramework() {
+        // Get current framework code
+        let frameworkCode;
+        if (this.inputMode.value === 'simple') {
+            frameworkCode = this.parseSimpleABA();
+        } else {
+            frameworkCode = this.editor.value.trim();
+        }
+
+        if (!frameworkCode) {
+            this.log('⚠️ No framework code to download', 'warning');
+            return;
+        }
+
+        // Create blob and download
+        const blob = new Blob([frameworkCode], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `waba-framework-${timestamp}.lp`;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.log(`💾 Downloaded framework as ${a.download}`, 'success');
     }
 
     updateGraphTheme() {
@@ -245,6 +297,18 @@ class WABAPlayground {
                 this.runWABA();
             }
         });
+
+        // Syntax guide modal
+        this.syntaxGuideBtn.addEventListener('click', () => this.openSyntaxGuide());
+        this.syntaxGuideClose.addEventListener('click', () => this.closeSyntaxGuide());
+        this.syntaxGuideModal.addEventListener('click', (e) => {
+            if (e.target === this.syntaxGuideModal) {
+                this.closeSyntaxGuide();
+            }
+        });
+
+        // Download .lp file
+        this.downloadLpBtn.addEventListener('click', () => this.downloadCurrentFramework());
     }
 
     async regenerateGraph() {

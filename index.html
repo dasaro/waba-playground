@@ -86,6 +86,9 @@
                 <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
                     <span id="theme-icon" aria-hidden="true">🌙</span>
                 </button>
+                <button id="syntax-guide-btn" class="link-btn" title="WABA Syntax Guide" aria-label="Open WABA syntax guide">
+                    <span aria-hidden="true">📖</span>
+                </button>
             </div>
         </div>
 
@@ -214,7 +217,10 @@
                                 <option value="advanced">Advanced Mode (ASP)</option>
                             </select>
                         </div>
-                        <button id="run-btn" class="run-btn" aria-label="Execute WABA framework">▶️ Run WABA</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="run-btn" class="run-btn" aria-label="Execute WABA framework">▶️ Run WABA</button>
+                            <button id="download-lp-btn" class="clear-btn" aria-label="Download current framework as .lp file">💾 Download .lp</button>
+                        </div>
                     </div>
 
                     <!-- Advanced Mode: Code Editor -->
@@ -382,6 +388,80 @@ c_a: 70"></textarea>
             <div class="loading-spinner" aria-hidden="true"></div>
             <h3 id="loading-text">Running WABA...</h3>
             <p id="loading-subtext">Computing extensions and visualizing results</p>
+        </div>
+    </div>
+
+    <!-- Syntax Guide Modal -->
+    <div id="syntax-guide-modal" class="modal" role="dialog" aria-labelledby="syntax-guide-title" aria-hidden="true" hidden>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="syntax-guide-title">WABA Syntax Guide</h2>
+                <button id="syntax-guide-close" class="modal-close" aria-label="Close syntax guide">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>ASP (Answer Set Programming) Basics</h3>
+                <ul>
+                    <li><strong>Comments:</strong> <code>% This is a comment</code></li>
+                    <li><strong>Facts:</strong> <code>fact_name.</code></li>
+                    <li><strong>Rules:</strong> <code>head :- body1, body2.</code></li>
+                    <li><strong>Constraints:</strong> <code>:- constraint_violated.</code></li>
+                    <li><strong>Choice:</strong> <code>{ chosen_atom }.</code></li>
+                </ul>
+
+                <h3>WABA Core Predicates</h3>
+
+                <h4>Assumptions (Defeasible Atoms)</h4>
+                <pre><code>assumption(atom_name).</code></pre>
+                <p>Declares a defeasible assumption that can be in or out of extensions.</p>
+
+                <h4>Weights</h4>
+                <pre><code>weight(atom_name, weight_value).</code></pre>
+                <p>Assigns a positive integer weight to an atom (default: 1).</p>
+
+                <h4>Rules (Inference)</h4>
+                <pre><code>head(rule_id, conclusion).
+body(rule_id, premise1).
+body(rule_id, premise2).</code></pre>
+                <p>Defines inference rules: <code>conclusion ← premise1, premise2</code></p>
+                <p><em>Compact form:</em> <code>head(r1, conclusion; r1, premise1; r1, premise2).</code></p>
+
+                <h4>Contraries (Attack Relation)</h4>
+                <pre><code>contrary(attacked_assumption, attacking_element).</code></pre>
+                <p><strong>Important:</strong> "attacking_element attacks attacked_assumption" (not the reverse).</p>
+
+                <h4>Budget Constraint</h4>
+                <pre><code>budget(beta).</code></pre>
+                <p>Sets the budget β for attack resolution costs.</p>
+
+                <h3>Example Framework</h3>
+                <pre><code>% Assumptions
+assumption(assume_a).
+assumption(assume_b).
+
+% Weights
+weight(assume_a, 10).
+weight(assume_b, 20).
+weight(attack_element, 15).
+
+% Rules
+head(r1, attack_element).
+body(r1, assume_a).
+
+% Contraries
+contrary(assume_b, attack_element).
+
+% Budget
+budget(50).</code></pre>
+
+                <h3>Special Constants</h3>
+                <ul>
+                    <li><code>#sup</code> - Superior (infinity-like value)</li>
+                    <li><code>#inf</code> - Inferior (negative infinity-like value)</li>
+                </ul>
+
+                <h3>See Also</h3>
+                <p>For complete WABA documentation, visit the <a href="https://github.com/dasaro/WABA" target="_blank">WABA GitHub repository</a>.</p>
+            </div>
         </div>
     </div>
 
