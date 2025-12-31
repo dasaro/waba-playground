@@ -134,7 +134,8 @@ class WABAPlayground {
             this.output,
             this.stats,
             this.semiringSelect,
-            this.monoidSelect
+            this.monoidSelect,
+            this.optimizeSelect
         );
     }
 

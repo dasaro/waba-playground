@@ -2,11 +2,12 @@
  * OutputManager - Handles result display, parsing, and logging
  */
 export class OutputManager {
-    constructor(output, stats, semiringSelect, monoidSelect) {
+    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {
         this.output = output;
         this.stats = stats;
         this.semiringSelect = semiringSelect;
         this.monoidSelect = monoidSelect;
+        this.optimizeSelect = optimizeSelect;
     }
 
     // ===================================
@@ -29,9 +30,9 @@ export class OutputManager {
             this.log('⚠️ No extensions found', 'warning');
             this.log('Try adjusting the budget or framework constraints', 'info');
         } else {
-            // Determine sort direction based on monoid type
-            const monoid = this.monoidSelect.value;
-            const isMinimization = monoid.includes('minimization');
+            // Determine sort direction from optimization direction selector
+            const optDirection = this.optimizeSelect.value;
+            const isMinimization = optDirection === 'minimize' || optDirection === 'none';
 
             // Pre-compute costs for all witnesses (parse predicates to get discarded attacks)
             const witnessesWithCosts = witnesses.map(witness => {
@@ -48,13 +49,15 @@ export class OutputManager {
             });
 
             // Sort by pre-computed costs
-            // Minimization (cost): ascending order (lower cost first)
-            // Maximization (reward): descending order (higher reward first)
+            // Minimization: ascending order (0, 70, 90, 95 - lower cost first)
+            // Maximization: descending order (95, 90, 70, 0 - higher reward first)
             witnessesWithCosts.sort((a, b) => {
                 return isMinimization ? (a.cost - b.cost) : (b.cost - a.cost);
             });
 
-            console.log('Sorting:', isMinimization ? 'minimization (ascending)' : 'maximization (descending)');
+            console.log('Optimization direction:', optDirection);
+            console.log('Sort order:', isMinimization ? 'ascending (lower cost first)' : 'descending (higher reward first)');
+            console.log('Sorted costs:');
             witnessesWithCosts.forEach((item, i) => {
                 console.log(`  ${i+1}. Cost: ${item.cost}`);
             });
