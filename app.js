@@ -625,10 +625,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         try {
             // Parse framework to extract assumptions, contraries, rules, and weights
-            const assumptions = this.parseAssumptions(frameworkCode);
-            const contraries = this.parseContraries(frameworkCode);
-            const rules = this.parseRules(frameworkCode);
-            const weights = this.parseWeights(frameworkCode);
+            const assumptions = ParserUtils.parseAssumptions(frameworkCode);
+            const contraries = ParserUtils.parseContraries(frameworkCode);
+            const rules = ParserUtils.parseRules(frameworkCode);
+            const weights = ParserUtils.parseWeights(frameworkCode);
 
             // Build vis.js nodes (one per assumption)
             const visNodes = [];
@@ -884,10 +884,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         try {
             // Parse framework to extract assumptions, contraries, rules, and weights
-            const assumptions = this.parseAssumptions(frameworkCode);
-            const contraries = this.parseContraries(frameworkCode);
-            const rules = this.parseRules(frameworkCode);
-            const weights = this.parseWeights(frameworkCode);
+            const assumptions = ParserUtils.parseAssumptions(frameworkCode);
+            const contraries = ParserUtils.parseContraries(frameworkCode);
+            const rules = ParserUtils.parseRules(frameworkCode);
+            const weights = ParserUtils.parseWeights(frameworkCode);
 
             // DEBUG: Log parsed data
             console.log('=== ASSUMPTION-LEVEL GRAPH DEBUG (BRANCHING) ===');
