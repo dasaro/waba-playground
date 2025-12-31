@@ -4771,6 +4771,45 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
         return 0;
     }
 
+    computeCostFromDiscarded(discardedAttacks) {
+        // Manually compute cost from discarded attacks based on selected monoid
+        if (discardedAttacks.length === 0) return 0;
+
+        const monoid = this.monoidSelect.value;
+        const weights = [];
+
+        // Extract weights from discarded attacks
+        discardedAttacks.forEach(attack => {
+            const match = attack.match(/discarded_attack\([^,]+,\s*[^,]+,\s*([^)]+)\)/);
+            if (match) {
+                const weight = match[1];
+                if (weight === '#sup') {
+                    weights.push(Infinity);
+                } else if (weight === '#inf') {
+                    weights.push(-Infinity);
+                } else {
+                    weights.push(parseFloat(weight) || 0);
+                }
+            }
+        });
+
+        if (weights.length === 0) return 0;
+
+        // Compute cost based on monoid
+        switch (monoid) {
+            case 'max':
+                return Math.max(...weights);
+            case 'sum':
+                return weights.reduce((a, b) => a + b, 0);
+            case 'min':
+                return Math.min(...weights);
+            case 'count':
+                return weights.length;
+            default:
+                return 0;
+        }
+    }
+
     displayResults(result, elapsed) {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
@@ -4848,9 +4887,13 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
         // Parse the predicates
         const parsed = this.parseAnswerSet(predicates);
 
-        // Extract cost from witness.Optimization field
-        const cost = this.extractCost(witness);
-        parsed.cost = (cost !== 0 || witness.Optimization !== undefined) ? cost : null;
+        // Extract cost from witness.Optimization field, or compute from discarded attacks
+        let cost = this.extractCost(witness);
+        if (witness.Optimization === undefined && parsed.discarded.length > 0) {
+            // Manually compute cost from discarded attacks based on monoid
+            cost = this.computeCostFromDiscarded(parsed.discarded);
+        }
+        parsed.cost = cost;
 
         const answerDiv = document.createElement('div');
         answerDiv.className = 'answer-set';
