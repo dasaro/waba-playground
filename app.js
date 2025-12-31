@@ -587,7 +587,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // First pass: collect all edges
             elements.forEach(el => {
                 if (el.data.source) {
-                    // It's an edge - store original width and color for reset
+                    // It's an edge - store original width, color, and dashes for reset
                     const edgeColor = { color: el.data.color, highlight: el.data.color };
                     visEdges.push({
                         id: el.data.id,
@@ -598,6 +598,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         originalWidth: el.data.width,  // Store original for reset
                         color: edgeColor,
                         originalColor: edgeColor,  // Store original for reset
+                        dashes: false,
+                        originalDashes: false,  // Store original for reset
                         attackedAssumption: el.data.attackedAssumption,
                         attackingElement: el.data.attackingElement,
                         derivedBy: el.data.derivedBy,
