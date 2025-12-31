@@ -141,11 +141,37 @@
                         <div class="config-item">
                             <label for="semantics-select">Semantics</label>
                             <select id="semantics-select" class="select">
-                                <option value="stable">Stable Semantics</option>
-                                <option value="cf">Conflict-Free Semantics</option>
+                                <optgroup label="Core">
+                                    <option value="stable">Stable</option>
+                                    <option value="cf">Conflict-Free</option>
+                                    <option value="admissible">Admissible</option>
+                                    <option value="complete">Complete</option>
+                                    <option value="grounded">Grounded</option>
+                                </optgroup>
+                                <optgroup label="Extension-based">
+                                    <option value="ideal">Ideal</option>
+                                    <option value="naive">Naive</option>
+                                    <option value="preferred">Preferred</option>
+                                    <option value="semi-stable">Semi-Stable</option>
+                                    <option value="staged">Staged</option>
+                                </optgroup>
+                                <optgroup label="Heuristic">
+                                    <option value="heuristic-naive">Naive (heuristic)</option>
+                                    <option value="heuristic-preferred">Preferred (heuristic)</option>
+                                    <option value="heuristic-semi-stable">Semi-Stable (heuristic)</option>
+                                    <option value="heuristic-staged">Staged (heuristic)</option>
+                                    <option value="heuristic-grounded">Grounded (heuristic)</option>
+                                </optgroup>
+                                <optgroup label="OptN">
+                                    <option value="optN-preferred">Preferred (optN)</option>
+                                    <option value="optN-semi-stable">Semi-Stable (optN)</option>
+                                    <option value="optN-staged">Staged (optN)</option>
+                                    <option value="optN-ideal">Ideal (optN)</option>
+                                    <option value="optN-eager">Eager (optN)</option>
+                                    <option value="optN-grounded">Grounded (optN)</option>
+                                </optgroup>
                             </select>
-                        </div>
-                    </div>
+                        </div>                    </div>
 
                     <div class="config-grid">
                         <div class="config-item">
@@ -501,9 +527,7 @@ budget(50).</code></pre>
         </div>
     </div>
 
-    <!-- Load example frameworks -->
-    <script src="examples.js"></script>
-    <!-- Load main application -->
-    <script src="app.js"></script>
+    <!-- Main Application (ES6 Module) -->
+    <script type="module" src="app.js"></script>
 </body>
 </html>
