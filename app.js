@@ -4323,8 +4323,8 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
 %% Priority @2: Reject #sup (highest priority - should never minimize to #sup)
 :~ M = #max { W : discarded_attack(_,_,W) }, M = #sup. [1@2]
 
-%% Priority @1: Avoid #inf (prefer finite values over #inf)
-:~ M = #max { W : discarded_attack(_,_,W) }, M = #inf. [1@1]
+%% Priority @1: Cost=0 (no discarded attacks) gets 0 penalty
+:~ M = #max { W : discarded_attack(_,_,W) }, M = #inf. [0@1]
 
 %% Priority @0: Minimize finite costs (lowest priority)
 :~ M = #max { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
@@ -4439,8 +4439,8 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
 %% Priority @2: Reject #inf (highest priority - should never minimize to #inf)
 :~ M = #min { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
 
-%% Priority @1: Avoid #sup (prefer finite values over #sup)
-:~ M = #min { W : discarded_attack(_,_,W) }, M = #sup. [1@1]
+%% Priority @1: Cost=0 (no discarded attacks) gets 0 penalty
+:~ M = #min { W : discarded_attack(_,_,W) }, M = #sup. [0@1]
 
 %% Priority @0: Minimize finite costs (lowest priority)
 :~ M = #min { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
