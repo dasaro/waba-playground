@@ -3277,7 +3277,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             // Get optimization mode and build clingo arguments
             const optMode = this.optModeSelect ? this.optModeSelect.value : 'ignore';
             const args = [];
-            if (optMode !== 'ignore') {
+            if (optMode === 'ignore') {
+                // Tell Clingo to ignore weak constraints and enumerate all models
+                args.push('--opt-mode=ignore');
+            } else {
+                // Find and enumerate only optimal models
                 args.push('--opt-mode=' + optMode);
                 args.push('--quiet=1');
                 args.push('--project');
