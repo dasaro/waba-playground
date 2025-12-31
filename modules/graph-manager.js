@@ -141,6 +141,7 @@ export class GraphManager {
                 from: edge.from,
                 to: edge.to,
                 attackingElement: edge.attackingElement,
+                contrary: edge.contrary,
                 attackedAssumption: edge.attackedAssumption,
                 targetAssumption: edge.targetAssumption
             });
@@ -149,7 +150,9 @@ export class GraphManager {
 
             // Check for discarded attack match
             for (const da of discardedAttacks) {
-                const fromMatch = edge.from === da.source || edge.attackingElement === da.source;
+                // For assumption-level modes, the contrary property stores the attacking element
+                // For standard mode, attackingElement IS the attacking element
+                const fromMatch = edge.contrary === da.source || edge.attackingElement === da.source;
                 const toMatch = edge.to === da.via || edge.attackedAssumption === da.via || edge.targetAssumption === da.via;
 
                 console.log(`  Checking discarded ${da.source} → ${da.via}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
@@ -170,7 +173,9 @@ export class GraphManager {
 
             // Check for successful attack match
             for (const sa of parsedSuccessful) {
-                const fromMatch = edge.from === sa.source || edge.attackingElement === sa.source;
+                // For assumption-level modes, the contrary property stores the attacking element
+                // For standard mode, attackingElement IS the attacking element
+                const fromMatch = edge.contrary === sa.source || edge.attackingElement === sa.source;
                 const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target || edge.targetAssumption === sa.target;
 
                 console.log(`  Checking successful ${sa.source} → ${sa.target}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
