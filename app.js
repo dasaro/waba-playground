@@ -590,9 +590,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.graphManager.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            if (window.hideGraphEmptyState) {
-                UIManager.hideGraphEmptyState();
-            }
+            UIManager.hideGraphEmptyState();
 
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
@@ -848,9 +846,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.graphManager.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            if (window.hideGraphEmptyState) {
-                UIManager.hideGraphEmptyState();
-            }
+            UIManager.hideGraphEmptyState();
 
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
@@ -1178,9 +1174,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.graphManager.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            if (window.hideGraphEmptyState) {
-                UIManager.hideGraphEmptyState();
-            }
+            UIManager.hideGraphEmptyState();
 
             // Store framework code and mode
             this.currentFrameworkCode = frameworkCode;
