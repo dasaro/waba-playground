@@ -2,7 +2,7 @@
 // Topology-focused examples with both derived and non-derived attacks
 // CRITICAL: contrary is a FUNCTION - each assumption has exactly ONE contrary
 
-const examples = {
+export const examples = {
     simple: `%% Simple Example - Mixed Attacks
 %% Demonstrates: derived attack (c_a <- b) + non-derived attack (c directly)
 %% Shows: not all atoms need weights
