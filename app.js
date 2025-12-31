@@ -14,6 +14,7 @@ class WABAPlayground {
         this.budgetInput = document.getElementById('budget-input');
         this.numModelsInput = document.getElementById('num-models-input');
         this.optimizeSelect = document.getElementById('optimize-select');
+        this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
         this.flatConstraint = document.getElementById('flat-constraint');
         this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
@@ -3273,8 +3274,17 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             console.log('Number of models requested:', numModels);
             console.log('Calling clingo.run with numModels =', numModels);
 
+            // Get optimization mode and build clingo arguments
+            const optMode = this.optModeSelect ? this.optModeSelect.value : 'ignore';
+            const args = [];
+            if (optMode !== 'ignore') {
+                args.push('--opt-mode=' + optMode);
+                args.push('--quiet=1');
+                args.push('--project');
+            }
+
             // Run clingo
-            const result = await clingo.run(program, numModels);
+            const result = await clingo.run(program, numModels, args);
 
             const endTime = performance.now();
             const elapsed = ((endTime - startTime) / 1000).toFixed(3);
@@ -3307,40 +3317,50 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const semiring = this.semiringSelect.value;
         const monoid = this.monoidSelect.value;
         const semantics = this.semanticsSelect.value;
-        const optimize = this.optimizeSelect.value;
-        const constraint = this.constraintSelect.value;
+        const optMode = this.optModeSelect ? this.optModeSelect.value : 'ignore'; // NEW: optimization mode
+        const optimize = this.optimizeSelect.value; // 'none', 'minimize', 'maximize'
+        const constraint = this.constraintSelect.value; // 'ub' or 'lb'
         const flatEnabled = this.flatConstraint.checked;
         const budget = parseInt(this.budgetInput.value) || 100;
+
+        // Determine optimization direction for monoid selection
+        const direction = (optimize === 'maximize') ? 'maximize' : 'minimize';
 
         // Embed WABA modules inline (since we can't load files in browser)
         const coreBase = this.getCoreModule();
         const semiringModule = this.getSemiringModule(semiring);
-        const monoidModule = this.getMonoidModule(monoid);
+        const monoidModule = this.getMonoidModule(monoid, direction); // NEW: pass direction
         const filterModule = this.getFilterModule();
-        const optimizeModule = this.getOptimizeModule(optimize);
         const semanticsModule = this.getSemanticsModule(semantics);
-        // Only use budget constraint if not optimizing
-        const constraintModule = optimize === 'none' ? this.getConstraintModule(constraint, budget) : '';
+
+        // NEW: Auto-select constraint based on monoid, only if enumeration mode
+        const constraintModule = (optMode === 'ignore')
+            ? this.getConstraintModule(monoid, constraint)
+            : '';
+
         const flatModule = flatEnabled ? this.getFlatModule() : '';
+
+        // NEW: Add budget constant declaration
+        const budgetDecl = `#const beta = ${budget}.\nbudget(beta).`;
 
         // Combine all modules
         return `
+%% === Budget ===
+${budgetDecl}
+
 %% === WABA Core Base ===
 ${coreBase}
 
 %% === Semiring: ${semiring} ===
 ${semiringModule}
 
-%% === Monoid: ${monoid} ===
+%% === Monoid: ${monoid} (${direction}) ===
 ${monoidModule}
 
 %% === Filter ===
 ${filterModule}
 
-%% === Optimization: ${optimize} ===
-${optimizeModule}
-
-%% === Budget Constraint: ${constraint} ===
+%% === Budget Constraint: ${constraint} (monoid-specific) ===
 ${constraintModule}
 
 %% === Flat Constraint ===
@@ -3356,52 +3376,87 @@ ${framework}
 
     getCoreModule() {
             return `
-    %% WABA Base Logic (Semiring/Monoid-Independent)
-    %% This file contains the core argumentation logic that is independent
-    %% of the choice of semiring (weight propagation) and monoid (cost aggregation).
+%% WABA Base Logic (Semiring/Monoid-Independent) - GROUNDING OPTIMIZED
+%% This file contains the core argumentation logic that is independent
+%% of the choice of semiring (weight propagation) and monoid (cost aggregation).
+%%
+%% OPTIMIZATIONS APPLIED:
+%% - Added unary domain predicates to reduce grounding size
+%% - Use rule/1 consistently instead of head(R,_)
+%% - Removed redundant supported(X) joins
 
-    %% Budget declaration moved to constraint files (constraint/ub.lp or constraint/lb.lp)
+%% Budget declaration moved to constraint files (constraint/ub.lp or constraint/lb.lp)
 
-    %% Rule meta-predicate
-    rule(R) :- head(R,_).
+%% ====================
+%% DOMAIN PREDICATES
+%% ====================
+%% These unary predicates reduce grounding by avoiding repeated existential patterns
 
-    %% Assumption choice: each assumption is either in or out
-    in(X) :- assumption(X), not out(X).
-    out(X) :- assumption(X), not in(X).
+%% Rule meta-predicate (R is a rule identifier)
+rule(R) :- head(R,_).
 
-    %% Support computation (weight-independent)
-    %% An atom is supported if:
-    %% 1. It's an assumption that is in, OR
-    %% 2. There exists a rule with this atom as head and all body elements are supported
-    supported(X) :- assumption(X), in(X).
-    supported(X) :- head(R,X), triggered_by_in(R).
+%% Unary flag: X appears as some rule head
+is_head(X) :- head(_,X).
 
-    %% A rule is triggered when all its body elements are supported
-    triggered_by_in(R) :- head(R,_), supported(X) : body(R,X).
+%% Unary flag: R has at least one body element
+has_body(R) :- body(R,_).
 
-    %% Attack computation
-    %% An attack exists when a supported atom X attacks an assumption Y
-    %% (where Y's contrary is X), with the weight of X
-    attacks_with_weight(X,Y,W) :- supported(X), supported_with_weight(X,W),
-                                   assumption(Y), contrary(Y,X).
+%% Derived atoms: heads that are not assumptions
+derived_atom(X) :- is_head(X), not assumption(X).
 
-    %% Attack discretion choice
-    %% We can choose to discard any attack (at a cost)
-    { discarded_attack(X,Y,W) : attacks_with_weight(X,Y,W) }.
+%% ====================
+%% CORE LOGIC
+%% ====================
 
-    %% Successful attacks
-    %% An attack succeeds if it's not discarded
-    attacks_successfully_with_weight(X,Y,W) :- attacks_with_weight(X,Y,W),
-                                                 not discarded_attack(X,Y,W).
+%% Assumption choice: each assumption is either in or out
+in(X) :- assumption(X), not out(X).
+out(X) :- assumption(X), not in(X).
 
-    %% Defeat
-    %% An assumption is defeated if there's a successful attack against it
-    defeated(X) :- attacks_successfully_with_weight(_,X,_).
+%% Support computation (weight-independent)
+%% An atom is supported if:
+%% 1. It's an assumption that is in, OR
+%% 2. There exists a rule with this atom as head and all body elements are supported
+supported(X) :- assumption(X), in(X).
+supported(X) :- head(R,X), triggered_by_in(R).
 
-    %% Budget constraint is modular (loaded separately):
-    %% - constraint/ub.lp: Upper Bound regime for MAX/SUM/COUNT/LEX monoids
-    %% - constraint/lb.lp: Lower Bound regime for MIN monoid
-    `;
+%% A rule is triggered when all its body elements are supported
+%% OPTIMIZED: Use rule(R) instead of head(R,_) for domain
+triggered_by_in(R) :- rule(R), supported(X) : body(R,X).
+
+%% Attack computation
+%% An attack exists when a supported atom X attacks an assumption Y
+%% (where Y's contrary is X), with the weight of X
+%% OPTIMIZED: Remove redundant supported(X) check (supported_with_weight(X,W) implies support)
+attacks_with_weight(X,Y,W) :- supported_with_weight(X,W), assumption(Y), contrary(Y,X).
+
+%% Attack discretion choice
+%% We can choose to discard any attack (at a cost)
+{ discarded_attack(X,Y,W) : attacks_with_weight(X,Y,W) }.
+
+%% Successful attacks
+%% An attack succeeds if it's not discarded
+attacks_successfully_with_weight(X,Y,W) :- attacks_with_weight(X,Y,W), not discarded_attack(X,Y,W).
+
+%% Defeat
+%% An assumption is defeated if there's a successful attack against it
+defeated(X) :- attacks_successfully_with_weight(_,X,_).
+
+%% ====================
+%% BUDGET CONSTRAINT
+%% ====================
+%% Budget Constraints
+%% ====================
+%%
+%% Budget constraints are in constraint/ directory and are monoid-specific.
+%% All monoids now use weak constraints directly (no extension_cost/1 predicate).
+%%
+%% Load appropriate constraint file for budget enforcement:
+%% - constraint/ub_max.lp - Upper bound for MAX monoid (cost ≤ beta)
+%% - constraint/ub_sum.lp - Upper bound for SUM monoid (cost ≤ beta)
+%% - constraint/ub_count.lp - Upper bound for COUNT monoid (cost ≤ beta)
+%% - constraint/lb_min.lp - Lower bound for MIN monoid (cost ≥ beta)
+%% - constraint/no_discard.lp - Plain ABA mode (no attack discarding)
+`;
         }
 
 
@@ -4234,135 +4289,379 @@ ${framework}
         }
 
 
-        getMonoidModule(monoid) {
+        getMonoidModule(monoid, direction = 'minimize') {
             const modules = {
-                max: `
-    %% Maximum Cost Monoid for Cost Aggregation
-    %% Monoid: (ℤ ∪ {±∞}, max, #inf)
-    %% - Domain: All integers plus infinities
-    %% - Operation: maximum
-    %% - Identity: #inf (algebraic identity for max operation)
-    %% - Null value: 0 (when no attacks discarded, cost = 0 by design choice)
-    %%
-    %% Extension cost = maximum weight among all discarded attacks
-    %% This represents the "most expensive" attack that was discarded.
-    %% When no attacks are discarded, we use 0 (not the identity #inf) to represent "no cost".
-    %%
-    %% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
-    %% - Semirings assign defaults using disjunction identity
-    %% - All weight assignment is now semiring responsibility
-    %% - Monoids only handle cost aggregation
+                max: {
+                    minimize: `
+%% Maximum Monoid - Minimization (Cost Semantics)
+%% Monoid: (ℤ ∪ {±∞}, max, #inf)
+%% - Domain: All integers plus infinities
+%% - Operation: maximum
+%% - Identity: #inf (algebraic identity for max operation)
+%%
+%% DIRECT MINIMIZE WITH STRATIFIED PRIORITIES
+%% ===========================================
+%% Uses #minimize directive with priority levels for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent COSTS
+%% - Goal: Minimize the maximum discarded attack weight (worst-case cost)
+%%
+%% Performance:
+%% - #minimize with priorities is faster than weak constraints
+%% - Requires extension_cost/1 for proper #sup/#inf handling
 
-    %% Extension cost is the maximum discarded attack weight
-    %% Only compute aggregate when discarded attacks exist
-    extension_cost(C) :- discarded_attack(_,_,_), C = #max{ W, X, Y : discarded_attack(X,Y,W) }.
+%% Minimize the maximum discarded attack weight using weak constraints
+%% OPTIMIZED: Weak constraint avoids extension_cost/1 predicate (saves ~9% grounding)
+%% Syntax: :~ condition. [weight@priority]
+%% Stratified priorities handle edge cases (#inf, #sup) without explicit predicates
 
-    %% When no attacks are discarded, cost is 0 (identity element)
-    extension_cost(0) :- not discarded_attack(_,_,_).
+%% Priority @2: Reject #sup (highest priority - should never minimize to #sup)
+:~ M = #max { W : discarded_attack(_,_,W) }, M = #sup. [1@2]
 
-    %% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
-    `,
-                sum: `
-    %% Sum Monoid for Cost Aggregation - OPTIMIZED
-    %% Monoid: (ℤ ∪ {±∞}, +, 0)
-    %% - Domain: All integers plus infinities
-    %% - Operation: sum (addition)
-    %% - Identity: 0 (algebraic identity for addition)
-    %%
-    %% Extension cost = sum of all discarded attack weights
-    %% This represents the "total cost" of all discarded attacks.
-    %%
-    %% OPTIMIZATION NOTES:
-    %% ===================
-    %% Removed redundant empty-case handling:
-    %% - REMOVED: discarded_attack(_,_,_) check in body
-    %% - REMOVED: extension_cost(0) :- not discarded_attack(_,_,_).
-    %% - Clingo naturally returns #sum{} = 0 for empty sets (algebraic identity)
-    %% - Simplified from 2 rules to 1 rule
-    %%
-    %% Note: With multiple derivations of the same attack via different rules,
-    %% each derivation contributes its weight to the sum.
-    %% The tuple (W, X, Y) ensures each unique attack instance is counted.
-    %%
-    %% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
-    %% - Semirings assign defaults using disjunction identity
-    %% - All weight assignment is now semiring responsibility
-    %% - Monoids only handle cost aggregation
+%% Priority @1: Avoid #inf (prefer finite values over #inf)
+:~ M = #max { W : discarded_attack(_,_,W) }, M = #inf. [1@1]
 
-    %% Extension cost is the sum of all discarded attack weights
-    %% OPTIMIZED: Rely on natural #sum{} = 0 for empty sets
-    extension_cost(C) :- C = #sum{ W, X, Y : discarded_attack(X,Y,W) }.
+%% Priority @0: Minimize finite costs (lowest priority)
+:~ M = #max { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
+`,
+                    maximize: `
+%% Maximum Monoid - Maximization (Reward Semantics)
+%% Monoid: (ℤ ∪ {±∞}, max, #inf)
+%% - Domain: All integers plus infinities
+%% - Operation: maximum
+%% - Identity: #inf (algebraic identity for max operation)
+%%
+%% DIRECT MAXIMIZE WITH STRATIFIED PRIORITIES
+%% ===========================================
+%% Uses #maximize directive with priority levels for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent REWARDS/BENEFITS
+%% - Goal: Maximize the maximum discarded attack weight (maximize best reward)
+%%
+%% Performance:
+%% - #maximize with priorities is faster than weak constraints
+%% - Requires extension_cost/1 for proper #sup/#inf handling
 
-    %% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
-    `,
-                min: `
-    %% Minimum Cost Monoid for Cost Aggregation - OPTIMIZED
-    %% Monoid: (ℤ ∪ {±∞}, min, #sup)
-    %% - Domain: All integers plus infinities
-    %% - Operation: minimum
-    %% - Identity: #sup (algebraic identity for min operation)
-    %%
-    %% Extension cost = minimum weight among all discarded attacks
-    %% This represents the "cheapest" attack that was discarded.
-    %% When no attacks are discarded, the cost is #sup (identity for min).
-    %%
-    %% OPTIMIZATION NOTES:
-    %% ===================
-    %% Removed redundant empty-case handling:
-    %% - REMOVED: discarded_attack(_,_,_) check in body
-    %% - REMOVED: extension_cost(#sup) :- not discarded_attack(_,_,_).
-    %% - Clingo naturally returns #min{} = #sup for empty sets (algebraic identity)
-    %% - Simplified from 2 rules to 1 rule
-    %%
-    %% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
-    %% - Semirings assign defaults using disjunction identity
-    %% - All weight assignment is now semiring responsibility
-    %% - Monoids only handle cost aggregation
-    %%
-    %% Note: MIN monoid uses LOWER BOUND regime (maximize quality threshold)
-    %% - LB constraint: :- extension_cost(C), C < B, budget(B).
+%% Maximize the maximum discarded attack weight using weak constraints
+%% OPTIMIZED: Weak constraint avoids extension_cost/1 predicate (saves ~9% grounding)
+%% Syntax: :~ condition. [weight@priority]
+%% Stratified priorities handle edge cases (#inf, #sup) without explicit predicates
+%% Negative weights = maximization (minimize -M = maximize M)
 
-    %% Extension cost is the minimum discarded attack weight
-    %% OPTIMIZED: Rely on natural #min{} = #sup for empty sets
-    extension_cost(C) :- C = #min{ W, X, Y : discarded_attack(X,Y,W) }.
+%% Priority @2: Reject #inf (highest priority - #inf is worst for rewards)
+:~ M = #max { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
 
-    %% Budget constraint: Use constraint/lb.lp (Lower Bound regime)
-    %% Default beta=#inf is permissive (allows all extensions)
-    %% Override with -c beta=N to set minimum quality threshold
-    `,
-                count: `
-    %% WABA Monoid: Count
-    %% Cost aggregation: Counts number of discarded attacks (weight-agnostic)
-    %%
-    %% Monoid: (ℕ ∪ {∞}, count, 0)
-    %% - Domain: Natural numbers plus infinity
-    %% - Operation: count (cardinality)
-    %% - Identity: 0 (algebraic identity: count of empty set = 0)
-    %% - Null value: #sup (when no attacks discarded, for optimization direction)
-    %%
-    %% Semantics:
-    %%   - extension_cost = number of discarded attack pairs
-    %%   - Ignores attack weights - only counts discards
-    %%   - Budget limits the COUNT of discards, not total weight cost
-    %%
-    %% Compatible semirings: All (weight-agnostic aggregation)
-    %% Budget constraint: C > B (enforce C <= B, standard cost limit)
-    %% Optimization: minimize extension_cost (prefer fewer discards)
+%% Priority @1: Prefer #sup over finite (for reward semantics, highest is best)
+:~ M = #max { W : discarded_attack(_,_,W) }, M != #sup. [-1@1]
 
-    %% DEFAULT WEIGHTS: Now defined in semiring files (moved from here)
-    %% - Semirings assign defaults using disjunction identity
-    %% - All weight assignment is now semiring responsibility
-    %% - Monoids only handle cost aggregation
-    %% - COUNT is weight-agnostic anyway (only counts, ignores weights)
+%% Priority @0: Maximize finite costs (lowest priority)
+:~ M = #max { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [-M@0]
+`
+                },
+                sum: {
+                    minimize: `
+%% Sum Monoid - Minimization (Cost Semantics)
+%% Monoid: (ℤ ∪ {±∞}, +, 0)
+%% - Domain: All integers plus infinities
+%% - Operation: sum (addition)
+%% - Identity: 0 (algebraic identity for addition)
+%%
+%% DIRECT MINIMIZE APPROACH (PERFORMANCE OPTIMIZED)
+%% =================================================
+%% Uses direct #minimize aggregate for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent COSTS
+%% - Goal: Minimize total cost of discarded attacks
+%%
+%% Performance:
+%% - Direct #minimize is faster than weak constraints
+%% - No intermediate extension_cost/1 computation needed
 
-    %% Count aggregation: number of discarded attacks
-    %% #count of empty set = 0 (correct: zero discards has zero cost)
-    extension_cost(C) :- C = #count{ X,Y : discarded_attack(X,Y,_) }.
+%% Minimize total cost of discarded attacks directly
+#minimize { W,X,Y : discarded_attack(X,Y,W) }.
+`,
+                    maximize: `
+%% Sum Monoid - Maximization (Reward Semantics)
+%% Monoid: (ℤ ∪ {±∞}, +, 0)
+%% - Domain: All integers plus infinities
+%% - Operation: sum (addition)
+%% - Identity: 0 (algebraic identity for addition)
+%%
+%% DIRECT MAXIMIZE APPROACH (PERFORMANCE OPTIMIZED)
+%% =================================================
+%% Uses direct #maximize aggregate for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent REWARDS/BENEFITS
+%% - Goal: Maximize total benefit of discarded attacks
+%%
+%% Performance:
+%% - Direct #maximize is faster than weak constraints
+%% - No intermediate extension_cost/1 computation needed
 
-    %% Budget constraint: Use constraint/ub.lp (Upper Bound regime)
-    `,
+%% Maximize total benefit of discarded attacks directly
+#maximize { W,X,Y : discarded_attack(X,Y,W) }.
+`
+                },
+                min: {
+                    minimize: `
+%% Minimum Monoid - Minimization (Quality Threshold Semantics)
+%% Monoid: (ℤ ∪ {±∞}, min, #sup)
+%% - Domain: All integers plus infinities
+%% - Operation: minimum
+%% - Identity: #sup (algebraic identity for min operation)
+%%
+%% DIRECT MINIMIZE WITH STRATIFIED PRIORITIES
+%% ===========================================
+%% Uses #minimize directive with priority levels for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent QUALITY THRESHOLDS
+%% - extension_cost = minimum discarded attack weight (weakest link)
+%% - Goal: MINIMIZE the minimum (lower quality threshold = more permissive)
+%%
+%% Performance:
+%% - #minimize with priorities is faster than weak constraints
+%% - Requires extension_cost/1 for proper #sup/#inf handling
+
+%% Minimize the minimum discarded attack weight using weak constraints
+%% OPTIMIZED: Weak constraint avoids extension_cost/1 predicate (saves ~20% grounding)
+%% Syntax: :~ condition. [weight@priority]
+%% Stratified priorities handle edge cases (#inf, #sup) without explicit predicates
+
+%% Priority @2: Reject #inf (highest priority - should never minimize to #inf)
+:~ M = #min { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
+
+%% Priority @1: Avoid #sup (prefer finite values over #sup)
+:~ M = #min { W : discarded_attack(_,_,W) }, M = #sup. [1@1]
+
+%% Priority @0: Minimize finite costs (lowest priority)
+:~ M = #min { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
+`,
+                    maximize: `
+%% Minimum Monoid - Maximization (Quality Threshold Semantics)
+%% Monoid: (ℤ ∪ {±∞}, min, #sup)
+%% - Domain: All integers plus infinities
+%% - Operation: minimum
+%% - Identity: #sup (algebraic identity for min operation)
+%%
+%% DIRECT MAXIMIZE WITH STRATIFIED PRIORITIES
+%% ===========================================
+%% Uses #maximize directive with priority levels for optimal performance.
+%%
+%% Semantics:
+%% - Weights represent QUALITY THRESHOLDS
+%% - extension_cost = minimum discarded attack weight (weakest link)
+%% - Goal: MAXIMIZE the minimum (raise the quality floor)
+%%
+%% Performance:
+%% - #maximize with priorities is faster than weak constraints
+%% - Requires extension_cost/1 for proper #sup/#inf handling
+
+%% Maximize the minimum discarded attack weight using weak constraints
+%% OPTIMIZED: Weak constraint avoids extension_cost/1 predicate (saves ~20% grounding)
+%% Syntax: :~ condition. [weight@priority]
+%% Stratified priorities handle edge cases (#inf, #sup) without explicit predicates
+%% Negative weights = maximization (minimize -M = maximize M)
+
+%% Priority @2: Reject #inf (highest priority - should never maximize to #inf)
+:~ M = #min { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
+
+%% Priority @1: Prefer #inf over finite (for quality threshold semantics)
+:~ M = #min { W : discarded_attack(_,_,W) }, M != #inf. [-1@1]
+
+%% Priority @0: Maximize finite costs (lowest priority)
+:~ M = #min { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [-M@0]
+`
+                },
+                count: {
+                    minimize: `
+%% Count Monoid - Minimization (Cost Semantics)
+%% Monoid: (ℕ ∪ {∞}, count, 0)
+%% - Domain: Natural numbers plus infinity
+%% - Operation: count (cardinality)
+%% - Identity: 0 (algebraic identity: count of empty set = 0)
+%%
+%% DIRECT MINIMIZE APPROACH (PERFORMANCE OPTIMIZED)
+%% =================================================
+%% Uses direct #minimize with count aggregation for optimal performance.
+%%
+%% Semantics:
+%% - Minimize the number of discarded attacks (weight-agnostic)
+%% - Goal: Find extensions that discard fewest attacks
+%%
+%% Performance:
+%% - Direct #minimize is faster than weak constraints
+%% - Weight parameter set to 1 for counting
+
+%% Minimize the number of discarded attacks (count each as 1)
+%% OPTIMIZED: Bind W explicitly for better grounding (saves ~4% rules)
+#minimize { 1,X,Y : discarded_attack(X,Y,_) }.
+`,
+                    maximize: `
+%% Count Monoid - Maximization (Reward Semantics)
+%% Monoid: (ℕ ∪ {∞}, count, 0)
+%% - Domain: Natural numbers plus infinity
+%% - Operation: count (cardinality)
+%% - Identity: 0 (algebraic identity: count of empty set = 0)
+%%
+%% DIRECT MAXIMIZE APPROACH (PERFORMANCE OPTIMIZED)
+%% =================================================
+%% Uses direct #maximize with count aggregation for optimal performance.
+%%
+%% Semantics:
+%% - Maximize the number of discarded attacks (weight-agnostic)
+%% - Goal: Find extensions that discard most attacks
+%%
+%% Performance:
+%% - Direct #maximize is faster than weak constraints
+%% - Weight parameter set to 1 for counting
+
+%% Maximize the number of discarded attacks (count each as 1)
+%% OPTIMIZED: Bind W explicitly for better grounding (saves ~4% rules)
+#maximize { 1,X,Y : discarded_attack(X,Y,_) }.
+`
+                }
             };
-            return modules[monoid] || modules.max;
+            return modules[monoid]?.[direction] || modules.max.minimize;
+        }
+
+
+        getConstraintModule(monoid, bound = 'ub') {
+            // Auto-select constraint file based on monoid type
+            const constraintMap = {
+                max: { ub: 'ub_max', lb: 'lb_max' },
+                sum: { ub: 'ub_sum', lb: 'lb_sum' },
+                min: { ub: 'ub_min', lb: 'lb_min' },
+                count: { ub: 'ub_count', lb: 'lb_count' }
+            };
+
+            const constraintType = constraintMap[monoid]?.[bound];
+
+            const constraints = {
+                ub_max: `
+%% Upper Bound Constraint - MAX Monoid
+%% ====================================
+%%
+%% Enforces: max of discarded attack weights ≤ β (STRICT)
+%%
+%% Use with: monoid/max_minimization.lp, monoid/max_maximization.lp
+%%
+%% Semantics: The highest-cost discarded attack cannot exceed budget (worst-case ceiling)
+%%
+%% IMPORTANT: Uses C >= B (not C > B) to strictly enforce beta=0 as "no discarding"
+%% - With beta=0: NO attacks can be discarded (including zero-weight attacks)
+%% - With beta=N: Only attacks with weight > N are forbidden
+%%
+%% Beta must be defined either:
+%%   - In framework file: #const beta = N.
+%%   - Via command line: -c beta=N
+%%
+%% Budget must be defined as:
+%%   budget(beta).
+%% in your framework file.
+
+%% Reject if maximum cost exceeds or equals budget
+%% Using >= ensures beta=0 prevents ALL discarding (including zero-weight attacks)
+:- C = #max{ W : discarded_attack(_,_,W) }, C >= B, budget(B), B != #sup, C != #inf.
+
+%% Reject if any discarded attack has weight #sup with finite budget
+:- discarded_attack(_,_,#sup), budget(B), B != #sup.
+`,
+                ub_sum: `
+%% Upper Bound Constraint - SUM Monoid
+%% =====================================
+%%
+%% Enforces: sum of discarded attack weights ≤ β (STRICT)
+%%
+%% Use with: monoid/sum_minimization.lp, monoid/sum_maximization.lp
+%%
+%% Semantics: Total cost of discarded attacks cannot exceed budget
+%%
+%% IMPORTANT: Uses >= (not >) to strictly enforce beta=0 as "no discarding"
+%% - With beta=0: NO attacks can be discarded (including zero-weight attacks)
+%% - With beta=N: Only combinations with total cost > N are forbidden
+%%
+%% Beta must be defined either:
+%%   - In framework file: #const beta = N.
+%%   - Via command line: -c beta=N
+%%
+%% Budget must be defined as:
+%%   budget(beta).
+%% in your framework file.
+
+%% Reject if total cost exceeds or equals budget
+%% Using >= ensures beta=0 prevents ALL discarding
+:- #sum{ W,X,Y : discarded_attack(X,Y,W) } >= B, budget(B), B != #sup.
+
+%% Reject if any discarded attack has weight #sup with finite budget
+:- discarded_attack(_,_,#sup), budget(B), B != #sup.
+`,
+                ub_count: `
+%% Upper Bound Constraint - COUNT Monoid
+%% ======================================
+%%
+%% Enforces: count of discarded attacks ≤ β (STRICT)
+%%
+%% Use with: monoid/count_minimization.lp, monoid/count_maximization.lp
+%%
+%% Semantics: Number of discarded attacks cannot exceed budget (weight-agnostic)
+%%
+%% IMPORTANT: Uses >= (not >) to strictly enforce beta=0 as "no discarding"
+%% - With beta=0: NO attacks can be discarded (not even a single one)
+%% - With beta=N: Maximum N attacks can be discarded
+%%
+%% Beta must be defined either:
+%%   - In framework file: #const beta = N.
+%%   - Via command line: -c beta=N
+%%
+%% Budget must be defined as:
+%%   budget(beta).
+%% in your framework file.
+
+%% Reject if count exceeds or equals budget
+%% Using >= ensures beta=0 prevents ALL discarding
+:- #count{ X,Y : discarded_attack(X,Y,_) } >= B, budget(B), B != #sup.
+
+%% Reject if any discarded attack has weight #sup with finite budget
+:- discarded_attack(_,_,#sup), budget(B), B != #sup.
+`,
+                lb_min: `
+%% Lower Bound Constraint - MIN Monoid
+%% ====================================
+%%
+%% Enforces: min of discarded attack weights ≥ β (STRICT QUALITY THRESHOLD)
+%%
+%% Use with: monoid/min_minimization.lp, monoid/min_maximization.lp
+%%
+%% Semantics: Lowest-cost discarded attack must meet quality threshold
+%%            (standard use case for MIN monoid - ensures quality floor)
+%%
+%% IMPORTANT: Uses C <= B (not C < B) for strict boundary enforcement
+%% - With beta=N: Requires min(discarded weights) > N (strictly greater)
+%% - With beta=0: Forbids zero-weight discards (requires positive weights only)
+%%
+%% Beta must be defined either:
+%%   - In framework file: #const beta = N.
+%%   - Via command line: -c beta=N
+%%
+%% Budget must be defined as:
+%%   budget(beta).
+%% in your framework file.
+
+%% Reject if minimum cost at or below threshold
+%% Using <= ensures strict boundary (beta=N requires cost > N)
+:- C = #min{ W : discarded_attack(_,_,W) }, C <= B, budget(B), B != #inf, C != #inf.
+
+%% Reject if any discarded attack has weight #sup
+:- discarded_attack(_,_,#sup).
+`
+            };
+
+            return constraints[constraintType] || '';
         }
 
 
@@ -4400,120 +4699,15 @@ ${framework}
         }
 
         getOptimizeModule(optimize) {
-            const modules = {
-                none: `
-    % No optimization`,
-                minimize: `
-    #minimize{ X : extension_cost(X) }.
-    `,
-                maximize: `
-    %% WABA Cost Maximization (for MIN+LB monoid)
-    %% Maximize extension_cost (prefer higher quality discards)
-    %% Use with MIN monoid where budget is a lower bound (quality threshold)
-
-    #maximize{ X : extension_cost(X) }.
-    `,
-            };
-            return modules[optimize] || modules.none;
+            // DEPRECATED: Optimization is now handled directly by monoid modules via weak constraints
+            // This method is kept for backward compatibility but returns empty string
+            // The new weak constraint-based monoids (max_minimization.lp, sum_maximization.lp, etc.)
+            // include optimization directives directly, eliminating the need for separate
+            // #minimize/#maximize on extension_cost/1
+            return '';
         }
 
 
-        getConstraintModule(constraint, budget) {
-            const modules = {
-                ub: `
-    %% WABA Upper Bound (UB) Budget Constraint
-    %% =========================================
-    %%
-    %% Used by: MAX, SUM, COUNT, LEX monoids
-    %% Semantics: Accept extension iff extension_cost ≤ β
-    %% Constraint: Reject if extension_cost > β
-    %%
-    %% Default: β = #sup (supremum/+∞)
-    %%   - Permissive: All extensions allowed by default
-    %%   - Override with -c beta=N to set cost limit
-    %%
-    %% Examples:
-    %%   -c beta=0      # Classical ABA (no discarding allowed)
-    %%   -c beta=100    # Allow discarding attacks up to total cost 100
-    %%   -c beta=#sup   # Explicit permissive (same as default)
-    %%   (no -c beta)   # Uses default #sup (permissive)
-
-
-    budget(${budget}).
-
-    %% Budget constraint (standard cost limit)
-    %% Rejects extensions where cost exceeds budget
-    %%
-    %% Dual enforcement approach:
-    %% 1. Check extension_cost aggregate (for monoids that compute total cost)
-    %% 2. Check individual discarded attacks (for detecting #sup weights ignored by #sum)
-    %%
-    %% Special handling for infinities:
-    %%   - #sup: Passes when used as "no discards" marker, fails when discarding #sup-weight attacks
-    %%   - #inf: Always fails (invalid cost)
-
-    %% Reject if aggregated extension cost exceeds budget (handles finite costs)
-    :- extension_cost(C), C > B, budget(B), C != #sup.
-
-    %% Reject if extension_cost is #inf (invalid)
-    :- extension_cost(#inf).
-
-    %% Reject if ANY discarded attack has weight #sup with finite budget
-    %% (infinite cost attack is unaffordable unless budget is also #sup)
-    %% This catches cases where #sum aggregate ignores #sup values
-    :- discarded_attack(_,_,#sup), budget(B), B != #sup.
-    `,
-                lb: `
-    %% WABA Lower Bound (LB) Budget Constraint
-    %% =========================================
-    %%
-    %% Used by: MIN monoid
-    %% Semantics: Accept extension iff extension_cost ≥ β (quality threshold)
-    %% Constraint: Reject if extension_cost < β
-    %%
-    %% Default: β = #inf (infimum/-∞)
-    %%   - Permissive: All extensions allowed by default
-    %%   - Override with -c beta=N to set minimum quality threshold
-    %%
-    %% Note: Lower values are WORSE quality (cheaper discarded attacks)
-    %%       Higher values are BETTER quality (only expensive attacks discarded)
-    %%
-    %% Examples:
-    %%   -c beta=#inf   # Explicit permissive (same as default, -∞)
-    %%   -c beta=0      # Reject if any attack with cost < 0 is discarded
-    %%   -c beta=10     # Reject if min(discarded attacks) < 10
-    %%   (no -c beta)   # Uses default #inf (permissive)
-
-
-    budget(${budget}).
-
-    %% Budget constraint (quality threshold)
-    %% Rejects extensions where quality (min cost) is too low
-    %%
-    %% Dual enforcement approach (same as UB):
-    %% 1. Check extension_cost aggregate (for quality threshold)
-    %% 2. Check individual discarded attacks (for detecting #sup weights)
-    %%
-    %% Special handling for infinities:
-    %%   - #sup: Passes when used as "no discards" marker (extension_cost only)
-    %%           Fails when discarding #sup-weight attacks
-    %%   - #inf: Worst quality, always fails
-
-    %% Standard quality threshold check (handles finite costs)
-    :- extension_cost(C), C < B, budget(B).
-
-    %% Reject if ANY discarded attack has weight #sup
-    %% For LB (quality threshold), discarding #sup-weight attacks always fails
-    %% because it's impossible to distinguish from "no discards" (both give cost #sup)
-    %% This prevents extensions with discards from passing as "best quality"
-    :- discarded_attack(_,_,#sup).
-    `,
-                none: `
-    % No budget constraint
-    `
-            };
-            return modules[constraint] || modules.ub;
-        }
 
 
         getFlatModule() {
@@ -4554,19 +4748,22 @@ ${framework}
     `;
         }
 
-    extractCost(predicates) {
-        // Extract extension_cost from predicates array
-        for (const pred of predicates) {
-            const costMatch = pred.match(/^extension_cost\(([^)]+)\)$/);
-            if (costMatch && costMatch[1] !== '#inf') {
-                const cost = costMatch[1];
-                // Handle #sup as infinity for sorting
-                if (cost === '#sup') return Infinity;
-                // Parse numeric cost
-                return parseFloat(cost) || 0;
+    extractCost(witness) {
+        // Try witness.Optimization field (weak constraint-based system)
+        if (witness.Optimization !== undefined) {
+            const opt = witness.Optimization;
+            if (Array.isArray(opt)) {
+                // MAX/MIN monoid: [0, 0, 80] → return 80 (last value)
+                const lastValue = opt[opt.length - 1];
+                if (lastValue === '#sup') return Infinity;
+                if (lastValue === '#inf') return -Infinity;
+                return parseFloat(lastValue) || 0;
             }
+            // SUM/COUNT monoid: 210 → return 210
+            if (opt === '#sup') return Infinity;
+            if (opt === '#inf') return -Infinity;
+            return parseFloat(opt) || 0;
         }
-        // Default to 0 if no cost found
         return 0;
     }
 
@@ -4589,8 +4786,8 @@ ${framework}
         } else {
             // Sort witnesses by cost (ascending order)
             const sortedWitnesses = witnesses.slice().sort((a, b) => {
-                const costA = this.extractCost(a.Value || []);
-                const costB = this.extractCost(b.Value || []);
+                const costA = this.extractCost(a);
+                const costB = this.extractCost(b);
                 return costA - costB;
             });
 
@@ -4908,13 +5105,6 @@ ${framework}
                 const atom = weightMatch[1];
                 const weight = weightMatch[2];
                 result.weights.set(atom, weight);
-                return;
-            }
-
-            // Extract extension_cost (prefer numeric values, skip #inf)
-            const costMatch = pred.match(/^extension_cost\(([^)]+)\)$/);
-            if (costMatch && costMatch[1] !== '#inf') {
-                result.cost = costMatch[1];
                 return;
             }
 

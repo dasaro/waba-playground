@@ -131,10 +131,10 @@
                         <div class="config-item">
                             <label for="monoid-select">Monoid (Cost Aggregation)</label>
                             <select id="monoid-select" class="select">
-                                <option value="max">MAX - Maximum Cost</option>
-                                <option value="sum">SUM - Total Cost</option>
-                                <option value="min">MIN - Minimum Cost</option>
-                                <option value="count">COUNT - Number of Attacks</option>
+                                <option value="max">MAX - Minimize/Maximize Worst Attack</option>
+                                <option value="sum">SUM - Minimize/Maximize Total Cost</option>
+                                <option value="min">MIN - Minimize/Maximize Best Attack</option>
+                                <option value="count">COUNT - Minimize/Maximize Attack Count</option>
                             </select>
                         </div>
 
@@ -149,11 +149,19 @@
 
                     <div class="config-grid">
                         <div class="config-item">
-                            <label for="optimize-select">Optimization</label>
+                            <label for="optimize-select">Optimization Direction</label>
                             <select id="optimize-select" class="select">
-                                <option value="none">None (Enumerate All)</option>
-                                <option value="minimize">Minimize Cost</option>
-                                <option value="maximize">Maximize Cost</option>
+                                <option value="none">None</option>
+                                <option value="minimize" selected>Minimize (Cost Semantics)</option>
+                                <option value="maximize">Maximize (Reward Semantics)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="opt-mode-select">Optimization Mode</label>
+                            <select id="opt-mode-select" class="select">
+                                <option value="ignore">Enumerate All Extensions</option>
+                                <option value="optN" selected>Find Optimal Extensions Only</option>
                             </select>
                         </div>
 
