@@ -9,8 +9,8 @@ Try it live: [https://yourusername.github.io/waba-playground](https://youruserna
 - **🎮 Interactive Editor**: Write and edit WABA frameworks with syntax highlighting
 - **⚙️ Configurable Algebraic Structures**:
   - 5 Semirings: Gödel, Tropical, Arctic, Łukasiewicz, Bottleneck-Cost
-  - 4 Monoids: MAX, SUM, MIN, COUNT
-  - 2 Semantics: Stable, Conflict-Free
+  - 5 Monoids (each with minimization/maximization): MAX, SUM, MIN, COUNT, LEX
+  - 21 Semantics: Core (stable, cf, admissible, complete, grounded), Extension-based (ideal, naive, preferred, semi-stable, staged), Heuristic variants, OptN variants
 - **📊 Interactive Graph Visualization** (powered by vis.js):
   - **Three visualization modes**:
     - **Standard**: Set-based view showing all possible assumption sets
@@ -46,29 +46,66 @@ Try it live: [https://yourusername.github.io/waba-playground](https://youruserna
 git clone https://github.com/yourusername/waba-playground.git
 cd waba-playground
 
-# Serve locally (using Python's built-in server)
+# Install dependencies (http-server)
+npm install
+
+# Sync WABA modules from parent repository
+npm run sync
+
+# Start development server (syncs modules + serves on :8080)
+npm run dev
+
+# Or serve manually using Python
 python3 -m http.server 8000
 
-# Or using Node.js
-npx http-server
-
-# Open browser to http://localhost:8000
+# Open browser to http://localhost:8080 (or :8000)
 ```
+
+**Development Workflow**:
+- `npm run sync` - Regenerate `waba-modules.js` from WABA .lp files
+- `npm run build` - Alias for `npm run sync`
+- `npm run dev` - Sync modules + start local server
+
+See `modules/README.md` for detailed module architecture documentation.
 
 ## Architecture
 
-The playground consists of:
+### Modular ES6 Design (December 2024 Refactoring)
 
+The playground uses a **modular ES6 architecture** with 10 specialized manager modules:
+
+**Core Files**:
 - **`index.html`** - Main UI structure with editor, controls, graph container, and output panels
 - **`style.css`** - Modern dark/light theme styling with responsive design
-- **`app.js`** - Core application logic, clingo-wasm integration, and vis.js graph visualization
+- **`app.js`** - Main orchestration (565 lines, 90% reduction from original 5,417-line monolith)
 - **`examples.js`** - Preloaded topology-focused WABA framework examples
+- **`waba-modules.js`** - Auto-generated embeddings of all 49 WABA .lp modules
+
+**Modules** (in `modules/` directory):
+- **`theme-manager.js`** - Dark/light theme switching and graph color updates
+- **`font-manager.js`** - Font size controls (60%-200%)
+- **`ui-manager.js`** - UI interactions (modals, overlays, fullscreen, empty states)
+- **`file-manager.js`** - File I/O and format conversion (.lp ↔ .waba)
+- **`parser-utils.js`** - Shared regex-based parsing utilities (removes duplication)
+- **`graph-utils.js`** - Shared graph styling utilities (removes ~500 lines duplication)
+- **`graph-manager.js`** - Graph infrastructure and extension highlighting
+- **`popup-manager.js`** - Popup displays and tooltips (removes duplication)
+- **`clingo-manager.js`** - Clingo WASM integration (73% smaller, no hardcoded .lp strings)
+- **`output-manager.js`** - Result display, parsing, and logging
+
+**Scripts** (in `scripts/` directory):
+- **`sync-modules.js`** - Build script that generates `waba-modules.js` from WABA .lp files
+
+**Code Reduction**: ~90% reduction in main app.js (5,417 → 565 lines), ~680 lines of duplication removed
+
+See **`modules/README.md`** for detailed module architecture documentation.
 
 ### How It Works
 
 1. **Modular Composition**: Combines WABA core, semiring, monoid, and semantics modules at runtime
-2. **WebAssembly Execution**: Runs full clingo solver in the browser via [clingo-wasm](https://github.com/domoritz/clingo-wasm)
-3. **No Backend Required**: Pure client-side application, works offline after initial load
+2. **Automated Sync**: `npm run sync` regenerates `waba-modules.js` from WABA .lp source files
+3. **WebAssembly Execution**: Runs full clingo solver in the browser via [clingo-wasm](https://github.com/domoritz/clingo-wasm)
+4. **No Backend Required**: Pure client-side application, works offline after initial load
 
 ## Example Frameworks
 
@@ -199,27 +236,55 @@ contrary(a, c_a).
 
 ## Syncing with WABA Implementation
 
-The playground embeds WABA logic modules in `app.js`. When you update the main WABA implementation, sync the modules:
+The playground automatically embeds all WABA logic modules from the parent repository. When you update the main WABA implementation, sync is fully automated:
 
 ```bash
-# Generate synced module code
-node sync-modules.js > synced-modules.txt
+# After updating WABA .lp files in ../WABA/
+cd waba-playground
+npm run sync
 
-# Review the output
-cat synced-modules.txt
-
-# Copy the generated functions into app.js
-# Replace: getCoreModule(), getSemiringModule(), getMonoidModule(),
-#          getSemanticsModule(), getOptimizeModule(), getConstraintModule(), getFlatModule()
+# This regenerates waba-modules.js with all 49 WABA modules
+# Then commit and push to deploy
+git add waba-modules.js
+git commit -m "Sync WABA modules: <description of changes>"
+git push origin main
 ```
 
-**Modules that need syncing:**
-- Core Base: `WABA/core/base.lp` → `getCoreModule()`
-- Semirings: `WABA/semiring/*.lp` → `getSemiringModule()`
-- Monoids: `WABA/monoid/*.lp` → `getMonoidModule()`
-- Semantics: `WABA/semantics/*.lp` → `getSemanticsModule()`
-- Constraints: `WABA/constraint/*.lp` → `getConstraintModule()`, `getFlatModule()`
-- Optimization: `WABA/optimize/*.lp` → `getOptimizeModule()`
+### What Gets Synced (49 Modules Total)
+
+**Synced from `../WABA/` directory:**
+- **Core Base** (1): `core/base.lp` → `wabaModules.core.base`
+- **Semirings** (5): `semiring/*.lp` → `wabaModules.semiring.*`
+  - godel, tropical, arctic, lukasiewicz, bottleneck_cost
+- **Monoids** (10): `monoid/*_{minimization,maximization}.lp` → `wabaModules.monoid.*`
+  - max, sum, min, count, lex (each with minimization and maximization)
+- **Semantics** (21): `semantics/**/*.lp` → `wabaModules.semantics.*`
+  - Core: stable, cf, admissible, complete, grounded
+  - Extension-based: ideal, naive, preferred, semi-stable, staged
+  - Heuristic: heuristic-{naive, preferred, semi-stable, staged, grounded}
+  - OptN: optN-{preferred, semi-stable, staged, ideal, eager, grounded}
+- **Constraints** (10): `constraint/*.lp` → `wabaModules.constraint.*`
+  - Upper bounds: ub_max, ub_sum, ub_min, ub_count
+  - Lower bounds: lb_max, lb_sum, lb_min, lb_count
+  - Special: ub_lex, lb_lex
+- **Filters** (2): `filter/*.lp` → `wabaModules.filter.*`
+  - standard, projection
+
+### How Auto-Sync Works
+
+1. **Build Script**: `scripts/sync-modules.js` reads all .lp files from `../WABA/`
+2. **Generation**: Creates `waba-modules.js` with embedded modules as JavaScript strings
+3. **Import**: `clingo-manager.js` imports `wabaModules` and assembles programs at runtime
+4. **No Manual Editing**: Never edit `waba-modules.js` manually (it's auto-generated)
+
+### Sync Process Details
+
+**Input**: WABA .lp files in `../WABA/` directory
+**Output**: `waba-modules.js` (auto-generated ES6 module)
+**Trigger**: Run `npm run sync` after WABA updates
+**Validation**: Script reports missing files and exits on error
+
+See **`modules/README.md`** → "WABA Module Sync Process" for complete technical details.
 
 ## Customization
 
