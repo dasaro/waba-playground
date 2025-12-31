@@ -60,6 +60,10 @@ class WABAPlayground {
         this.legendToggleBtn = document.getElementById('legend-toggle-btn');
         this.graphLegend = document.getElementById('graph-legend');
 
+        // Export buttons
+        this.exportPngBtn = document.getElementById('export-png-btn');
+        this.exportPdfBtn = document.getElementById('export-pdf-btn');
+
         // Theme toggle
         this.themeToggleBtn = document.getElementById('theme-toggle-btn');
         this.themeIcon = document.getElementById('theme-icon');
@@ -242,6 +246,10 @@ class WABAPlayground {
 
         // Legend toggle button
         this.legendToggleBtn.addEventListener('click', () => this.toggleLegend());
+
+        // Export buttons
+        this.exportPngBtn.addEventListener('click', () => this.exportGraphAsPng());
+        this.exportPdfBtn.addEventListener('click', () => this.exportGraphAsPdf());
     }
 
     toggleLegend() {
@@ -253,6 +261,52 @@ class WABAPlayground {
             this.graphLegend.setAttribute('hidden', '');
             this.legendToggleBtn.setAttribute('aria-expanded', 'false');
         }
+    }
+
+    exportGraphAsPng() {
+        if (!this.graphManager.network) {
+            alert('No graph to export. Please run WABA first.');
+            return;
+        }
+
+        // Use vis.js built-in canvas export
+        const canvas = this.graphManager.network.canvas.frame.canvas;
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'waba-graph.png';
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    exportGraphAsPdf() {
+        if (!this.graphManager.network) {
+            alert('No graph to export. Please run WABA first.');
+            return;
+        }
+
+        // Convert canvas to image then to PDF
+        const canvas = this.graphManager.network.canvas.frame.canvas;
+        const imgData = canvas.toDataURL('image/png');
+
+        // Create a simple PDF by opening image in new window for printing
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>WABA Graph</title>
+                    <style>
+                        body { margin: 0; display: flex; justify-content: center; align-items: center; }
+                        img { max-width: 100%; height: auto; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${imgData}" onload="window.print(); window.close();" />
+                </body>
+            </html>
+        `);
     }
 
     // ===================================

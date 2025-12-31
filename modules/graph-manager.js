@@ -50,29 +50,37 @@ export class GraphManager {
     resetGraphColors() {
         if (!this.network) return;
 
+        console.log('Resetting graph colors...');
+
         // Reset all nodes to original colors
         const nodes = this.networkData.nodes.get();
         const nodeUpdates = nodes.map(node => ({
             id: node.id,
             color: node.originalColor || node.color,
-            borderWidth: 2
+            borderWidth: node.originalBorderWidth || 2
         }));
         this.networkData.nodes.update(nodeUpdates);
 
-        // Reset all edges to original colors and widths
+        // Reset all edges to original colors, widths, and dashes
         const edges = this.networkData.edges.get();
         const edgeUpdates = edges.map(edge => ({
             id: edge.id,
             color: edge.originalColor || edge.color,
-            width: edge.originalWidth || edge.width
+            width: edge.originalWidth || edge.width || 2,
+            dashes: edge.originalDashes || false
         }));
         this.networkData.edges.update(edgeUpdates);
+
+        console.log(`Reset ${nodeUpdates.length} nodes and ${edgeUpdates.length} edges`);
     }
 
     highlightExtension(inAssumptions, discardedAttacks, successfulAttacks) {
         if (!this.network) return;
 
-        console.log('Highlighting extension:', { inAssumptions, discardedAttacks, successfulAttacks });
+        console.log('=== HIGHLIGHTING EXTENSION ===');
+        console.log('In assumptions:', inAssumptions);
+        console.log('Discarded attacks:', discardedAttacks);
+        console.log('Successful attacks:', successfulAttacks);
 
         // Reset colors first
         this.resetGraphColors();
@@ -80,6 +88,7 @@ export class GraphManager {
         // Get all nodes and edges
         const nodes = this.networkData.nodes.get();
         const edges = this.networkData.edges.get();
+        console.log(`Total edges in graph: ${edges.length}`);
 
         // Highlight nodes that match "in" assumptions
         const nodeUpdates = [];
@@ -105,6 +114,7 @@ export class GraphManager {
 
         if (nodeUpdates.length > 0) {
             this.networkData.nodes.update(nodeUpdates);
+            console.log(`Highlighted ${nodeUpdates.length} nodes`);
         }
 
         // Parse successful attacks from string format
@@ -119,48 +129,65 @@ export class GraphManager {
             }
             return null;
         }).filter(a => a !== null);
+        console.log('Parsed successful attacks:', parsedSuccessful);
 
-        // Highlight edges - unified matching logic for all graph modes
+        // Highlight edges - unified matching logic
         const edgeUpdates = [];
-        edges.forEach(edge => {
-            // Helper function to check if edge matches an attack (source -> target)
-            const edgeMatches = (source, target) => {
-                // Check direct from/to match
-                if (edge.from === source && edge.to === target) return true;
-                // Check Standard mode properties
-                if (edge.attackingElement === source && edge.attackedAssumption === target) return true;
-                // Check edge ID contains attack pattern (for assumption-level modes)
-                if (edge.id && edge.id.includes(`${source}-`) && edge.id.includes(`-${target}`)) return true;
-                return false;
-            };
+        let discardedCount = 0;
+        let successfulCount = 0;
 
-            // Check for discarded attack match (only one match per edge)
-            const matchedDiscard = discardedAttacks.find(da => edgeMatches(da.source, da.via));
-            if (matchedDiscard) {
-                edgeUpdates.push({
-                    id: edge.id,
-                    color: { color: '#9ca3af', highlight: '#6b7280' },
-                    width: 3,
-                    dashes: true
-                });
-                return; // Skip checking successful if already discarded
+        edges.forEach(edge => {
+            console.log(`Checking edge ${edge.id}:`, {
+                from: edge.from,
+                to: edge.to,
+                attackingElement: edge.attackingElement,
+                attackedAssumption: edge.attackedAssumption
+            });
+
+            // Check for discarded attack match
+            for (const da of discardedAttacks) {
+                const fromMatch = edge.from === da.source || edge.attackingElement === da.source;
+                const toMatch = edge.to === da.via || edge.attackedAssumption === da.via;
+
+                if (fromMatch && toMatch) {
+                    console.log(`  → MATCHED DISCARDED: ${da.source} → ${da.via}`);
+                    edgeUpdates.push({
+                        id: edge.id,
+                        color: { color: '#9ca3af', highlight: '#6b7280' },
+                        width: 3,
+                        dashes: true
+                    });
+                    discardedCount++;
+                    return; // Skip checking successful
+                }
             }
 
-            // Check for successful attack match (only if not already discarded)
-            const matchedSuccess = parsedSuccessful.find(sa => edgeMatches(sa.source, sa.target));
-            if (matchedSuccess) {
-                edgeUpdates.push({
-                    id: edge.id,
-                    color: { color: '#ef4444', highlight: '#dc2626' },
-                    width: 5,
-                    dashes: false
-                });
+            // Check for successful attack match
+            for (const sa of parsedSuccessful) {
+                const fromMatch = edge.from === sa.source || edge.attackingElement === sa.source;
+                const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target;
+
+                if (fromMatch && toMatch) {
+                    console.log(`  → MATCHED SUCCESSFUL: ${sa.source} → ${sa.target}`);
+                    edgeUpdates.push({
+                        id: edge.id,
+                        color: { color: '#ef4444', highlight: '#dc2626' },
+                        width: 5,
+                        dashes: false
+                    });
+                    successfulCount++;
+                    return;
+                }
             }
         });
+
+        console.log(`Highlighting: ${discardedCount} discarded, ${successfulCount} successful attacks`);
 
         if (edgeUpdates.length > 0) {
             this.networkData.edges.update(edgeUpdates);
         }
+
+        console.log('=== HIGHLIGHTING COMPLETE ===');
     }
 
     updateIsolatedAssumptionsOverlay() {

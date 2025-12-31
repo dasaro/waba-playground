@@ -48,10 +48,15 @@ export class OutputManager {
             });
 
             // Sort by pre-computed costs
-            // Minimization: ascending (lower cost = better)
-            // Maximization: descending (higher reward = better)
+            // Minimization (cost): ascending order (lower cost first)
+            // Maximization (reward): descending order (higher reward first)
             witnessesWithCosts.sort((a, b) => {
                 return isMinimization ? (a.cost - b.cost) : (b.cost - a.cost);
+            });
+
+            console.log('Sorting:', isMinimization ? 'minimization (ascending)' : 'maximization (descending)');
+            witnessesWithCosts.forEach((item, i) => {
+                console.log(`  ${i+1}. Cost: ${item.cost}`);
             });
 
             // Display all witnesses in sorted order
