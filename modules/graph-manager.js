@@ -172,8 +172,8 @@ export class GraphManager {
                     edgeUpdates.push({
                         id: edge.id,
                         color: { color: '#9ca3af', highlight: '#6b7280' },
-                        width: 3,
-                        dashes: true
+                        width: 2,  // Thin line
+                        dashes: [5, 5]  // Explicit dash pattern
                     });
                     discardedCount++;
                     matched = true;
@@ -195,8 +195,8 @@ export class GraphManager {
                     edgeUpdates.push({
                         id: edge.id,
                         color: { color: '#ef4444', highlight: '#dc2626' },
-                        width: 5,
-                        dashes: false
+                        width: 2,  // Thin line
+                        dashes: false  // Solid line for successful attacks
                     });
                     successfulCount++;
                     matched = true;
