@@ -18,14 +18,44 @@ const __dirname = path.dirname(__filename);
 const WABA_ROOT = path.join(__dirname, '..', '..', 'WABA');
 const OUTPUT_FILE = path.join(__dirname, '..', 'waba-modules.js');
 
-// Read a .lp file and return its content
-function readModule(filepath) {
+// Read a .lp file and return its content with resolved includes
+function readModule(filepath, visited = new Set()) {
     try {
-        return fs.readFileSync(filepath, 'utf8');
+        const content = fs.readFileSync(filepath, 'utf8');
+        return resolveIncludes(content, path.dirname(filepath), visited);
     } catch (err) {
         console.warn(`⚠️  Warning: Could not read ${filepath}`);
         return `% Module not found: ${path.basename(filepath)}`;
     }
+}
+
+// Resolve #include directives recursively
+function resolveIncludes(content, basedir, visited = new Set()) {
+    // Pattern: #include "filename.lp"
+    const includePattern = /#include\s+"([^"]+)"/g;
+
+    return content.replace(includePattern, (match, filename) => {
+        const includePath = path.join(basedir, filename);
+
+        // Check for circular includes
+        if (visited.has(includePath)) {
+            console.warn(`⚠️  Warning: Circular include detected: ${filename}`);
+            return `% Circular include: ${filename}`;
+        }
+
+        // Mark as visited
+        visited.add(includePath);
+
+        try {
+            const includeContent = fs.readFileSync(includePath, 'utf8');
+            // Recursively resolve includes in the included file
+            const resolved = resolveIncludes(includeContent, path.dirname(includePath), visited);
+            return `%% INLINED FROM: ${filename}\n${resolved}\n%% END INLINE: ${filename}`;
+        } catch (err) {
+            console.warn(`⚠️  Warning: Could not read included file ${filename}`);
+            return `% Include not found: ${filename}`;
+        }
+    });
 }
 
 // Escape content for JavaScript template literal
