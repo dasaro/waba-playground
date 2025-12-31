@@ -251,9 +251,9 @@ c"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label>Contraries (format: (assumption, contrary))</label>
-                                <textarea id="contraries-input" class="simple-textarea" placeholder="(a, c_a)
-(b, c_b)"></textarea>
+                                <label>Contraries (format: assumption: contrary)</label>
+                                <textarea id="contraries-input" class="simple-textarea" placeholder="a: c_a
+b: c_b"></textarea>
                             </div>
 
                             <div class="simple-field">
@@ -401,7 +401,7 @@ c_a: 70"></textarea>
             </div>
             <div class="modal-body">
                 <h3>Simple Mode (.waba Format)</h3>
-                <p>Simple Mode uses a structured text format with four sections:</p>
+                <p>Simple Mode uses a structured text format with four sections. Inline comments use <code>%</code> (same as ASP).</p>
 
                 <h4>1. Assumptions</h4>
                 <pre><code>a
@@ -427,20 +427,21 @@ attack_element: 15</code></pre>
                 <p>Format: <code>atom: weight</code>. Assigns positive integer weights (default: 1).</p>
 
                 <h4>Complete .waba Example</h4>
-                <pre><code>Assumptions:
+                <pre><code>% Assumptions:
 a
 b
 
-Rules:
+% Rules:
 attack_element ← a
 
-Contraries:
+% Contraries:
 b: attack_element
 
-Weights:
+% Weights:
 a: 10
 b: 20
 attack_element: 15</code></pre>
+                <p><em>Note:</em> Section headers (Assumptions, Rules, etc.) are commented with <code>%</code> to allow inline comments throughout the file.</p>
 
                 <h3>Advanced Mode (.lp Format)</h3>
                 <p>Advanced Mode uses ASP syntax with WABA predicates:</p>

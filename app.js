@@ -235,25 +235,25 @@ class WABAPlayground {
         // Assumptions
         const assumptions = this.assumptionsInput.value.trim();
         if (assumptions) {
-            content += 'Assumptions:\n' + assumptions + '\n\n';
+            content += '% Assumptions:\n' + assumptions + '\n\n';
         }
 
         // Rules
         const rules = this.rulesInput.value.trim();
         if (rules) {
-            content += 'Rules:\n' + rules + '\n\n';
+            content += '% Rules:\n' + rules + '\n\n';
         }
 
         // Contraries
         const contraries = this.contrariesInput.value.trim();
         if (contraries) {
-            content += 'Contraries:\n' + contraries + '\n\n';
+            content += '% Contraries:\n' + contraries + '\n\n';
         }
 
         // Weights
         const weights = this.weightsInput.value.trim();
         if (weights) {
-            content += 'Weights:\n' + weights + '\n';
+            content += '% Weights:\n' + weights + '\n';
         }
 
         return content.trim();
@@ -323,11 +323,11 @@ class WABAPlayground {
         let content = '';
 
         if (assumptions.length > 0) {
-            content += 'Assumptions:\n' + assumptions.join('\n') + '\n\n';
+            content += '% Assumptions:\n' + assumptions.join('\n') + '\n\n';
         }
 
         if (rules.size > 0) {
-            content += 'Rules:\n';
+            content += '% Rules:\n';
             rules.forEach((rule) => {
                 if (rule.head) {
                     const bodyStr = rule.body.length > 0 ? rule.body.join(', ') : '';
@@ -338,11 +338,11 @@ class WABAPlayground {
         }
 
         if (contraries.length > 0) {
-            content += 'Contraries:\n' + contraries.join('\n') + '\n\n';
+            content += '% Contraries:\n' + contraries.join('\n') + '\n\n';
         }
 
         if (weights.length > 0) {
-            content += 'Weights:\n' + weights.join('\n') + '\n';
+            content += '% Weights:\n' + weights.join('\n') + '\n';
         }
 
         return content.trim();
@@ -3193,8 +3193,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         const weights = [];
 
         for (const line of lines) {
-            // Skip empty lines and comments
-            if (!line || line.startsWith('#')) continue;
+            // Skip empty lines and comments (% is ASP/WABA standard)
+            if (!line || line.startsWith('%')) continue;
 
             // Check for rule: "a <- b,d" or "d <- c"
             const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
@@ -3203,17 +3203,17 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 continue;
             }
 
-            // Check for contrary: "(b, c_b)"
-            const contraryMatch = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
-            if (contraryMatch) {
-                contraries.push(line);
-                continue;
-            }
-
-            // Check for weight: "d : 10" or "a: 80"
+            // Check for weight first (has colon + number): "d : 10" or "a: 80"
             const weightMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
             if (weightMatch) {
                 weights.push(line);
+                continue;
+            }
+
+            // Check for contrary (has colon + atom): "a: attack_element" format
+            const contraryMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*([a-z_][a-z0-9_]*)$/i);
+            if (contraryMatch) {
+                contraries.push(line);
                 continue;
             }
 
