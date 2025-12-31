@@ -65,9 +65,25 @@ export class ClingoManager {
             // Determine number of models to find
             let numModels = config.numModels || 0;
 
+            // Build clingo arguments based on optimization mode
+            const args = [];
+            const optMode = config.optMode || 'ignore'; // Default to enumerate all
+
+            if (optMode === 'ignore') {
+                // Tell Clingo to ignore weak constraints and enumerate all models
+                args.push('--opt-mode=ignore');
+            } else {
+                // Find and enumerate only optimal models
+                args.push('--opt-mode=' + optMode);
+                args.push('--quiet=1');
+                args.push('--project');
+            }
+
+            console.log('Clingo args:', args);
+
             // Run Clingo
             const startTime = performance.now();
-            const result = await clingo.run(program, numModels, config.clingoArgs || []);
+            const result = await clingo.run(program, numModels, args);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
 
             console.log('Clingo result:', result);

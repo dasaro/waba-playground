@@ -267,6 +267,7 @@ class WABAPlayground {
                 constraint: this.constraintSelect.value,
                 budget: parseInt(this.budgetInput.value) || 0,
                 numModels: parseInt(this.numModelsInput.value) || 0,
+                optMode: this.optModeSelect.value, // 'ignore' or 'optN'
                 filterType: 'standard'
             };
 
