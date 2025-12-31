@@ -53,6 +53,7 @@ class WABAPlayground {
         this.syntaxGuideModal = document.getElementById('syntax-guide-modal');
         this.syntaxGuideClose = document.getElementById('syntax-guide-close');
         this.downloadLpBtn = document.getElementById('download-lp-btn');
+        this.downloadWabaBtn = document.getElementById('download-waba-btn');
 
         this.clingoReady = false;
 
@@ -155,8 +156,8 @@ class WABAPlayground {
         this.syntaxGuideBtn.focus();
     }
 
-    downloadCurrentFramework() {
-        // Get current framework code
+    downloadAsLp() {
+        // Get current framework code (always in .lp format)
         let frameworkCode;
         if (this.inputMode.value === 'simple') {
             frameworkCode = this.parseSimpleABA();
@@ -185,6 +186,166 @@ class WABAPlayground {
         URL.revokeObjectURL(url);
 
         this.log(`💾 Downloaded framework as ${a.download}`, 'success');
+    }
+
+    downloadAsWaba() {
+        // Get current framework in .waba format (Simple Mode format)
+        let wabaContent;
+
+        if (this.inputMode.value === 'simple') {
+            // Already in simple mode - export the raw text
+            wabaContent = this.generateWabaFormat();
+        } else {
+            // Parse .lp format and convert to .waba format
+            const clingoCode = this.editor.value.trim();
+            if (!clingoCode) {
+                this.log('⚠️ No framework code to download', 'warning');
+                return;
+            }
+            wabaContent = this.convertLpToWaba(clingoCode);
+        }
+
+        if (!wabaContent) {
+            this.log('⚠️ Could not generate .waba format', 'warning');
+            return;
+        }
+
+        // Create blob and download
+        const blob = new Blob([wabaContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `waba-framework-${timestamp}.waba`;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.log(`💾 Downloaded framework as ${a.download}`, 'success');
+    }
+
+    generateWabaFormat() {
+        // Generate .waba format from Simple Mode fields
+        let content = '';
+
+        // Assumptions
+        const assumptions = this.assumptionsInput.value.trim();
+        if (assumptions) {
+            content += 'Assumptions:\n' + assumptions + '\n\n';
+        }
+
+        // Rules
+        const rules = this.rulesInput.value.trim();
+        if (rules) {
+            content += 'Rules:\n' + rules + '\n\n';
+        }
+
+        // Contraries
+        const contraries = this.contrariesInput.value.trim();
+        if (contraries) {
+            content += 'Contraries:\n' + contraries + '\n\n';
+        }
+
+        // Weights
+        const weights = this.weightsInput.value.trim();
+        if (weights) {
+            content += 'Weights:\n' + weights + '\n';
+        }
+
+        return content.trim();
+    }
+
+    convertLpToWaba(clingoCode) {
+        // Parse .lp format and convert to .waba Simple Mode format
+        const preprocessed = clingoCode.replace(/\.\s+/g, '.\n');
+        const lines = preprocessed.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('%'));
+
+        const assumptions = [];
+        const weights = [];
+        const contraries = [];
+        const rules = new Map();
+
+        // Parse each line
+        lines.forEach(line => {
+            // Parse assumptions
+            let match = line.match(/^assumption\(([^)]+)\)\.$/);
+            if (match) {
+                assumptions.push(match[1]);
+                return;
+            }
+
+            // Parse weights
+            match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+            if (match) {
+                weights.push(`${match[1]}: ${match[2]}`);
+                return;
+            }
+
+            // Parse contraries
+            match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                contraries.push(`${match[1]}: ${match[2]}`);
+                return;
+            }
+
+            // Parse head
+            match = line.match(/^head\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                const ruleId = match[1];
+                const head = match[2];
+                if (!rules.has(ruleId)) {
+                    rules.set(ruleId, { head: head, body: [] });
+                } else {
+                    rules.get(ruleId).head = head;
+                }
+                return;
+            }
+
+            // Parse body
+            match = line.match(/^body\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                const ruleId = match[1];
+                const bodyAtom = match[2];
+                if (!rules.has(ruleId)) {
+                    rules.set(ruleId, { head: null, body: [bodyAtom] });
+                } else {
+                    rules.get(ruleId).body.push(bodyAtom);
+                }
+                return;
+            }
+        });
+
+        // Generate .waba format
+        let content = '';
+
+        if (assumptions.length > 0) {
+            content += 'Assumptions:\n' + assumptions.join('\n') + '\n\n';
+        }
+
+        if (rules.size > 0) {
+            content += 'Rules:\n';
+            rules.forEach((rule) => {
+                if (rule.head) {
+                    const bodyStr = rule.body.length > 0 ? rule.body.join(', ') : '';
+                    content += `${rule.head} ← ${bodyStr}\n`;
+                }
+            });
+            content += '\n';
+        }
+
+        if (contraries.length > 0) {
+            content += 'Contraries:\n' + contraries.join('\n') + '\n\n';
+        }
+
+        if (weights.length > 0) {
+            content += 'Weights:\n' + weights.join('\n') + '\n';
+        }
+
+        return content.trim();
     }
 
     updateGraphTheme() {
@@ -307,8 +468,9 @@ class WABAPlayground {
             }
         });
 
-        // Download .lp file
-        this.downloadLpBtn.addEventListener('click', () => this.downloadCurrentFramework());
+        // Download files
+        this.downloadLpBtn.addEventListener('click', () => this.downloadAsLp());
+        this.downloadWabaBtn.addEventListener('click', () => this.downloadAsWaba());
     }
 
     async regenerateGraph() {

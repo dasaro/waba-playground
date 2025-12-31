@@ -219,7 +219,8 @@
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button id="run-btn" class="run-btn" aria-label="Execute WABA framework">▶️ Run WABA</button>
-                            <button id="download-lp-btn" class="clear-btn" aria-label="Download current framework as .lp file">💾 Download .lp</button>
+                            <button id="download-lp-btn" class="clear-btn" aria-label="Download current framework as .lp file">💾 .lp</button>
+                            <button id="download-waba-btn" class="clear-btn" aria-label="Download current framework as .waba file">💾 .waba</button>
                         </div>
                     </div>
 
@@ -399,65 +400,91 @@ c_a: 70"></textarea>
                 <button id="syntax-guide-close" class="modal-close" aria-label="Close syntax guide">&times;</button>
             </div>
             <div class="modal-body">
-                <h3>ASP (Answer Set Programming) Basics</h3>
-                <ul>
-                    <li><strong>Comments:</strong> <code>% This is a comment</code></li>
-                    <li><strong>Facts:</strong> <code>fact_name.</code></li>
-                    <li><strong>Rules:</strong> <code>head :- body1, body2.</code></li>
-                    <li><strong>Constraints:</strong> <code>:- constraint_violated.</code></li>
-                    <li><strong>Choice:</strong> <code>{ chosen_atom }.</code></li>
-                </ul>
+                <h3>Simple Mode (.waba Format)</h3>
+                <p>Simple Mode uses a structured text format with four sections:</p>
 
-                <h3>WABA Core Predicates</h3>
+                <h4>1. Assumptions</h4>
+                <pre><code>a
+b
+c</code></pre>
+                <p>One assumption per line. These are defeasible atoms that can be in or out of extensions.</p>
 
-                <h4>Assumptions (Defeasible Atoms)</h4>
+                <h4>2. Rules</h4>
+                <pre><code>conclusion ← premise1, premise2
+attack_element ← a</code></pre>
+                <p>One rule per line using <code>←</code> (or <code>&lt;-</code>) to separate head from body. Premises separated by commas.</p>
+
+                <h4>3. Contraries</h4>
+                <pre><code>a: attack_element
+b: conclusion</code></pre>
+                <p>Format: <code>attacked_assumption: attacking_element</code><br>
+                <strong>Important:</strong> <code>attacking_element</code> attacks <code>attacked_assumption</code> (not the reverse).</p>
+
+                <h4>4. Weights</h4>
+                <pre><code>a: 10
+b: 20
+attack_element: 15</code></pre>
+                <p>Format: <code>atom: weight</code>. Assigns positive integer weights (default: 1).</p>
+
+                <h4>Complete .waba Example</h4>
+                <pre><code>Assumptions:
+a
+b
+
+Rules:
+attack_element ← a
+
+Contraries:
+b: attack_element
+
+Weights:
+a: 10
+b: 20
+attack_element: 15</code></pre>
+
+                <h3>Advanced Mode (.lp Format)</h3>
+                <p>Advanced Mode uses ASP syntax with WABA predicates:</p>
+
+                <h4>Assumptions</h4>
                 <pre><code>assumption(atom_name).</code></pre>
-                <p>Declares a defeasible assumption that can be in or out of extensions.</p>
 
                 <h4>Weights</h4>
                 <pre><code>weight(atom_name, weight_value).</code></pre>
-                <p>Assigns a positive integer weight to an atom (default: 1).</p>
 
                 <h4>Rules (Inference)</h4>
                 <pre><code>head(rule_id, conclusion).
 body(rule_id, premise1).
 body(rule_id, premise2).</code></pre>
-                <p>Defines inference rules: <code>conclusion ← premise1, premise2</code></p>
                 <p><em>Compact form:</em> <code>head(r1, conclusion; r1, premise1; r1, premise2).</code></p>
 
                 <h4>Contraries (Attack Relation)</h4>
                 <pre><code>contrary(attacked_assumption, attacking_element).</code></pre>
-                <p><strong>Important:</strong> "attacking_element attacks attacked_assumption" (not the reverse).</p>
 
                 <h4>Budget Constraint</h4>
                 <pre><code>budget(beta).</code></pre>
-                <p>Sets the budget β for attack resolution costs.</p>
 
-                <h3>Example Framework</h3>
+                <h4>Complete .lp Example</h4>
                 <pre><code>% Assumptions
-assumption(assume_a).
-assumption(assume_b).
+assumption(a).
+assumption(b).
 
 % Weights
-weight(assume_a, 10).
-weight(assume_b, 20).
+weight(a, 10).
+weight(b, 20).
 weight(attack_element, 15).
 
 % Rules
 head(r1, attack_element).
-body(r1, assume_a).
+body(r1, a).
 
 % Contraries
-contrary(assume_b, attack_element).
+contrary(b, attack_element).
 
 % Budget
 budget(50).</code></pre>
 
-                <h3>Special Constants</h3>
-                <ul>
-                    <li><code>#sup</code> - Superior (infinity-like value)</li>
-                    <li><code>#inf</code> - Inferior (negative infinity-like value)</li>
-                </ul>
+                <h3>File Upload</h3>
+                <p>You can upload <strong>.waba</strong> files (Simple Mode format) or <strong>.lp</strong> files (Advanced Mode ASP format). The playground will automatically detect the format and switch to the appropriate mode.</p>
 
                 <h3>See Also</h3>
                 <p>For complete WABA documentation, visit the <a href="https://github.com/dasaro/WABA" target="_blank">WABA GitHub repository</a>.</p>
