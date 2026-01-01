@@ -1036,7 +1036,6 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
             // Store isolated assumptions for display
             this.graphManager.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
-            this.graphManager.updateIsolatedAssumptionsOverlay();
 
             // Run layout and fit to view
             this.graphManager.runGraphLayout(true);
@@ -1048,6 +1047,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         easingFunction: 'easeInOutQuad'
                     }
                 });
+                // Update isolated assumptions banner after layout
+                this.graphManager.updateIsolatedAssumptionsOverlay();
             }, 600);
 
         } catch (error) {
@@ -1364,7 +1365,6 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
             // Store isolated assumptions for display
             this.graphManager.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
-            this.graphManager.updateIsolatedAssumptionsOverlay();
 
             // Run layout and fit to view
             this.graphManager.runGraphLayout(true);
@@ -1376,6 +1376,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         easingFunction: 'easeInOutQuad'
                     }
                 });
+                // Update isolated assumptions banner after layout
+                this.graphManager.updateIsolatedAssumptionsOverlay();
             }, 600);
 
         } catch (error) {
