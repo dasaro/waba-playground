@@ -289,17 +289,17 @@ c_a: 70"></textarea>
                     </div>
                     <div class="panel-content" id="panel-graph-content">
                     <div class="graph-header">
-                        <div class="graph-mode-selector">
+                        <div class="graph-mode-selector" role="radiogroup" aria-label="Graph visualization mode">
                             <label class="mode-option">
-                                <input type="radio" name="graph-mode" value="standard">
+                                <input type="radio" name="graph-mode" value="standard" aria-label="Standard graph mode - show all nodes and edges">
                                 <span>Standard</span>
                             </label>
                             <label class="mode-option">
-                                <input type="radio" name="graph-mode" value="assumption-direct" checked>
+                                <input type="radio" name="graph-mode" value="assumption-direct" checked aria-label="Assumption-Direct mode - show only assumptions with direct attacks">
                                 <span>Assumption-Direct</span>
                             </label>
                             <label class="mode-option">
-                                <input type="radio" name="graph-mode" value="assumption-branching">
+                                <input type="radio" name="graph-mode" value="assumption-branching" aria-label="Assumption-Branching mode - show assumptions with full branching attack paths">
                                 <span>Assumption-Branching</span>
                             </label>
                         </div>

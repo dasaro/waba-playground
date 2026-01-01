@@ -14,15 +14,76 @@ export class UIManager {
     openSyntaxGuide() {
         this.syntaxGuideModal.hidden = false;
         this.syntaxGuideModal.setAttribute('aria-hidden', 'false');
-        // Trap focus in modal
-        this.syntaxGuideModal.querySelector('button').focus();
+
+        // Focus the first tab button (or close button as fallback)
+        const firstTab = this.syntaxGuideModal.querySelector('.doc-tab');
+        if (firstTab) {
+            firstTab.focus();
+        } else {
+            const closeBtn = this.syntaxGuideModal.querySelector('button');
+            if (closeBtn) closeBtn.focus();
+        }
+
+        // Set up focus trap
+        this._setupFocusTrap();
     }
 
     closeSyntaxGuide() {
         this.syntaxGuideModal.hidden = true;
         this.syntaxGuideModal.setAttribute('aria-hidden', 'true');
+
         // Return focus to syntax guide button
-        this.syntaxGuideBtn.focus();
+        if (this.syntaxGuideBtn) {
+            this.syntaxGuideBtn.focus();
+        }
+
+        // Remove focus trap
+        this._removeFocusTrap();
+    }
+
+    _setupFocusTrap() {
+        // Get all focusable elements in the modal
+        const focusableElements = this.syntaxGuideModal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        // Handle Tab key to trap focus
+        this._trapFocusHandler = (e) => {
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    // Shift + Tab
+                    if (document.activeElement === firstElement) {
+                        e.preventDefault();
+                        lastElement.focus();
+                    }
+                } else {
+                    // Tab
+                    if (document.activeElement === lastElement) {
+                        e.preventDefault();
+                        firstElement.focus();
+                    }
+                }
+            }
+
+            // Close modal on Escape
+            if (e.key === 'Escape') {
+                this.closeSyntaxGuide();
+            }
+        };
+
+        this.syntaxGuideModal.addEventListener('keydown', this._trapFocusHandler);
+    }
+
+    _removeFocusTrap() {
+        if (this._trapFocusHandler) {
+            this.syntaxGuideModal.removeEventListener('keydown', this._trapFocusHandler);
+            this._trapFocusHandler = null;
+        }
     }
 
     // ===================================
@@ -53,15 +114,23 @@ export class UIManager {
     static showGraphEmptyState() {
         const emptyState = document.getElementById('graph-empty-state');
         const canvas = document.getElementById('cy');
-        if (emptyState) emptyState.removeAttribute('hidden');
-        if (canvas) canvas.style.opacity = '0.3';
+        if (emptyState) {
+            emptyState.removeAttribute('hidden');
+        }
+        if (canvas && canvas.style) {
+            canvas.style.opacity = '0.3';
+        }
     }
 
     static hideGraphEmptyState() {
         const emptyState = document.getElementById('graph-empty-state');
         const canvas = document.getElementById('cy');
-        if (emptyState) emptyState.setAttribute('hidden', '');
-        if (canvas) canvas.style.opacity = '1';
+        if (emptyState) {
+            emptyState.setAttribute('hidden', '');
+        }
+        if (canvas && canvas.style) {
+            canvas.style.opacity = '1';
+        }
     }
 
     static showOutputEmptyState() {

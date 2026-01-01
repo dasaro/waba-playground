@@ -335,16 +335,27 @@ class WABAPlayground {
 
             // Wait for graph to re-render
             setTimeout(() => {
-                callback();
-                // Restore original theme
-                setTimeout(() => {
-                    document.documentElement.setAttribute('data-theme', currentTheme || 'dark');
-                    this.themeManager.updateGraphTheme();
-                }, 100);
+                try {
+                    callback();
+                } catch (error) {
+                    console.error('Export failed:', error);
+                    alert('Export failed. Please try again.');
+                } finally {
+                    // Restore original theme even if export failed
+                    setTimeout(() => {
+                        document.documentElement.setAttribute('data-theme', currentTheme || 'dark');
+                        this.themeManager.updateGraphTheme();
+                    }, 100);
+                }
             }, 200);
         } else {
             // Already in light mode
-            callback();
+            try {
+                callback();
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Export failed. Please try again.');
+            }
         }
     }
 
@@ -467,6 +478,10 @@ class WABAPlayground {
         // Get selected graph mode
         const selectedMode = Array.from(this.graphModeRadios).find(r => r.checked);
         const mode = selectedMode ? selectedMode.value : 'standard';
+
+        // Store current framework and mode for popups
+        this.currentFrameworkCode = frameworkCode;
+        this.currentGraphMode = mode;
 
         // Delegate to GraphManager
         await this.graphManager.updateGraph(frameworkCode, mode, this.clingoManager);
