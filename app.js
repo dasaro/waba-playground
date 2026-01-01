@@ -178,24 +178,31 @@ class WABAPlayground {
         // Setup fullscreen change callback to resize graph
         this.uiManager.setFullscreenChangeCallback(() => {
             if (this.network) {
-                const canvas = document.getElementById('cy');
-                if (canvas) {
-                    // Force reflow to ensure layout is calculated
-                    const _ = canvas.offsetHeight;
+                const resizeNetwork = () => {
+                    const canvas = document.getElementById('cy');
+                    if (canvas) {
+                        // Get the actual computed dimensions
+                        const width = canvas.offsetWidth;
+                        const height = canvas.offsetHeight;
 
-                    // Get the actual computed dimensions
-                    const width = canvas.offsetWidth;
-                    const height = canvas.offsetHeight;
+                        console.log(`📐 Resizing vis.js network to ${width}x${height}`);
 
-                    console.log(`📐 Resizing vis.js network to ${width}x${height}`);
+                        // Explicitly set the size - this forces vis.js to resize the canvas
+                        this.network.setSize(width + 'px', height + 'px');
 
-                    // Explicitly set the size - this forces vis.js to resize the canvas
-                    this.network.setSize(width + 'px', height + 'px');
+                        // Then redraw and fit
+                        this.network.redraw();
+                        this.network.fit();
+                    }
+                };
 
-                    // Then redraw and fit
-                    this.network.redraw();
-                    this.network.fit();
-                }
+                // Immediate resize attempt
+                resizeNetwork();
+
+                // Delayed resize to catch flexbox layout completion (100ms, 250ms, 500ms)
+                setTimeout(resizeNetwork, 100);
+                setTimeout(resizeNetwork, 250);
+                setTimeout(resizeNetwork, 500);
             }
         });
 
