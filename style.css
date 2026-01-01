@@ -1071,37 +1071,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-webkit-full-screen,
 #graph-container:-moz-full-screen,
 #graph-container:-ms-fullscreen {
-    display: flex;
-    flex-direction: column;
-    width: 100vw !important;
-    height: 100vh !important;
-    padding: 0 !important; /* Remove padding to maximize canvas space */
+    padding: var(--space-lg);
     background: var(--bg-primary);
-}
-
-#graph-container:fullscreen #cy,
-#graph-container:-webkit-full-screen #cy,
-#graph-container:-moz-full-screen #cy,
-#graph-container:-ms-fullscreen #cy {
-    flex: 1 1 0;  /* flex-grow: 1, flex-shrink: 1, flex-basis: 0 */
-    width: 100% !important;
-    /* Don't set height - let flex calculate it, then vis.js can measure it correctly */
-    min-height: 0 !important;
-    overflow: hidden; /* Ensure canvas doesn't overflow */
-}
-
-#graph-container:fullscreen .graph-header,
-#graph-container:-webkit-full-screen .graph-header,
-#graph-container:-moz-full-screen .graph-header,
-#graph-container:-ms-fullscreen .graph-header {
-    flex-shrink: 0; /* Prevent header from shrinking */
-}
-
-#graph-container:fullscreen .isolated-assumptions-banner,
-#graph-container:-webkit-full-screen .isolated-assumptions-banner,
-#graph-container:-moz-full-screen .isolated-assumptions-banner,
-#graph-container:-ms-fullscreen .isolated-assumptions-banner {
-    flex-shrink: 0; /* Prevent banner from shrinking */
 }
 
 /* ===================================
@@ -1114,41 +1085,6 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .number { color: #d19a66; }
 .predicate { color: #61afef; }
 
-/* Ensure fullscreen element fills entire viewport and has proper stacking */
-#graph-container:fullscreen,
-#graph-container:-webkit-full-screen,
-#graph-container:-moz-full-screen,
-#graph-container:-ms-fullscreen {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 9999 !important;
-    margin: 0 !important;
-}
-
-/* Hide specific interfering elements when graph is fullscreen */
-body:has(#graph-container:fullscreen) .header,
-body:has(#graph-container:fullscreen) .left-panel,
-body:has(#graph-container:fullscreen) .footer,
-body:has(#graph-container:fullscreen) .intro-section {
-    display: none !important;
-}
-
-body:has(#graph-container:-webkit-full-screen) .header,
-body:has(#graph-container:-webkit-full-screen) .left-panel,
-body:has(#graph-container:-webkit-full-screen) .footer,
-body:has(#graph-container:-webkit-full-screen) .intro-section {
-    display: none !important;
-}
-
-body:has(#graph-container:-moz-full-screen) .header,
-body:has(#graph-container:-moz-full-screen) .left-panel,
-body:has(#graph-container:-moz-full-screen) .footer,
-body:has(#graph-container:-moz-full-screen) .intro-section {
-    display: none !important;
-}
 
 /* ===================================
    Mobile Optimizations
