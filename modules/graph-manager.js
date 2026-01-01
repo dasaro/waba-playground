@@ -42,10 +42,17 @@ export class GraphManager {
         const options = GraphUtils.getLayoutOptions(quickMode);
         this.network.setOptions({ physics: options });
 
-        // Stop physics after stabilization
+        // Stop physics after stabilization for semi-static behavior
         this.network.once('stabilizationIterationsDone', () => {
             this.network.setOptions({ physics: { enabled: false } });
+            console.log('Graph layout complete - physics disabled');
         });
+    }
+
+    triggerInitialLayout() {
+        // Trigger initial layout when graph data is loaded
+        if (!this.network) return;
+        this.runGraphLayout(false);
     }
 
     resetGraphColors() {

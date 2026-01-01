@@ -131,13 +131,15 @@ export class GraphUtils {
 
     /**
      * Get edge font color for current theme
-     * @returns {Object} - {color, background}
+     * @returns {Object} - {color, background, strokeWidth, strokeColor}
      */
     static getEdgeFontColor() {
         const isDark = GraphUtils.isDarkTheme();
         return {
-            color: isDark ? '#cbd5e1' : '#64748b',
-            background: isDark ? '#1e293b' : '#ffffff'
+            color: isDark ? '#ffffff' : '#1e293b',  // White in dark mode, dark in light mode
+            background: 'transparent',
+            strokeWidth: isDark ? 3 : 0,  // Border in dark mode for contrast
+            strokeColor: isDark ? '#1e293b' : 'transparent'
         };
     }
 
@@ -182,16 +184,16 @@ export class GraphUtils {
             minVelocity: 0.75,
             solver: 'barnesHut',
             barnesHut: {
-                gravitationalConstant: -4000,
-                centralGravity: 0.3,
-                springLength: 200,
-                springConstant: 0.05,
-                damping: 0.5,
-                avoidOverlap: 0.2
+                gravitationalConstant: -2000,  // Reduced for less movement
+                centralGravity: 0.1,  // Reduced central pull
+                springLength: 250,  // Longer springs for better spread
+                springConstant: 0.04,  // Weaker springs
+                damping: 0.7,  // Higher damping to stop movement faster
+                avoidOverlap: 0.5  // Stronger overlap avoidance
             },
             stabilization: {
                 enabled: true,
-                iterations: quickMode ? 100 : 300,
+                iterations: quickMode ? 150 : 500,  // More iterations for better layout
                 updateInterval: 25,
                 onlyDynamicEdges: false,
                 fit: true
@@ -209,7 +211,8 @@ export class GraphUtils {
                 shape: 'dot',
                 font: {
                     size: 14,
-                    color: GraphUtils.getFontColor()
+                    color: GraphUtils.getFontColor(),
+                    vadjust: 0  // Center label vertically inside node
                 },
                 borderWidth: 2,
                 shadow: {
@@ -241,12 +244,16 @@ export class GraphUtils {
                     enabled: false
                 }
             },
-            physics: GraphUtils.getLayoutOptions(false),
+            physics: {
+                enabled: false  // Start with physics disabled for semi-static behavior
+            },
             interaction: {
                 hover: true,
                 tooltipDelay: 200,
                 hideEdgesOnDrag: false,
-                hideEdgesOnZoom: false
+                hideEdgesOnZoom: false,
+                dragNodes: true,  // Allow dragging
+                dragView: true  // Allow panning the view
             }
         };
     }

@@ -264,6 +264,31 @@ class WABAPlayground {
         }
     }
 
+    exportGraphInLightMode(callback) {
+        // Temporarily switch to light mode for export
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const wasLight = currentTheme === 'light';
+
+        if (!wasLight) {
+            // Switch to light mode
+            document.documentElement.setAttribute('data-theme', 'light');
+            this.themeManager.updateGraphTheme();
+
+            // Wait for graph to re-render
+            setTimeout(() => {
+                callback();
+                // Restore original theme
+                setTimeout(() => {
+                    document.documentElement.setAttribute('data-theme', currentTheme || 'dark');
+                    this.themeManager.updateGraphTheme();
+                }, 100);
+            }, 200);
+        } else {
+            // Already in light mode
+            callback();
+        }
+    }
+
     addWatermark(sourceCanvas) {
         // Create a new canvas with watermark
         const watermarkedCanvas = document.createElement('canvas');
@@ -327,17 +352,19 @@ class WABAPlayground {
             return;
         }
 
-        // Get canvas and add watermark
-        const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
-        const watermarkedCanvas = this.addWatermark(sourceCanvas);
+        // Export in light mode
+        this.exportGraphInLightMode(() => {
+            const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
+            const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
-        watermarkedCanvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'waba-graph.png';
-            link.click();
-            URL.revokeObjectURL(url);
+            watermarkedCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'waba-graph.png';
+                link.click();
+                URL.revokeObjectURL(url);
+            });
         });
     }
 
@@ -347,19 +374,21 @@ class WABAPlayground {
             return;
         }
 
-        // Get canvas and add watermark
-        const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
-        const watermarkedCanvas = this.addWatermark(sourceCanvas);
+        // Export in light mode
+        this.exportGraphInLightMode(() => {
+            const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
+            const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        watermarkedCanvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `waba-graph-${timestamp}.png`;
-            link.click();
-            URL.revokeObjectURL(url);
-        }, 'image/png', 1.0);  // Quality 1.0 for high-resolution export
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            watermarkedCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `waba-graph-${timestamp}.png`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, 'image/png', 1.0);  // Quality 1.0 for high-resolution export
+        });
     }
 
     // ===================================
