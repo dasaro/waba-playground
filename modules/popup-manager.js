@@ -116,6 +116,91 @@ export class PopupManager {
     }
 
     /**
+     * Show node popup with details
+     * @param {Object} node - Node data from vis.js
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     * @param {Object} data - Additional data (frameworkCode, graphMode)
+     */
+    static showNodePopup(node, x, y, data) {
+        // Remove existing popups
+        PopupManager.clearAllPopups();
+
+        const popup = document.createElement('div');
+        popup.className = 'node-popup graph-tooltip';
+
+        let content = `<strong>Node: ${node.label || node.id}</strong><br>`;
+
+        // Add node-specific information
+        if (node.title) {
+            content += `${node.title}<br>`;
+        }
+
+        if (node.assumptions && node.assumptions.length > 0) {
+            content += `<strong>Assumptions:</strong> ${node.assumptions.join(', ')}<br>`;
+        }
+
+        if (node.size !== undefined) {
+            content += `<strong>Size:</strong> ${node.size}<br>`;
+        }
+
+        popup.innerHTML = content;
+        document.body.appendChild(popup);
+
+        // Position the popup
+        PopupManager.positionPopup(popup, x + 10, y + 10);
+
+        // Auto-remove on click outside
+        setTimeout(() => {
+            const removePopup = (e) => {
+                if (!popup.contains(e.target)) {
+                    popup.remove();
+                    document.removeEventListener('click', removePopup);
+                }
+            };
+            document.addEventListener('click', removePopup);
+        }, 100);
+    }
+
+    /**
+     * Show edge/weight popup with details
+     * @param {number|string} weight - Edge weight
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     */
+    static showWeightPopup(weight, x, y) {
+        // Remove existing popups
+        PopupManager.clearAllPopups();
+
+        const popup = document.createElement('div');
+        popup.className = 'node-popup graph-tooltip';
+
+        let displayWeight = weight;
+        if (weight === Infinity || weight === '#sup') {
+            displayWeight = '#sup (supremum)';
+        } else if (weight === -Infinity || weight === '#inf') {
+            displayWeight = '#inf (infimum)';
+        }
+
+        popup.innerHTML = `<strong>Attack Weight:</strong> ${displayWeight}`;
+        document.body.appendChild(popup);
+
+        // Position the popup
+        PopupManager.positionPopup(popup, x + 10, y + 10);
+
+        // Auto-remove on click outside
+        setTimeout(() => {
+            const removePopup = (e) => {
+                if (!popup.contains(e.target)) {
+                    popup.remove();
+                    document.removeEventListener('click', removePopup);
+                }
+            };
+            document.addEventListener('click', removePopup);
+        }, 100);
+    }
+
+    /**
      * Remove all popups/tooltips from the page
      */
     static clearAllPopups() {

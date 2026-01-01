@@ -59,6 +59,21 @@ export class GraphManager {
                 }
             }
         });
+
+        // Prevent physics from re-enabling during drag
+        this.network.on('dragStart', () => {
+            this.network.setOptions({ physics: { enabled: false } });
+        });
+
+        this.network.on('dragEnd', () => {
+            // Ensure physics stays disabled after drag
+            this.network.setOptions({ physics: { enabled: false } });
+        });
+
+        // Prevent stabilization from re-enabling physics
+        this.network.on('stabilizationIterationsDone', () => {
+            this.network.setOptions({ physics: { enabled: false } });
+        });
     }
 
     runGraphLayout(quickMode = false) {

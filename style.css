@@ -1597,3 +1597,49 @@ button:focus-visible,
         font-size: 0.8em;
     }
 }
+
+/* ================================================================
+   Graph Popups and Tooltips
+   ================================================================ */
+
+.graph-tooltip,
+.node-popup,
+.derivation-tooltip {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
+    pointer-events: auto;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+.graph-tooltip strong,
+.node-popup strong,
+.derivation-tooltip strong {
+    color: var(--primary-color);
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .graph-tooltip,
+[data-theme="light"] .node-popup,
+[data-theme="light"] .derivation-tooltip {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    color: #1e293b;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .graph-tooltip strong,
+[data-theme="light"] .node-popup strong,
+[data-theme="light"] .derivation-tooltip strong {
+    color: #5568d3;
+}
+}
