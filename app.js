@@ -230,18 +230,29 @@ class WABAPlayground {
         // If in fullscreen, calculate from container (vis.js inline styles can't be trusted)
         if (document.fullscreenElement) {
             const containerRect = container.getBoundingClientRect();
+            const containerStyle = window.getComputedStyle(container);
             const header = container.querySelector('.graph-header');
             const banner = container.querySelector('.isolated-assumptions-banner');
 
+            // Start with container dimensions
             width = containerRect.width;
             height = containerRect.height;
+
+            // Subtract container padding (top + bottom for height, left + right for width)
+            const paddingTop = parseFloat(containerStyle.paddingTop);
+            const paddingBottom = parseFloat(containerStyle.paddingBottom);
+            const paddingLeft = parseFloat(containerStyle.paddingLeft);
+            const paddingRight = parseFloat(containerStyle.paddingRight);
+
+            width -= (paddingLeft + paddingRight);
+            height -= (paddingTop + paddingBottom);
 
             // Subtract header height
             if (header) height -= header.offsetHeight;
             // Subtract banner height if visible
             if (banner && !banner.hidden) height -= banner.offsetHeight;
 
-            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Available ${width}x${height}`);
+            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Padding ${paddingTop + paddingBottom}px, Available ${width}x${height}`);
         } else {
             // Normal mode: use #cy dimensions
             width = canvas.offsetWidth;
