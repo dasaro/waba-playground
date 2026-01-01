@@ -1085,8 +1085,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-ms-fullscreen #cy {
     flex: 1;
     width: 100% !important;
-    height: auto !important; /* Override the fixed 500px height */
     min-height: unset !important;
+    /* Don't set explicit height - let flex: 1 handle vertical sizing */
+    /* vis.js will be explicitly resized via setSize() in JavaScript */
 }
 
 #graph-container:fullscreen .graph-header,
