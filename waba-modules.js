@@ -2125,6 +2125,12 @@ miss_common(X) :- common_complete(X), not in(X).
 #show supported_with_weight/2.
 #show attacks_successfully_with_weight/3.
 #show discarded_attack/3.
+
+% Framework structure (needed for attack derivation tracing)
+#show assumption/1.
+#show contrary/2.
+#show head/2.
+#show body/2.
 `,
         projection: `%% Output filtering for projection mode: show in/out and discarded attacks
 #show in/1.
