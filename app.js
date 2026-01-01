@@ -3,7 +3,7 @@
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
-import { UIManager } from './modules/ui-manager.js?v=20260101-6';
+import { UIManager } from './modules/ui-manager.js?v=20260101-8';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
@@ -49,7 +49,6 @@ class WABAPlayground {
         this.graphCanvas = document.getElementById('cy');
         this.graphContainer = document.getElementById('graph-container');
         this.resetLayoutBtn = document.getElementById('reset-layout-btn');
-        this.fullscreenBtn = document.getElementById('fullscreen-btn');
 
         // Syntax guide and download
         this.syntaxGuideBtn = document.getElementById('syntax-guide-btn');
@@ -111,7 +110,6 @@ class WABAPlayground {
             this.syntaxGuideBtn,
             this.syntaxGuideModal,
             this.syntaxGuideClose,
-            this.fullscreenBtn,
             this.graphContainer
         );
 
@@ -175,16 +173,6 @@ class WABAPlayground {
             (edge, x, y) => this.handleEdgeClick(edge, x, y)
         );
 
-        // Setup ResizeObserver for automatic resize detection
-        this.setupGraphResizeObserver();
-
-        // Setup fullscreen change callback (triggers initial resize)
-        this.uiManager.setFullscreenChangeCallback(() => {
-            if (this.network) {
-                this.resizeGraphToContainer();
-            }
-        });
-
         // Attach event listeners
         this.attachEventListeners();
 
@@ -201,63 +189,6 @@ class WABAPlayground {
                 this.loadExample(selectedExample);
             }
         }, 100);
-    }
-
-    // ===================================
-    // Graph Resize Management
-    // ===================================
-
-    /**
-     * Resize graph to fit container dimensions
-     * In fullscreen: reads CSS-sized container dimensions and tells vis.js
-     * In normal mode: no-op (CSS handles sizing)
-     */
-    resizeGraphToContainer() {
-        if (!this.network) return;
-
-        // Only resize in fullscreen mode
-        // In normal mode, CSS sets fixed 500px height - no resize needed
-        if (!document.fullscreenElement) {
-            console.log('📐 Normal mode: CSS handles sizing, skipping resize');
-            return;
-        }
-
-        // Read dimensions from CSS-sized container (CSS flexbox has already calculated them)
-        const canvas = document.getElementById('cy');
-        if (!canvas) return;
-
-        const width = canvas.offsetWidth;
-        const height = canvas.offsetHeight;
-
-        console.log(`📐 Fullscreen: CSS sized container to ${width}x${height}, telling vis.js`);
-
-        // Tell vis.js the new dimensions (it doesn't auto-detect container size changes)
-        this.network.setSize(width + 'px', height + 'px');
-        this.network.redraw();
-        this.network.fit();
-    }
-
-    /**
-     * Setup ResizeObserver to automatically resize graph in fullscreen
-     * Simplified version - just triggers redraw/fit when container resizes
-     */
-    setupGraphResizeObserver() {
-        const container = document.getElementById('graph-container');
-        if (!container) return;
-
-        this.resizeObserver = new ResizeObserver(() => {
-            // Only respond to fullscreen resizes (window resize, browser chrome changes)
-            if (document.fullscreenElement && this.network) {
-                // Debounce rapid events
-                clearTimeout(this.resizeTimeout);
-                this.resizeTimeout = setTimeout(() => {
-                    this.resizeGraphToContainer();
-                }, 100);
-            }
-        });
-
-        this.resizeObserver.observe(container);
-        console.log('✅ ResizeObserver attached (fullscreen-only)');
     }
 
     // ===================================
@@ -328,10 +259,6 @@ class WABAPlayground {
         // Download buttons
         this.downloadLpBtn.addEventListener('click', () => this.downloadAsLp());
         this.downloadWabaBtn.addEventListener('click', () => this.downloadAsWaba());
-
-        // Fullscreen button
-        this.fullscreenBtn.addEventListener('click', () => this.uiManager.toggleFullscreen());
-        document.addEventListener('fullscreenchange', () => this.uiManager.updateFullscreenButton());
 
         // Legend toggle button
         this.legendToggleBtn.addEventListener('click', () => this.toggleLegend());

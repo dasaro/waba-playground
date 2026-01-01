@@ -1,18 +1,12 @@
 /**
- * UIManager - Handles UI interactions (modals, overlays, fullscreen, empty states)
+ * UIManager - Handles UI interactions (modals, overlays, empty states)
  */
 export class UIManager {
-    constructor(syntaxGuideBtn, syntaxGuideModal, syntaxGuideClose, fullscreenBtn, graphContainer) {
+    constructor(syntaxGuideBtn, syntaxGuideModal, syntaxGuideClose, graphContainer) {
         this.syntaxGuideBtn = syntaxGuideBtn;
         this.syntaxGuideModal = syntaxGuideModal;
         this.syntaxGuideClose = syntaxGuideClose;
-        this.fullscreenBtn = fullscreenBtn;
         this.graphContainer = graphContainer;
-        this.onFullscreenChange = null;  // Callback for fullscreen changes
-    }
-
-    setFullscreenChangeCallback(callback) {
-        this.onFullscreenChange = callback;
     }
 
     // ===================================
@@ -30,35 +24,6 @@ export class UIManager {
         this.syntaxGuideModal.setAttribute('aria-hidden', 'true');
         // Return focus to syntax guide button
         this.syntaxGuideBtn.focus();
-    }
-
-    // ===================================
-    // Fullscreen
-    // ===================================
-    toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            this.graphContainer.requestFullscreen().catch(err => {
-                console.error('Error attempting to enable fullscreen:', err);
-            });
-        } else {
-            document.exitFullscreen();
-        }
-    }
-
-    updateFullscreenButton() {
-        console.log('🖥️ Fullscreen state changed:', document.fullscreenElement ? 'ENTERED' : 'EXITED');
-
-        // Update button text
-        if (document.fullscreenElement) {
-            this.fullscreenBtn.textContent = '✕ Exit Fullscreen';
-        } else {
-            this.fullscreenBtn.textContent = '⛶ Fullscreen';
-        }
-
-        // Trigger resize callback (simplified - just redraw/fit)
-        if (this.onFullscreenChange) {
-            this.onFullscreenChange();
-        }
     }
 
     // ===================================
