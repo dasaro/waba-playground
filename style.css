@@ -1114,6 +1114,19 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .number { color: #d19a66; }
 .predicate { color: #61afef; }
 
+/* Hide other content when graph is fullscreen */
+body:has(#graph-container:fullscreen) > *:not(#graph-container:fullscreen) {
+    display: none !important;
+}
+
+body:has(#graph-container:-webkit-full-screen) > *:not(#graph-container:-webkit-full-screen) {
+    display: none !important;
+}
+
+body:has(#graph-container:-moz-full-screen) > *:not(#graph-container:-moz-full-screen) {
+    display: none !important;
+}
+
 /* ===================================
    Mobile Optimizations
    =================================== */
