@@ -1128,6 +1128,28 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     margin: 0 !important;
 }
 
+/* Hide specific interfering elements when graph is fullscreen */
+body:has(#graph-container:fullscreen) .header,
+body:has(#graph-container:fullscreen) .left-panel,
+body:has(#graph-container:fullscreen) .footer,
+body:has(#graph-container:fullscreen) .intro-section {
+    display: none !important;
+}
+
+body:has(#graph-container:-webkit-full-screen) .header,
+body:has(#graph-container:-webkit-full-screen) .left-panel,
+body:has(#graph-container:-webkit-full-screen) .footer,
+body:has(#graph-container:-webkit-full-screen) .intro-section {
+    display: none !important;
+}
+
+body:has(#graph-container:-moz-full-screen) .header,
+body:has(#graph-container:-moz-full-screen) .left-panel,
+body:has(#graph-container:-moz-full-screen) .footer,
+body:has(#graph-container:-moz-full-screen) .intro-section {
+    display: none !important;
+}
+
 /* ===================================
    Mobile Optimizations
    =================================== */
