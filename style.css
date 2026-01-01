@@ -1085,8 +1085,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-ms-fullscreen #cy {
     flex: 1;
     width: 100% !important;
+    height: auto !important; /* Override fixed 500px height from .graph-canvas */
     min-height: unset !important;
-    /* Don't set height: 100% - let flex: 1 handle vertical sizing */
+    /* Let flex: 1 handle vertical sizing to fill available space */
 }
 
 #graph-container:fullscreen .graph-header,
