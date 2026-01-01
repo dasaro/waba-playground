@@ -2,8 +2,8 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js';
-import { ParserUtils } from './parser-utils.js';
+import { GraphUtils } from './graph-utils.js?v=20260101-1';
+import { ParserUtils } from './parser-utils.js?v=20260101-1';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn) {

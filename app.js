@@ -1,16 +1,17 @@
 // WABA Playground - Modular Application (ES6)
+// VERSION: 20260101-1 - Update on every deployment (format: YYYYMMDD-N)
 
-import { ThemeManager } from './modules/theme-manager.js';
-import { FontManager } from './modules/font-manager.js';
-import { UIManager } from './modules/ui-manager.js';
-import { FileManager } from './modules/file-manager.js';
-import { ParserUtils } from './modules/parser-utils.js';
-import { GraphUtils } from './modules/graph-utils.js';
-import { GraphManager } from './modules/graph-manager.js';
-import { PopupManager } from './modules/popup-manager.js';
-import { ClingoManager } from './modules/clingo-manager.js';
-import { OutputManager } from './modules/output-manager.js';
-import { examples } from './examples.js';
+import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
+import { FontManager } from './modules/font-manager.js?v=20260101-1';
+import { UIManager } from './modules/ui-manager.js?v=20260101-1';
+import { FileManager } from './modules/file-manager.js?v=20260101-1';
+import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
+import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
+import { GraphManager } from './modules/graph-manager.js?v=20260101-1';
+import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
+import { ClingoManager } from './modules/clingo-manager.js?v=20260101-1';
+import { OutputManager } from './modules/output-manager.js?v=20260101-1';
+import { examples } from './examples.js?v=20260101-1';
 
 class WABAPlayground {
     constructor() {

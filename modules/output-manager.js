@@ -1,7 +1,7 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js';
+import { PopupManager } from './popup-manager.js?v=20260101-1';
 
 export class OutputManager {
     constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {

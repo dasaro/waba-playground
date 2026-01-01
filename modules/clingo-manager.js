@@ -1,7 +1,7 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and WABA program building
  */
-import { wabaModules } from '../waba-modules.js';
+import { wabaModules } from '../waba-modules.js?v=20260101-1';
 
 export class ClingoManager {
     constructor(runBtn) {

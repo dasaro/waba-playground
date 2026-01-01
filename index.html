@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Cache control for development -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <!-- CRITICAL: Set base URL for GitHub Pages project repository (conditional) -->
     <script>
@@ -540,6 +537,6 @@ budget(50).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260101"></script>
+    <script type="module" src="app.js?v=20260101-1"></script>
 </body>
 </html>
