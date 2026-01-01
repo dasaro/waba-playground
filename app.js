@@ -49,6 +49,8 @@ class WABAPlayground {
         // Graph visualization elements
         this.graphCanvas = document.getElementById('cy');
         this.resetLayoutBtn = document.getElementById('reset-layout-btn');
+        this.fullscreenBtn = document.getElementById('fullscreen-btn');
+        this.graphPanel = document.querySelector('.graph-panel');
 
         // Syntax guide and download
         this.syntaxGuideBtn = document.getElementById('syntax-guide-btn');
@@ -85,7 +87,7 @@ class WABAPlayground {
 
     initializeManagers() {
         // Initialize Graph Manager
-        this.graphManager = new GraphManager(this.graphCanvas, this.resetLayoutBtn);
+        this.graphManager = new GraphManager(this.graphCanvas, this.resetLayoutBtn, this.fullscreenBtn);
         // Share network references for backwards compatibility
         this.network = null; // Will be set by graphManager.initGraph()
         this.networkData = { nodes: null, edges: null };
@@ -168,6 +170,9 @@ class WABAPlayground {
         // Share network references
         this.network = this.graphManager.network;
         this.networkData = this.graphManager.networkData;
+
+        // Initialize fullscreen functionality
+        this.graphManager.initFullscreen(this.graphPanel);
 
         // Update theme manager with initialized network
         this.themeManager.network = this.network;

@@ -7,14 +7,17 @@ import { ParserUtils } from './parser-utils.js?v=20260101-1';
 import { UIManager } from './ui-manager.js?v=20260101-1';
 
 export class GraphManager {
-    constructor(graphCanvas, resetLayoutBtn) {
+    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn) {
         this.graphCanvas = graphCanvas;
         this.resetLayoutBtn = resetLayoutBtn;
+        this.fullscreenBtn = fullscreenBtn;
         this.network = null;
         this.networkData = { nodes: null, edges: null };
         this.isolatedNodes = [];
         this.currentFrameworkCode = '';
         this.currentGraphMode = 'standard';
+        this.isFullscreen = false;
+        this.graphPanel = null; // Will be set to the graph panel container
     }
 
     /**
@@ -1256,6 +1259,106 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating assumption-level graph:', error);
+        }
+    }
+
+    // ===================================
+    // Fullscreen Mode
+    // ===================================
+
+    /**
+     * Initialize fullscreen functionality
+     * @param {HTMLElement} graphPanel - The graph panel container element
+     */
+    initFullscreen(graphPanel) {
+        this.graphPanel = graphPanel;
+
+        // Add fullscreen button click handler
+        if (this.fullscreenBtn) {
+            this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        }
+
+        // Listen for fullscreen changes (user pressing ESC or clicking browser exit)
+        document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('mozfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('MSFullscreenChange', () => this.handleFullscreenChange());
+    }
+
+    /**
+     * Toggle fullscreen mode for the graph panel
+     */
+    async toggleFullscreen() {
+        if (!this.graphPanel) {
+            console.error('Graph panel not initialized for fullscreen');
+            return;
+        }
+
+        try {
+            if (!this.isFullscreen) {
+                // Enter fullscreen
+                if (this.graphPanel.requestFullscreen) {
+                    await this.graphPanel.requestFullscreen();
+                } else if (this.graphPanel.webkitRequestFullscreen) {
+                    await this.graphPanel.webkitRequestFullscreen();
+                } else if (this.graphPanel.mozRequestFullScreen) {
+                    await this.graphPanel.mozRequestFullScreen();
+                } else if (this.graphPanel.msRequestFullscreen) {
+                    await this.graphPanel.msRequestFullscreen();
+                }
+            } else {
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    await document.webkitExitFullscreen();
+                } else if (document.mozCancelFullScreen) {
+                    await document.mozCancelFullScreen();
+                } else if (document.msExitFullscreen) {
+                    await document.msExitFullscreen();
+                }
+            }
+        } catch (error) {
+            console.error('Fullscreen error:', error);
+        }
+    }
+
+    /**
+     * Handle fullscreen state changes (including ESC key exit)
+     */
+    handleFullscreenChange() {
+        const isCurrentlyFullscreen = !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement
+        );
+
+        this.isFullscreen = isCurrentlyFullscreen;
+
+        // Update button text and icon
+        if (this.fullscreenBtn) {
+            if (this.isFullscreen) {
+                this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
+                this.graphPanel.classList.add('fullscreen-active');
+            } else {
+                this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
+                this.graphPanel.classList.remove('fullscreen-active');
+            }
+        }
+
+        // Redraw graph to fit new container size
+        if (this.network) {
+            setTimeout(() => {
+                this.network.fit({
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }, 100);
         }
     }
 }
