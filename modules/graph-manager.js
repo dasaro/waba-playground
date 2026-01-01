@@ -41,21 +41,26 @@ export class GraphManager {
 
         // Handle clicks on nodes and edges
         this.network.on('click', (params) => {
+            // Get canvas element position to convert to screen coordinates
+            const canvasRect = this.graphCanvas.getBoundingClientRect();
+            const screenX = canvasRect.left + params.pointer.DOM.x;
+            const screenY = canvasRect.top + params.pointer.DOM.y;
+
             if (params.nodes.length > 0) {
                 // Clicked on a node
                 const nodeId = params.nodes[0];
                 const node = this.networkData.nodes.get(nodeId);
-                const position = params.pointer.DOM;
+                console.log('Node clicked:', node);
                 if (onNodeClick) {
-                    onNodeClick(node, position.x, position.y);
+                    onNodeClick(node, screenX, screenY);
                 }
             } else if (params.edges.length > 0) {
                 // Clicked on an edge
                 const edgeId = params.edges[0];
                 const edge = this.networkData.edges.get(edgeId);
-                const position = params.pointer.DOM;
+                console.log('Edge clicked:', edge);
                 if (onEdgeClick) {
-                    onEdgeClick(edge, position.x, position.y);
+                    onEdgeClick(edge, screenX, screenY);
                 }
             }
         });

@@ -1576,10 +1576,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
     }
 
     handleEdgeClick(edge, x, y) {
-        // Show edge popup with weight details
-        if (edge.weight !== undefined) {
-            PopupManager.showWeightPopup(edge.weight, x, y);
-        }
+        // Show edge popup with attack details
+        PopupManager.showEdgePopup(edge, x, y);
     }
 }
 
