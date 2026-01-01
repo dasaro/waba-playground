@@ -57,21 +57,18 @@ export class UIManager {
             console.log('Button text set to: Fullscreen');
         }
 
-        // Trigger callback to resize graph
+        // Trigger callback to resize graph using requestAnimationFrame
+        // This ensures the DOM has updated after fullscreen transition
         if (this.onFullscreenChange) {
-            console.log('✅ [updateFullscreenButton] Callback exists, scheduling execution...');
-            // Delay to allow CSS transitions to complete (increased for better reliability)
-            setTimeout(() => {
-                console.log('📞 [updateFullscreenButton] Executing callback now...');
-                this.onFullscreenChange();
-                // Force canvas height recalculation
-                const canvas = document.getElementById('cy');
-                if (canvas) {
-                    canvas.style.height = canvas.offsetHeight + 'px';
-                    console.log('✅ [updateFullscreenButton] Canvas height recalculated:', canvas.offsetHeight);
-                }
-                console.log('✅ [updateFullscreenButton] Callback execution complete');
-            }, 300);
+            console.log('✅ [updateFullscreenButton] Scheduling graph resize...');
+            // Use requestAnimationFrame to let browser complete fullscreen layout
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    console.log('📞 [updateFullscreenButton] Executing vis.js resize...');
+                    this.onFullscreenChange();
+                    console.log('✅ [updateFullscreenButton] Graph resized via vis.js redraw() and fit()');
+                });
+            });
         } else {
             console.warn('⚠️ [updateFullscreenButton] No callback set! Graph will not be resized.');
         }
