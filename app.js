@@ -276,35 +276,46 @@ class WABAPlayground {
 
         // Add watermark in bottom-right corner
         ctx.save();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = 2;
 
-        // Text settings
-        const fontSize = Math.max(14, Math.floor(sourceCanvas.height / 40));
+        // Generate timestamp
+        const now = new Date();
+        const dateTime = now.toISOString().slice(0, 19).replace('T', ' ');
+
+        // Watermark text
+        const line1 = `Generated with WABA Playground by Fabio Aurelio d'Asaro (${dateTime})`;
+        const line2 = 'https://github.com/dasaro/waba-playground';
+
+        // Small font
+        const fontSize = 11;
         ctx.font = `${fontSize}px Arial`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'bottom';
 
-        // Watermark text
-        const line1 = 'WABA Playground';
-        const line2 = 'https://github.com/dasaro/waba-playground';
-        const line3 = 'Author: Fabio D\'Asaro';
-
-        const padding = 10;
-        const lineHeight = fontSize + 4;
+        const padding = 8;
+        const lineHeight = fontSize + 3;
         const x = watermarkedCanvas.width - padding;
-        const y3 = watermarkedCanvas.height - padding;
-        const y2 = y3 - lineHeight;
+        const y2 = watermarkedCanvas.height - padding;
         const y1 = y2 - lineHeight;
 
-        // Draw text with outline for better visibility
-        ctx.strokeText(line1, x, y1);
+        // Measure text to create background rectangle
+        const text1Width = ctx.measureText(line1).width;
+        const text2Width = ctx.measureText(line2).width;
+        const maxWidth = Math.max(text1Width, text2Width);
+
+        const bgPadding = 4;
+        const bgX = x - maxWidth - bgPadding;
+        const bgY = y1 - fontSize - bgPadding;
+        const bgWidth = maxWidth + bgPadding * 2;
+        const bgHeight = lineHeight * 2 + bgPadding * 2;
+
+        // Draw white background rectangle
+        ctx.fillStyle = 'white';
+        ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+
+        // Draw black text
+        ctx.fillStyle = 'black';
         ctx.fillText(line1, x, y1);
-        ctx.strokeText(line2, x, y2);
         ctx.fillText(line2, x, y2);
-        ctx.strokeText(line3, x, y3);
-        ctx.fillText(line3, x, y3);
 
         ctx.restore();
         return watermarkedCanvas;
