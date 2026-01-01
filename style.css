@@ -2067,6 +2067,19 @@ button:focus-visible,
     margin-bottom: var(--space-xl);
 }
 
+/* Semantic Text Colors */
+.text-in {
+    color: var(--node-in);
+}
+
+.text-out {
+    color: var(--node-out);
+}
+
+.text-attack {
+    color: #3b82f6;
+}
+
 /* Mobile Adjustments */
 @media (max-width: 768px) {
     .modal-content-large {

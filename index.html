@@ -230,7 +230,7 @@
                     </div>
 
                     <!-- Advanced Mode: Code Editor -->
-                    <textarea id="code-editor" class="code-editor code-editor-textarea" style="display: none;" placeholder="Enter your WABA framework here...
+                    <textarea id="code-editor" class="code-editor code-editor-textarea" placeholder="Enter your WABA framework here...
 Example:
 assumption(a).
 assumption(b).
@@ -244,25 +244,25 @@ contrary(b, c_b)."></textarea>
                     <div id="simple-mode" class="simple-mode">
                         <div class="simple-grid">
                             <div class="simple-field">
-                                <label>Assumptions (one per line)</label>
+                                <label for="assumptions-input">Assumptions (one per line)</label>
                                 <textarea id="assumptions-input" class="simple-textarea" placeholder="a
 b
 c"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label>Rules (format: head <- body1, body2)</label>
+                                <label for="rules-input">Rules (format: head <- body1, body2)</label>
                                 <textarea id="rules-input" class="simple-textarea" placeholder="c_a <- b"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label>Contraries (format: assumption: contrary)</label>
+                                <label for="contraries-input">Contraries (format: assumption: contrary)</label>
                                 <textarea id="contraries-input" class="simple-textarea" placeholder="a: c_a
 b: c_b"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label>Weights (format: atom: weight)</label>
+                                <label for="weights-input">Weights (format: atom: weight)</label>
                                 <textarea id="weights-input" class="simple-textarea" placeholder="a: 80
 b: 60
 c_a: 70"></textarea>
@@ -785,9 +785,9 @@ budget(100).</code></pre>
                             <h5>Extension Card Format</h5>
                             <pre><code><strong>Extension 1</strong> (Cost: 0)
 ━━━━━━━━━━━━━━━━━━━━━━
-<span style="color: #22c55e;">✓ IN:</span> a, b, c
-<span style="color: #ef4444;">✗ OUT:</span> d, e
-<span style="color: #3b82f6;">⚔️ ATTACKS:</span>
+<span class="text-in">✓ IN:</span> a, b, c
+<span class="text-out">✗ OUT:</span> d, e
+<span class="text-attack">⚔️ ATTACKS:</span>
   c attacks d (weight: 50) [ACTIVE]
   b attacks e (weight: 30) [DISCARDED, cost: 30]
 ━━━━━━━━━━━━━━━━━━━━━━</code></pre>
