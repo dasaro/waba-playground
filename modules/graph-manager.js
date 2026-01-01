@@ -36,6 +36,31 @@ export class GraphManager {
         console.log('Graph initialized with vis.js');
     }
 
+    setupEventListeners(onNodeClick, onEdgeClick) {
+        if (!this.network) return;
+
+        // Handle clicks on nodes and edges
+        this.network.on('click', (params) => {
+            if (params.nodes.length > 0) {
+                // Clicked on a node
+                const nodeId = params.nodes[0];
+                const node = this.networkData.nodes.get(nodeId);
+                const position = params.pointer.DOM;
+                if (onNodeClick) {
+                    onNodeClick(node, position.x, position.y);
+                }
+            } else if (params.edges.length > 0) {
+                // Clicked on an edge
+                const edgeId = params.edges[0];
+                const edge = this.networkData.edges.get(edgeId);
+                const position = params.pointer.DOM;
+                if (onEdgeClick) {
+                    onEdgeClick(edge, position.x, position.y);
+                }
+            }
+        });
+    }
+
     runGraphLayout(quickMode = false) {
         if (!this.network) return;
 

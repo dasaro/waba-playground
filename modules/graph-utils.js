@@ -208,11 +208,13 @@ export class GraphUtils {
     static getNetworkOptions() {
         return {
             nodes: {
-                shape: 'dot',
+                shape: 'circle',  // Use circle instead of dot for better label positioning
+                size: 25,  // Larger size to fit labels inside
                 font: {
-                    size: 14,
+                    size: 11,  // Smaller font to fit inside nodes
                     color: GraphUtils.getFontColor(),
-                    vadjust: 0  // Center label vertically inside node
+                    vadjust: 0,  // Center label vertically
+                    align: 'center'  // Center label horizontally
                 },
                 borderWidth: 2,
                 shadow: {
@@ -245,7 +247,10 @@ export class GraphUtils {
                 }
             },
             physics: {
-                enabled: false  // Start with physics disabled for semi-static behavior
+                enabled: false,  // Start with physics disabled for semi-static behavior
+                stabilization: {
+                    enabled: false  // Prevent stabilization from re-enabling physics
+                }
             },
             interaction: {
                 hover: true,
@@ -253,7 +258,11 @@ export class GraphUtils {
                 hideEdgesOnDrag: false,
                 hideEdgesOnZoom: false,
                 dragNodes: true,  // Allow dragging
-                dragView: true  // Allow panning the view
+                dragView: true,  // Allow panning the view
+                zoomView: true  // Allow zooming
+            },
+            manipulation: {
+                enabled: false  // Disable manipulation to prevent physics re-enabling
             }
         };
     }

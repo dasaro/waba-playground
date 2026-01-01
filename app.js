@@ -159,6 +159,12 @@ class WABAPlayground {
         this.themeManager.network = this.network;
         this.themeManager.networkData = this.networkData;
 
+        // Setup graph click event listeners for popups
+        this.graphManager.setupEventListeners(
+            (node, x, y) => this.handleNodeClick(node, x, y),
+            (edge, x, y) => this.handleEdgeClick(edge, x, y)
+        );
+
         // Attach event listeners
         this.attachEventListeners();
 
@@ -1556,6 +1562,24 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
     // ===================================
     clearOutput() {
         this.outputManager.clearOutput();
+    }
+
+    // ===================================
+    // Graph Event Handlers
+    // ===================================
+    handleNodeClick(node, x, y) {
+        // Show node popup with details
+        PopupManager.showNodePopup(node, x, y, {
+            frameworkCode: this.currentFrameworkCode,
+            graphMode: this.currentGraphMode
+        });
+    }
+
+    handleEdgeClick(edge, x, y) {
+        // Show edge popup with weight details
+        if (edge.weight !== undefined) {
+            PopupManager.showWeightPopup(edge.weight, x, y);
+        }
     }
 }
 
