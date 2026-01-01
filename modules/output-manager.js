@@ -1,6 +1,8 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
+import { PopupManager } from './popup-manager.js';
+
 export class OutputManager {
     constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {
         this.output = output;
@@ -276,9 +278,22 @@ export class OutputManager {
         });
 
         // Add click handlers for derived atoms to show derivation chain
-        // Note: Removed showDerivationChain calls - will be handled by callback if needed
-
         this.output.appendChild(answerDiv);
+
+        // Attach event listeners to derived atom chips AFTER appending to DOM
+        if (parsed.derived && parsed.derived.length > 0) {
+            parsed.derived.forEach(atom => {
+                const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                const chipElement = answerDiv.querySelector(`#${atomId}`);
+                if (chipElement) {
+                    chipElement.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Don't trigger extension highlight
+                        console.log('Derived atom clicked:', atom);
+                        PopupManager.showDerivationChain(atom, parsed, chipElement);
+                    });
+                }
+            });
+        }
     }
 
     findSupportingAssumptions(element, parsed) {
