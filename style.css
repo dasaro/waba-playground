@@ -1075,7 +1075,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     flex-direction: column;
     width: 100vw !important;
     height: 100vh !important;
-    padding: 0 !important; /* Remove padding to maximize canvas space */
+    padding: var(--space-md) !important; /* Add padding so border is visible */
     background: var(--bg-primary);
 }
 
@@ -1083,11 +1083,11 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-webkit-full-screen #cy,
 #graph-container:-moz-full-screen #cy,
 #graph-container:-ms-fullscreen #cy {
-    flex: 1 1 auto;
+    flex: 1;
     width: 100% !important;
-    height: 0 !important; /* Set to 0 so flex can grow it - override fixed 500px */
-    min-height: 0 !important;
-    /* flex: 1 1 auto with height: 0 allows flex to expand to fill available space */
+    min-height: unset !important;
+    /* Don't set explicit height - let flex: 1 and JavaScript setSize() handle sizing */
+    /* This ensures the border is visible while the canvas fills the space */
 }
 
 #graph-container:fullscreen .graph-header,
