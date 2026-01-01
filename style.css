@@ -788,8 +788,11 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
+    width: 100%; /* Fill container width */
     height: 500px; /* Fixed height for consistent display */
+    max-width: 100%; /* Prevent overflow */
     position: relative;
+    overflow: hidden; /* Contain vis.js content */
 }
 
 /* ===================================
