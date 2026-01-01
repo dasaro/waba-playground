@@ -1083,11 +1083,11 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-webkit-full-screen #cy,
 #graph-container:-moz-full-screen #cy,
 #graph-container:-ms-fullscreen #cy {
-    flex: 1 1 auto;
+    flex: 1 1 0;  /* flex-grow: 1, flex-shrink: 1, flex-basis: 0 */
     width: 100% !important;
-    height: 0 !important; /* Set to 0 so flex can grow it - override fixed 500px */
+    /* Don't set height - let flex calculate it, then vis.js can measure it correctly */
     min-height: 0 !important;
-    /* flex: 1 1 auto with height: 0 allows flex to expand to fill available space */
+    overflow: hidden; /* Ensure canvas doesn't overflow */
 }
 
 #graph-container:fullscreen .graph-header,
