@@ -1075,7 +1075,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     flex-direction: column;
     width: 100vw !important;
     height: 100vh !important;
-    padding: var(--space-md);
+    padding: 0 !important; /* Remove padding to maximize canvas space */
     background: var(--bg-primary);
 }
 

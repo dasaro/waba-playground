@@ -178,8 +178,21 @@ class WABAPlayground {
         // Setup fullscreen change callback to resize graph
         this.uiManager.setFullscreenChangeCallback(() => {
             if (this.network) {
+                // Force reflow to ensure layout is calculated
+                const canvas = document.getElementById('cy');
+                if (canvas) {
+                    const _ = canvas.offsetHeight; // Force reflow
+                }
+
+                // Redraw and fit the network
                 this.network.redraw();
                 this.network.fit();
+
+                // Call again after a short delay to catch any late layout updates
+                setTimeout(() => {
+                    this.network.redraw();
+                    this.network.fit();
+                }, 100);
             }
         });
 
