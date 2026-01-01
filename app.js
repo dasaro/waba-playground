@@ -722,7 +722,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     const nodeData = {
                         id: el.data.id,
                         label: el.data.label,
-                        size: 15 + (el.data.size * 3),
+                        size: Math.max(25, 15 + (el.data.size * 3)),  // Min size 25 for labels to fit inside
                         color: nodeColor,
                         title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
                         font: {
@@ -810,7 +810,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 20,
+                    size: 25,  // Increased for labels inside nodes
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
@@ -952,13 +952,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 15,
+                    size: 25,  // Increased for labels inside nodes
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
                         color: isDark ? '#f1f5f9' : '#1e293b',
-                        size: 16
+                        size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
                 });
@@ -1074,7 +1074,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 20,
+                    size: 25,  // Increased for labels inside nodes
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
@@ -1184,7 +1184,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 const junctionNode = {
                                     id: junctionId,
                                     label: '',
-                                    size: 12,
+                                    size: 25,  // Increased for labels inside nodes
                                     shape: 'diamond',
                                     color: {
                                         border: '#10b981',
@@ -1197,7 +1197,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
                                     font: {
                                         color: isDark ? '#f1f5f9' : '#1e293b',
-                                        size: 14
+                                        size: 25  // Increased for labels inside nodes
                                     },
                                     isJunction: true,
                                     attackers: assumptionAttackers,
@@ -1279,13 +1279,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 15,
+                    size: 25,  // Increased for labels inside nodes
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
                         color: isDark ? '#f1f5f9' : '#1e293b',
-                        size: 16
+                        size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
                 });
