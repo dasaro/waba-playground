@@ -134,10 +134,12 @@ export class GraphManager {
     resetGraphColors() {
         if (!this.network) return;
 
+        console.log('🔄 [resetGraphColors] CALLED');
         console.log('Resetting graph colors...');
 
         // Reset all nodes to original colors
         const nodes = this.networkData.nodes.get();
+        console.log(`📊 [resetGraphColors] Processing ${nodes.length} nodes`);
         const nodeUpdates = nodes.map(node => ({
             id: node.id,
             color: node.originalColor || node.color,
@@ -147,6 +149,18 @@ export class GraphManager {
 
         // Reset all edges to original colors, widths, dashes, and smooth curves
         const edges = this.networkData.edges.get();
+        console.log(`📊 [resetGraphColors] Processing ${edges.length} edges`);
+
+        // Debug: Check first edge's color properties
+        if (edges.length > 0) {
+            console.log('📋 [resetGraphColors] Sample edge (first):');
+            console.log('  - id:', edges[0].id);
+            console.log('  - originalColor:', edges[0].originalColor);
+            console.log('  - color:', edges[0].color);
+            console.log('  - originalWidth:', edges[0].originalWidth);
+            console.log('  - width:', edges[0].width);
+        }
+
         const edgeUpdates = edges.map(edge => ({
             id: edge.id,
             color: edge.originalColor || edge.color,
@@ -156,7 +170,7 @@ export class GraphManager {
         }));
         this.networkData.edges.update(edgeUpdates);
 
-        console.log(`Reset ${nodeUpdates.length} nodes and ${edgeUpdates.length} edges`);
+        console.log(`✅ [resetGraphColors] Reset ${nodeUpdates.length} nodes and ${edgeUpdates.length} edges`);
     }
 
     highlightExtension(inAssumptions, discardedAttacks, successfulAttacks) {
@@ -172,6 +186,13 @@ export class GraphManager {
         console.log('Discarded attacks:', discardedAttacks);
         console.log('Discarded attacks detail:', discardedAttacks.map(da => `${da.source} → ${da.via} (weight: ${da.weight})`));
         console.log('Successful attacks:', successfulAttacks);
+
+        // Guard: If called with empty parameters, just reset instead of dimming everything
+        if (!inAssumptions || inAssumptions.length === 0) {
+            console.warn('⚠️ [highlightExtension] Called with empty inAssumptions - resetting instead of highlighting');
+            this.resetGraphColors();
+            return;
+        }
 
         // Note: Reset is now handled by caller (output-manager.js) to avoid double-reset
 
