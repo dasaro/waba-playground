@@ -209,7 +209,7 @@ class WABAPlayground {
 
     /**
      * Resize graph to fit container dimensions
-     * In fullscreen: triggers vis.js to re-measure its flex-sized container
+     * In fullscreen: reads CSS-sized container dimensions and tells vis.js
      * In normal mode: no-op (CSS handles sizing)
      */
     resizeGraphToContainer() {
@@ -222,10 +222,17 @@ class WABAPlayground {
             return;
         }
 
-        console.log('📐 Fullscreen: Triggering vis.js resize to fit flex container');
+        // Read dimensions from CSS-sized container (CSS flexbox has already calculated them)
+        const canvas = document.getElementById('cy');
+        if (!canvas) return;
 
-        // Just tell vis.js to re-measure and fit
-        // CSS flex layout has already sized the #cy container correctly
+        const width = canvas.offsetWidth;
+        const height = canvas.offsetHeight;
+
+        console.log(`📐 Fullscreen: CSS sized container to ${width}x${height}, telling vis.js`);
+
+        // Tell vis.js the new dimensions (it doesn't auto-detect container size changes)
+        this.network.setSize(width + 'px', height + 'px');
         this.network.redraw();
         this.network.fit();
     }
