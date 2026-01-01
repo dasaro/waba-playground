@@ -1743,6 +1743,345 @@ button:focus-visible,
     }
 }
 
+/* ===================================
+   Documentation Modal Tabs
+   =================================== */
+
+/* Larger modal for documentation */
+.modal-content-large {
+    max-width: 1200px;
+}
+
+/* Tab Navigation */
+.doc-tabs {
+    display: flex;
+    gap: var(--space-xs);
+    padding: 0 var(--space-lg);
+    background: var(--bg-primary);
+    border-bottom: 2px solid var(--border-color);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.doc-tab {
+    background: none;
+    border: none;
+    padding: var(--space-md) var(--space-lg);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    position: relative;
+    top: 2px;
+}
+
+.doc-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.doc-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: var(--bg-secondary);
+}
+
+/* Tab Content */
+.doc-tab-content {
+    display: none;
+}
+
+.doc-tab-content.active {
+    display: block;
+    animation: tabFadeIn 0.2s ease-out;
+}
+
+@keyframes tabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Documentation Cards */
+.doc-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin: var(--space-md) 0;
+    box-shadow: var(--shadow-sm);
+}
+
+.doc-card h4,
+.doc-card h5 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+
+/* Workflow Steps */
+.workflow-steps {
+    list-style: none;
+    counter-reset: step-counter;
+    padding-left: 0;
+}
+
+.workflow-steps li {
+    counter-increment: step-counter;
+    margin: var(--space-md) 0;
+    padding-left: 2.5rem;
+    position: relative;
+}
+
+.workflow-steps li::before {
+    content: counter(step-counter);
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: var(--primary-color);
+    color: white;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+/* Concept List */
+.concept-list dt {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: var(--space-sm);
+}
+
+.concept-list dd {
+    margin-left: var(--space-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--text-secondary);
+}
+
+/* Syntax Details (Collapsible) */
+.syntax-details {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin: var(--space-md) 0;
+    padding: var(--space-sm);
+}
+
+.syntax-details summary {
+    cursor: pointer;
+    padding: var(--space-sm);
+    font-weight: 600;
+    color: var(--primary-color);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.syntax-details summary::before {
+    content: '▶';
+    transition: transform var(--transition-fast);
+    display: inline-block;
+}
+
+.syntax-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.syntax-details summary:hover {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.syntax-details[open] {
+    padding-bottom: var(--space-md);
+}
+
+.syntax-details p,
+.syntax-details pre {
+    margin-left: calc(var(--space-sm) + 1.2em);
+}
+
+/* Configuration Tables */
+.config-table,
+.syntax-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-md) 0;
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.config-table th,
+.syntax-table th {
+    background: var(--bg-tertiary);
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.config-table td,
+.syntax-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.config-table tbody tr:hover,
+.syntax-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.config-table tbody tr:last-child td,
+.syntax-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Configuration DL */
+.config-dl dt {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: var(--space-md);
+}
+
+.config-dl dd {
+    margin-left: var(--space-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--text-secondary);
+}
+
+/* Results Section */
+.results-dl dt {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: var(--space-md);
+}
+
+.results-dl dd {
+    margin-left: var(--space-lg);
+    margin-bottom: var(--space-sm);
+}
+
+.results-dl dd ul {
+    margin-top: var(--space-xs);
+}
+
+/* Graph Legend in Docs */
+.graph-legend-doc {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin: var(--space-md) 0;
+}
+
+.graph-legend-doc h5 {
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-sm);
+    color: var(--primary-color);
+    font-size: var(--text-base);
+}
+
+.graph-legend-doc h5:first-child {
+    margin-top: 0;
+}
+
+.graph-legend-doc ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.graph-legend-doc li {
+    margin: var(--space-sm) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.legend-node {
+    font-size: 1.5em;
+}
+
+.legend-node.assumption { color: #60a5fa; }
+.legend-node.derived { color: #a78bfa; }
+.legend-node.top { color: #fbbf24; }
+.legend-node.in { color: #22c55e; }
+.legend-node.out { color: #ef4444; }
+.legend-node.gray { color: #6b7280; }
+
+.legend-edge {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.legend-edge.attack { color: #ef4444; }
+.legend-edge.discarded { color: #6b7280; }
+.legend-edge.joint { color: #a855f7; }
+
+/* Interaction List */
+.interaction-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.interaction-list li {
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.interaction-list li:last-child {
+    border-bottom: none;
+}
+
+/* Section Spacing */
+.syntax-section,
+.config-section,
+.results-section {
+    margin-bottom: var(--space-xl);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .modal-content-large {
+        max-width: 100%;
+    }
+
+    .doc-tabs {
+        padding: 0 var(--space-sm);
+    }
+
+    .doc-tab {
+        padding: var(--space-sm) var(--space-md);
+        font-size: var(--text-xs);
+    }
+
+    .config-table,
+    .syntax-table {
+        font-size: var(--text-sm);
+    }
+
+    .config-table th,
+    .config-table td,
+    .syntax-table th,
+    .syntax-table td {
+        padding: var(--space-xs) var(--space-sm);
+    }
+}
+
 /* ================================================================
    Graph Popups and Tooltips
    ================================================================ */

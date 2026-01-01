@@ -422,87 +422,181 @@ c_a: 70"></textarea>
         </div>
     </div>
 
-    <!-- Syntax Guide Modal -->
+    <!-- Documentation Modal -->
     <div id="syntax-guide-modal" class="modal" role="dialog" aria-labelledby="syntax-guide-title" aria-hidden="true" hidden>
-        <div class="modal-content">
+        <div class="modal-content modal-content-large">
             <div class="modal-header">
-                <h2 id="syntax-guide-title">WABA Syntax Guide</h2>
-                <button id="syntax-guide-close" class="modal-close" aria-label="Close syntax guide">&times;</button>
+                <h2 id="syntax-guide-title">📚 WABA Playground Documentation</h2>
+                <button id="syntax-guide-close" class="modal-close" aria-label="Close documentation">&times;</button>
             </div>
-            <div class="modal-body">
-                <h3>Simple Mode (.waba Format)</h3>
-                <p>Simple Mode uses a structured text format with four sections. Inline comments use <code>%</code> (same as ASP).</p>
 
-                <h4>1. Assumptions</h4>
-                <pre><code>a
+            <!-- Tab Navigation -->
+            <div class="doc-tabs" role="tablist">
+                <button class="doc-tab active" role="tab" aria-selected="true" aria-controls="tab-getting-started" data-tab="getting-started">
+                    🚀 Getting Started
+                </button>
+                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-syntax" data-tab="syntax">
+                    📝 Framework Syntax
+                </button>
+                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-config" data-tab="config">
+                    ⚙️ Configuration
+                </button>
+                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-results" data-tab="results">
+                    📊 Understanding Results
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Getting Started Tab -->
+                <div id="tab-getting-started" class="doc-tab-content active" role="tabpanel">
+                    <h3>Welcome to WABA Playground! 👋</h3>
+                    <p><strong>WABA</strong> (Weighted Assumption-Based Argumentation) combines algebraic semirings and monoids to enable flexible reasoning with weighted arguments and budget-constrained attack resolution.</p>
+
+                    <div class="doc-card">
+                        <h4>🎯 Quick Start Workflow</h4>
+                        <ol class="workflow-steps">
+                            <li><strong>Configure:</strong> Choose your semiring (weight propagation) and monoid (cost aggregation)</li>
+                            <li><strong>Define Framework:</strong> Load an example or write your own in Simple/Advanced mode</li>
+                            <li><strong>Run:</strong> Click "▶️ Run WABA" to compute extensions</li>
+                            <li><strong>Explore:</strong> View results and interact with the argumentation graph</li>
+                        </ol>
+                    </div>
+
+                    <div class="doc-card">
+                        <h4>💡 Key Concepts</h4>
+                        <dl class="concept-list">
+                            <dt>Assumptions</dt>
+                            <dd>Defeasible statements that can be in or out of extensions</dd>
+
+                            <dt>Weights</dt>
+                            <dd>Positive integer costs/rewards assigned to arguments</dd>
+
+                            <dt>Attacks</dt>
+                            <dd>Relations where one argument challenges another</dd>
+
+                            <dt>Extensions</dt>
+                            <dd>Consistent sets of assumptions that defend themselves from attacks</dd>
+
+                            <dt>Budget</dt>
+                            <dd>Maximum cost allowed for discarding attacks (optional)</dd>
+                        </dl>
+                    </div>
+
+                    <div class="doc-card">
+                        <h4>📂 File Formats</h4>
+                        <p>Upload your frameworks in two formats:</p>
+                        <ul>
+                            <li><strong>.waba</strong> - Simple, human-readable format (recommended for beginners)</li>
+                            <li><strong>.lp</strong> - Advanced ASP format with full expressiveness</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Framework Syntax Tab -->
+                <div id="tab-syntax" class="doc-tab-content" role="tabpanel" hidden>
+                    <h3>Framework Syntax</h3>
+
+                    <div class="syntax-section">
+                        <h4>📄 Simple Mode (.waba Format)</h4>
+                        <p>Simple Mode uses a structured text format with four sections. Comments use <code>%</code>.</p>
+
+                        <details class="syntax-details" open>
+                            <summary><strong>1. Assumptions</strong></summary>
+                            <pre><code>a
 b
 c</code></pre>
-                <p>One assumption per line. These are defeasible atoms that can be in or out of extensions.</p>
+                            <p>One assumption per line. These are defeasible atoms that can be in or out of extensions.</p>
+                        </details>
 
-                <h4>2. Rules</h4>
-                <pre><code>conclusion ← premise1, premise2
-attack_element ← a</code></pre>
-                <p>One rule per line using <code>←</code> (or <code>&lt;-</code>) to separate head from body. Premises separated by commas.</p>
+                        <details class="syntax-details">
+                            <summary><strong>2. Rules</strong></summary>
+                            <pre><code>conclusion ← premise1, premise2
+attack ← a</code></pre>
+                            <p>One rule per line using <code>←</code> (or <code>&lt;-</code>) to separate head from body.</p>
+                        </details>
 
-                <h4>3. Contraries</h4>
-                <pre><code>a: attack_element
+                        <details class="syntax-details">
+                            <summary><strong>3. Contraries (Attacks)</strong></summary>
+                            <pre><code>a: attack_element
 b: conclusion</code></pre>
-                <p>Format: <code>attacked_assumption: attacking_element</code><br>
-                <strong>Important:</strong> <code>attacking_element</code> attacks <code>attacked_assumption</code> (not the reverse).</p>
+                            <p>Format: <code>attacked: attacker</code><br>
+                            <strong>⚠️ Direction:</strong> <code>attacker</code> attacks <code>attacked</code> (not the reverse)</p>
+                        </details>
 
-                <h4>4. Weights</h4>
-                <pre><code>a: 10
-b: 20
-attack_element: 15</code></pre>
-                <p>Format: <code>atom: weight</code>. Assigns positive integer weights (default: 1).</p>
+                        <details class="syntax-details">
+                            <summary><strong>4. Weights</strong></summary>
+                            <pre><code>a: 80
+b: 60
+attack_element: 70</code></pre>
+                            <p>Format: <code>atom: weight</code>. Assigns positive integer weights (default: 1).</p>
+                        </details>
 
-                <h4>Complete .waba Example</h4>
-                <pre><code>% Assumptions:
+                        <details class="syntax-details">
+                            <summary><strong>Complete .waba Example</strong></summary>
+                            <pre><code>% Medical triage example
 a
 b
 
-% Rules:
 attack_element ← a
 
-% Contraries:
 b: attack_element
 
-% Weights:
-a: 10
-b: 20
-attack_element: 15</code></pre>
-                <p><em>Note:</em> Section headers (Assumptions, Rules, etc.) are commented with <code>%</code> to allow inline comments throughout the file.</p>
+a: 80
+b: 60
+attack_element: 70</code></pre>
+                        </details>
+                    </div>
 
-                <h3>Advanced Mode (.lp Format)</h3>
-                <p>Advanced Mode uses ASP syntax with WABA predicates:</p>
+                    <div class="syntax-section">
+                        <h4>⚡ Advanced Mode (.lp Format)</h4>
+                        <p>Advanced Mode uses Answer Set Programming (ASP) syntax with WABA predicates.</p>
 
-                <h4>Assumptions</h4>
-                <pre><code>assumption(atom_name).</code></pre>
+                        <details class="syntax-details">
+                            <summary><strong>Predicates Reference</strong></summary>
+                            <table class="syntax-table">
+                                <tr>
+                                    <th>Predicate</th>
+                                    <th>Syntax</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>assumption</code></td>
+                                    <td><code>assumption(a).</code></td>
+                                    <td>Declares a defeasible assumption</td>
+                                </tr>
+                                <tr>
+                                    <td><code>weight</code></td>
+                                    <td><code>weight(a, 80).</code></td>
+                                    <td>Assigns weight to an atom</td>
+                                </tr>
+                                <tr>
+                                    <td><code>head/body</code></td>
+                                    <td><code>head(r1, c). body(r1, a).</code></td>
+                                    <td>Defines inference rules</td>
+                                </tr>
+                                <tr>
+                                    <td><code>contrary</code></td>
+                                    <td><code>contrary(a, c).</code></td>
+                                    <td>c attacks a</td>
+                                </tr>
+                                <tr>
+                                    <td><code>budget</code></td>
+                                    <td><code>budget(100).</code></td>
+                                    <td>Sets budget constraint</td>
+                                </tr>
+                            </table>
+                        </details>
 
-                <h4>Weights</h4>
-                <pre><code>weight(atom_name, weight_value).</code></pre>
-
-                <h4>Rules (Inference)</h4>
-                <pre><code>head(rule_id, conclusion).
-body(rule_id, premise1).
-body(rule_id, premise2).</code></pre>
-                <p><em>Compact form:</em> <code>head(r1, conclusion; r1, premise1; r1, premise2).</code></p>
-
-                <h4>Contraries (Attack Relation)</h4>
-                <pre><code>contrary(attacked_assumption, attacking_element).</code></pre>
-
-                <h4>Budget Constraint</h4>
-                <pre><code>budget(beta).</code></pre>
-
-                <h4>Complete .lp Example</h4>
-                <pre><code>% Assumptions
+                        <details class="syntax-details">
+                            <summary><strong>Complete .lp Example</strong></summary>
+                            <pre><code>% Assumptions
 assumption(a).
 assumption(b).
 
 % Weights
-weight(a, 10).
-weight(b, 20).
-weight(attack_element, 15).
+weight(a, 80).
+weight(b, 60).
+weight(attack_element, 70).
 
 % Rules
 head(r1, attack_element).
@@ -512,19 +606,284 @@ body(r1, a).
 contrary(b, attack_element).
 
 % Budget
-budget(50).</code></pre>
+budget(100).</code></pre>
+                        </details>
+                    </div>
+                </div>
 
-                <h3>File Upload</h3>
-                <p>You can upload <strong>.waba</strong> files (Simple Mode format) or <strong>.lp</strong> files (Advanced Mode ASP format). The playground will automatically detect the format and switch to the appropriate mode.</p>
+                <!-- Configuration Tab -->
+                <div id="tab-config" class="doc-tab-content" role="tabpanel" hidden>
+                    <h3>Configuration Options</h3>
 
-                <h3>See Also</h3>
-                <p>For complete WABA documentation, visit the <a href="https://github.com/dasaro/WABA" target="_blank">WABA GitHub repository</a>.</p>
+                    <div class="config-section">
+                        <h4>🔢 Semiring (Weight Propagation)</h4>
+                        <p>Controls how weights propagate through inference rules.</p>
+
+                        <table class="config-table">
+                            <thead>
+                                <tr>
+                                    <th>Semiring</th>
+                                    <th>Conjunction (⊗)</th>
+                                    <th>Disjunction (⊕)</th>
+                                    <th>Use Case</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Gödel</strong></td>
+                                    <td>min</td>
+                                    <td>max</td>
+                                    <td>Fuzzy logic, weakest-link reasoning</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tropical</strong></td>
+                                    <td>+</td>
+                                    <td>min</td>
+                                    <td>Additive costs, shortest paths</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Arctic</strong></td>
+                                    <td>+</td>
+                                    <td>max</td>
+                                    <td>Reward accumulation, longest paths</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Łukasiewicz</strong></td>
+                                    <td>bounded sum</td>
+                                    <td>bounded sum</td>
+                                    <td>Bounded probability-like reasoning</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Bottleneck</strong></td>
+                                    <td>max</td>
+                                    <td>min</td>
+                                    <td>Worst-case optimization</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>📊 Monoid (Cost Aggregation)</h4>
+                        <p>Determines how costs of discarded attacks are combined.</p>
+
+                        <table class="config-table">
+                            <thead>
+                                <tr>
+                                    <th>Monoid</th>
+                                    <th>Operation</th>
+                                    <th>Meaning</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>MAX</strong></td>
+                                    <td>max(weights)</td>
+                                    <td>Worst single attack cost</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>SUM</strong></td>
+                                    <td>Σ weights</td>
+                                    <td>Total cost of all discarded attacks</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>MIN</strong></td>
+                                    <td>min(weights)</td>
+                                    <td>Best single attack cost</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>COUNT</strong></td>
+                                    <td>count(attacks)</td>
+                                    <td>Number of discarded attacks</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>🎯 Semantics</h4>
+                        <p>Defines admissibility criteria for extensions.</p>
+
+                        <table class="config-table">
+                            <thead>
+                                <tr>
+                                    <th>Semantics</th>
+                                    <th>Description</th>
+                                    <th>Extensions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Stable</strong></td>
+                                    <td>Conflict-free + all external arguments attacked</td>
+                                    <td>0 or more</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Preferred</strong></td>
+                                    <td>Maximal complete extensions</td>
+                                    <td>1 or more</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Complete</strong></td>
+                                    <td>Admissible + contains all defended arguments</td>
+                                    <td>1 or more</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Grounded</strong></td>
+                                    <td>Minimal complete extension</td>
+                                    <td>Exactly 1</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Semi-Stable</strong></td>
+                                    <td>Admissible with maximal range</td>
+                                    <td>1 or more</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Admissible</strong></td>
+                                    <td>Conflict-free + defends all members</td>
+                                    <td>1 or more</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>🎚️ Optimization</h4>
+                        <dl class="config-dl">
+                            <dt><strong>Minimize (Cost Semantics)</strong></dt>
+                            <dd>Find extensions with lowest cost. Weights represent costs to avoid.</dd>
+
+                            <dt><strong>Maximize (Reward Semantics)</strong></dt>
+                            <dd>Find extensions with highest reward. Weights represent benefits to pursue.</dd>
+
+                            <dt><strong>None (Enumerate All)</strong></dt>
+                            <dd>Show all extensions without optimization.</dd>
+                        </dl>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>💰 Budget Constraint</h4>
+                        <dl class="config-dl">
+                            <dt><strong>Upper Bound (cost ≤ β)</strong></dt>
+                            <dd>Only allow extensions where total cost doesn't exceed budget β.</dd>
+
+                            <dt><strong>Lower Bound (quality ≥ β)</strong></dt>
+                            <dd>Only allow extensions meeting minimum quality threshold β.</dd>
+
+                            <dt><strong>None</strong></dt>
+                            <dd>No budget constraints (enumerate all valid extensions).</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- Understanding Results Tab -->
+                <div id="tab-results" class="doc-tab-content" role="tabpanel" hidden>
+                    <h3>Understanding Results</h3>
+
+                    <div class="results-section">
+                        <h4>📋 Output Panel</h4>
+                        <p>The Results panel displays all computed extensions with detailed information:</p>
+
+                        <div class="doc-card">
+                            <h5>Extension Card Format</h5>
+                            <pre><code><strong>Extension 1</strong> (Cost: 0)
+━━━━━━━━━━━━━━━━━━━━━━
+<span style="color: #22c55e;">✓ IN:</span> a, b, c
+<span style="color: #ef4444;">✗ OUT:</span> d, e
+<span style="color: #3b82f6;">⚔️ ATTACKS:</span>
+  c attacks d (weight: 50) [ACTIVE]
+  b attacks e (weight: 30) [DISCARDED, cost: 30]
+━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+                        </div>
+
+                        <dl class="results-dl">
+                            <dt><strong>Extension Number</strong></dt>
+                            <dd>Unique identifier for each solution (click to highlight in graph)</dd>
+
+                            <dt><strong>Cost/Reward Value</strong></dt>
+                            <dd>Total optimization value based on monoid aggregation</dd>
+
+                            <dt><strong>IN (Green ✓)</strong></dt>
+                            <dd>Assumptions accepted in this extension</dd>
+
+                            <dt><strong>OUT (Red ✗)</strong></dt>
+                            <dd>Assumptions rejected/not selected</dd>
+
+                            <dt><strong>ATTACKS</strong></dt>
+                            <dd>
+                                <ul>
+                                    <li><strong>[ACTIVE]</strong> - Attack successfully defeats target</li>
+                                    <li><strong>[DISCARDED]</strong> - Attack blocked (contributes to cost)</li>
+                                </ul>
+                            </dd>
+                        </dl>
+                    </div>
+
+                    <div class="results-section">
+                        <h4>🗺️ Argumentation Graph</h4>
+                        <p>Interactive visualization of your framework structure:</p>
+
+                        <div class="graph-legend-doc">
+                            <h5>Node Types</h5>
+                            <ul>
+                                <li><span class="legend-node assumption">●</span> <strong>Assumption</strong> - Defeasible argument</li>
+                                <li><span class="legend-node derived">●</span> <strong>Joint Attack Node</strong> - Combined attack from multiple sources</li>
+                                <li><span class="legend-node top">●</span> <strong>⊤ (Top)</strong> - Facts/always true</li>
+                            </ul>
+
+                            <h5>Node Colors (when extension selected)</h5>
+                            <ul>
+                                <li><span class="legend-node in">●</span> <strong>Green</strong> - Argument IN extension</li>
+                                <li><span class="legend-node out">●</span> <strong>Red</strong> - Argument OUT/defeated</li>
+                                <li><span class="legend-node gray">●</span> <strong>Gray</strong> - Not involved</li>
+                            </ul>
+
+                            <h5>Edge Types</h5>
+                            <ul>
+                                <li><span class="legend-edge attack">→</span> <strong>Solid Red</strong> - Active attack</li>
+                                <li><span class="legend-edge discarded">⤍</span> <strong>Dashed Gray</strong> - Discarded attack</li>
+                                <li><span class="legend-edge joint">→</span> <strong>Purple</strong> - Joint attack component</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="results-section">
+                        <h4>🎮 Graph Interaction</h4>
+                        <ul class="interaction-list">
+                            <li><strong>Click extension card</strong> - Highlight in graph with color coding</li>
+                            <li><strong>Click node</strong> - View node details (weight, type, status)</li>
+                            <li><strong>Click edge</strong> - View attack details (weight, active/discarded)</li>
+                            <li><strong>Drag nodes</strong> - Rearrange layout manually</li>
+                            <li><strong>Scroll/pinch</strong> - Zoom in/out</li>
+                            <li><strong>Reset Layout</strong> - Restore default physics-based positioning</li>
+                        </ul>
+                    </div>
+
+                    <div class="results-section">
+                        <h4>📈 Statistics</h4>
+                        <p>Summary metrics displayed below the output:</p>
+                        <ul>
+                            <li><strong>Total Extensions</strong> - Number of solutions found</li>
+                            <li><strong>Computation Time</strong> - Solver execution time</li>
+                            <li><strong>Optimal Cost/Reward</strong> - Best value (if optimization enabled)</li>
+                        </ul>
+                    </div>
+
+                    <div class="results-section">
+                        <h4>💾 Export Options</h4>
+                        <ul>
+                            <li><strong>💾 .lp / .waba</strong> - Download current framework</li>
+                            <li><strong>💾 PNG</strong> - Export graph as image</li>
+                            <li><strong>📄 PDF</strong> - Export graph as PDF document</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260101-9"></script>
+    <script type="module" src="app.js?v=20260101-10"></script>
 </body>
 </html>

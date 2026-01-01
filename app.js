@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260101-9 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260101-10 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -262,6 +262,14 @@ class WABAPlayground {
             }
         });
 
+        // Documentation tabs
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const targetTab = e.target.dataset.tab;
+                this.switchDocTab(targetTab);
+            });
+        });
+
         // Download buttons
         this.downloadLpBtn.addEventListener('click', () => this.downloadAsLp());
         this.downloadWabaBtn.addEventListener('click', () => this.downloadAsWaba());
@@ -289,6 +297,29 @@ class WABAPlayground {
         } else {
             this.graphLegend.setAttribute('hidden', '');
             this.legendToggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    switchDocTab(targetTab) {
+        // Remove active class from all tabs and content
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.classList.remove('active');
+            tab.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.doc-tab-content').forEach(content => {
+            content.classList.remove('active');
+            content.setAttribute('hidden', '');
+        });
+
+        // Add active class to target tab and content
+        const targetTabBtn = document.querySelector(`[data-tab="${targetTab}"]`);
+        const targetContent = document.getElementById(`tab-${targetTab}`);
+
+        if (targetTabBtn && targetContent) {
+            targetTabBtn.classList.add('active');
+            targetTabBtn.setAttribute('aria-selected', 'true');
+            targetContent.classList.add('active');
+            targetContent.removeAttribute('hidden');
         }
     }
 
