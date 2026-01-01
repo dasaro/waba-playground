@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WABA Version Check</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+        .check { color: #10b981; }
+        .fail { color: #ef4444; }
+        pre { background: #0f172a; padding: 15px; border-radius: 8px; overflow-x: auto; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 WABA Playground Version Check</h1>
+
+    <h2>Expected Version:</h2>
+    <pre>v20260101 (January 1, 2026)</pre>
+
+    <h2>Module Status:</h2>
+    <div id="status">Checking...</div>
+
+    <h2>Clear Cache:</h2>
+    <button onclick="location.reload(true)">Hard Reload (Force Refresh)</button>
+    <button onclick="clearCache()">Clear Cache & Reload</button>
+
+    <h3>Manual Cache Clear Instructions:</h3>
+    <ul>
+        <li><strong>Chrome/Edge:</strong> Ctrl+Shift+R (Windows) / Cmd+Shift+R (Mac)</li>
+        <li><strong>Firefox:</strong> Ctrl+Shift+R (Windows) / Cmd+Shift+R (Mac)</li>
+        <li><strong>Safari:</strong> Cmd+Option+E (clear cache), then Cmd+R (reload)</li>
+    </ul>
+
+    <h3>If cache clearing doesn't work:</h3>
+    <ol>
+        <li>Open DevTools (F12)</li>
+        <li>Go to Network tab</li>
+        <li>Check "Disable cache"</li>
+        <li>Reload the page</li>
+    </ol>
+
+    <script type="module">
+        const expectedVersion = '20260101';
+
+        async function checkModules() {
+            const status = document.getElementById('status');
+            const checks = [];
+
+            try {
+                // Check if clearActiveExtension exists in OutputManager
+                const { OutputManager } = await import(`./modules/output-manager.js?v=${Date.now()}`);
+                const hasMethod = typeof OutputManager.prototype.clearActiveExtension === 'function';
+
+                checks.push(hasMethod
+                    ? '<div class="check">✓ OutputManager.clearActiveExtension() exists</div>'
+                    : '<div class="fail">✗ OutputManager.clearActiveExtension() missing</div>'
+                );
+
+                // Check if colorToRGBA exists in GraphManager
+                const { GraphManager } = await import(`./modules/graph-manager.js?v=${Date.now()}`);
+                const hasColorMethod = typeof GraphManager.prototype.colorToRGBA === 'function';
+
+                checks.push(hasColorMethod
+                    ? '<div class="check">✓ GraphManager.colorToRGBA() exists</div>'
+                    : '<div class="fail">✗ GraphManager.colorToRGBA() missing</div>'
+                );
+
+                status.innerHTML = checks.join('') + '<div class="check">✓ Modules loaded successfully!</div>';
+
+            } catch (error) {
+                status.innerHTML = `<div class="fail">✗ Error loading modules: ${error.message}</div>`;
+                console.error('Module check error:', error);
+            }
+        }
+
+        function clearCache() {
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => caches.delete(name));
+                }).then(() => {
+                    alert('Cache cleared! Page will reload.');
+                    location.reload(true);
+                });
+            } else {
+                alert('Cache API not supported. Use Ctrl+Shift+R to hard reload.');
+            }
+        }
+
+        window.clearCache = clearCache;
+        checkModules();
+    </script>
+</body>
+</html>
