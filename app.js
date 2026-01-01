@@ -494,8 +494,15 @@ class WABAPlayground {
             // Restore highlighted extension after graph update
             if (activeExtension) {
                 setTimeout(() => {
-                    this.outputManager.restoreActiveExtension();
-                }, 200);  // Delay to allow graph to render
+                    // Verify header element exists before restoring
+                    const header = this.output.querySelector(`.answer-header[data-extension-id="${activeExtension}"]`);
+                    if (header) {
+                        console.log('Restoring active extension:', activeExtension);
+                        this.outputManager.restoreActiveExtension();
+                    } else {
+                        console.warn('Could not restore extension - header not found:', activeExtension);
+                    }
+                }, 500);  // Increased delay to allow graph to fully render
             }
         }
     }
