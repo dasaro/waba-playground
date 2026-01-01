@@ -214,10 +214,16 @@ class WABAPlayground {
     resizeGraphToContainer() {
         if (!this.network) return;
 
+        // Set flag to prevent ResizeObserver feedback loop
+        this.isResizing = true;
+
         const canvas = document.getElementById('cy');
         const container = document.getElementById('graph-container');
 
-        if (!canvas || !container) return;
+        if (!canvas || !container) {
+            this.isResizing = false;
+            return;
+        }
 
         let width, height;
 
@@ -249,22 +255,36 @@ class WABAPlayground {
         // Redraw and fit the graph
         this.network.redraw();
         this.network.fit();
+
+        // Clear flag after DOM settles (prevents feedback loop)
+        setTimeout(() => {
+            this.isResizing = false;
+        }, 200);
     }
 
     /**
      * Setup ResizeObserver to automatically resize graph when container size changes
-     * This eliminates the need for setTimeout delays and manual resize triggers
+     * Only observes in fullscreen mode to prevent feedback loops
      */
     setupGraphResizeObserver() {
         const container = document.getElementById('graph-container');
         if (!container) return;
 
+        this.isResizing = false; // Flag to prevent feedback loops
+
         // Create ResizeObserver to watch container size changes
         this.resizeObserver = new ResizeObserver((entries) => {
+            // CRITICAL: Only resize in fullscreen mode
+            // In normal mode, layout is fixed by CSS - observing creates feedback loops
+            if (!document.fullscreenElement) return;
+
+            // Skip if we're currently resizing (prevents recursion)
+            if (this.isResizing) return;
+
             // Debounce rapid resize events
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(() => {
-                if (this.network) {
+                if (this.network && document.fullscreenElement) {
                     this.resizeGraphToContainer();
                 }
             }, 100); // Small delay to batch rapid changes
@@ -272,7 +292,7 @@ class WABAPlayground {
 
         // Observe the container
         this.resizeObserver.observe(container);
-        console.log('✅ ResizeObserver attached to graph container');
+        console.log('✅ ResizeObserver attached (only active in fullscreen mode)');
     }
 
     // ===================================
