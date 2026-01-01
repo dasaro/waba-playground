@@ -49,6 +49,17 @@
     --transition-fast: 0.15s ease;
     --transition-normal: 0.3s ease;
     --transition-slow: 0.5s ease;
+
+    /* ===== Graph Colors ===== */
+    --node-assumption: #60a5fa;      /* Blue - assumption nodes */
+    --node-derived: #a78bfa;         /* Purple - derived nodes */
+    --node-top: #fbbf24;             /* Amber - top nodes */
+    --node-in: #22c55e;              /* Green - accepted nodes */
+    --node-out: #ef4444;             /* Red - rejected nodes */
+    --node-gray: #6b7280;            /* Gray - inactive nodes */
+    --edge-attack: #ef4444;          /* Red - attack edges */
+    --edge-discarded: #6b7280;       /* Gray - discarded edges */
+    --edge-joint: #a855f7;           /* Purple - joint edges */
 }
 
 /* Light Theme */
@@ -1381,10 +1392,6 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
 .loading-content h3 {
     font-size: var(--text-xl);
     font-weight: 600;
@@ -2022,21 +2029,21 @@ button:focus-visible,
     font-size: 1.5em;
 }
 
-.legend-node.assumption { color: #60a5fa; }
-.legend-node.derived { color: #a78bfa; }
-.legend-node.top { color: #fbbf24; }
-.legend-node.in { color: #22c55e; }
-.legend-node.out { color: #ef4444; }
-.legend-node.gray { color: #6b7280; }
+.legend-node.assumption { color: var(--node-assumption); }
+.legend-node.derived { color: var(--node-derived); }
+.legend-node.top { color: var(--node-top); }
+.legend-node.in { color: var(--node-in); }
+.legend-node.out { color: var(--node-out); }
+.legend-node.gray { color: var(--node-gray); }
 
 .legend-edge {
     font-weight: bold;
     font-size: 1.2em;
 }
 
-.legend-edge.attack { color: #ef4444; }
-.legend-edge.discarded { color: #6b7280; }
-.legend-edge.joint { color: #a855f7; }
+.legend-edge.attack { color: var(--edge-attack); }
+.legend-edge.discarded { color: var(--edge-discarded); }
+.legend-edge.joint { color: var(--edge-joint); }
 
 /* Interaction List */
 .interaction-list {
@@ -2131,5 +2138,4 @@ button:focus-visible,
 [data-theme="light"] .node-popup strong,
 [data-theme="light"] .derivation-tooltip strong {
     color: #5568d3;
-}
 }
