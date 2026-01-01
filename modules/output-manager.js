@@ -281,18 +281,28 @@ export class OutputManager {
         this.output.appendChild(answerDiv);
 
         // Attach event listeners to derived atom chips AFTER appending to DOM
+        console.log('🔗 [appendAnswerSet] Checking for derived atoms...');
+        console.log('Parsed derived atoms:', parsed.derived);
         if (parsed.derived && parsed.derived.length > 0) {
+            console.log(`📌 [appendAnswerSet] Attaching click handlers to ${parsed.derived.length} derived atoms`);
             parsed.derived.forEach(atom => {
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
                 const chipElement = answerDiv.querySelector(`#${atomId}`);
+                console.log(`  Looking for element with ID: ${atomId}`, chipElement ? 'FOUND' : 'NOT FOUND');
                 if (chipElement) {
                     chipElement.addEventListener('click', (e) => {
                         e.stopPropagation(); // Don't trigger extension highlight
-                        console.log('Derived atom clicked:', atom);
+                        console.log('✅ [Derived atom click] Atom clicked:', atom);
+                        console.log('Calling PopupManager.showDerivationChain...');
                         PopupManager.showDerivationChain(atom, parsed, chipElement);
                     });
+                    console.log(`  ✅ Click handler attached to ${atomId}`);
+                } else {
+                    console.error(`  ❌ Could not find element with ID ${atomId}`);
                 }
             });
+        } else {
+            console.log('ℹ️ [appendAnswerSet] No derived atoms to attach handlers to');
         }
     }
 

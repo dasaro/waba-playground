@@ -46,23 +46,34 @@ export class UIManager {
     }
 
     updateFullscreenButton() {
+        console.log('🖥️ [updateFullscreenButton] CALLED');
+        console.log('Fullscreen element:', document.fullscreenElement ? 'YES' : 'NO');
+
         if (document.fullscreenElement) {
             this.fullscreenBtn.textContent = '✕ Exit Fullscreen';
+            console.log('Button text set to: Exit Fullscreen');
         } else {
             this.fullscreenBtn.textContent = '⛶ Fullscreen';
+            console.log('Button text set to: Fullscreen');
         }
 
         // Trigger callback to resize graph
         if (this.onFullscreenChange) {
+            console.log('✅ [updateFullscreenButton] Callback exists, scheduling execution...');
             // Delay to allow CSS transitions to complete (increased for better reliability)
             setTimeout(() => {
+                console.log('📞 [updateFullscreenButton] Executing callback now...');
                 this.onFullscreenChange();
                 // Force canvas height recalculation
                 const canvas = document.getElementById('cy');
                 if (canvas) {
                     canvas.style.height = canvas.offsetHeight + 'px';
+                    console.log('✅ [updateFullscreenButton] Canvas height recalculated:', canvas.offsetHeight);
                 }
+                console.log('✅ [updateFullscreenButton] Callback execution complete');
             }, 300);
+        } else {
+            console.warn('⚠️ [updateFullscreenButton] No callback set! Graph will not be resized.');
         }
     }
 

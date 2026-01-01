@@ -128,7 +128,12 @@ export class GraphManager {
     }
 
     highlightExtension(inAssumptions, discardedAttacks, successfulAttacks) {
-        if (!this.network) return;
+        console.log('🔍 [highlightExtension] CALLED');
+
+        if (!this.network) {
+            console.error('❌ [highlightExtension] Network not initialized!');
+            return;
+        }
 
         console.log('=== HIGHLIGHTING EXTENSION ===');
         console.log('In assumptions:', inAssumptions);
@@ -269,24 +274,41 @@ export class GraphManager {
         console.log(`Highlighting: ${discardedCount} discarded, ${successfulCount} successful attacks`);
 
         if (edgeUpdates.length > 0) {
+            console.log('📊 [highlightExtension] Updating edges with new styles...');
             this.networkData.edges.update(edgeUpdates);
+            console.log('✅ [highlightExtension] Edge updates applied successfully');
+        } else {
+            console.warn('⚠️ [highlightExtension] No edge updates to apply');
         }
 
         console.log('=== HIGHLIGHTING COMPLETE ===');
     }
 
     updateIsolatedAssumptionsOverlay() {
+        console.log('🏝️ [updateIsolatedAssumptionsOverlay] CALLED');
         const banner = document.getElementById('isolated-assumptions-banner');
         const list = document.getElementById('isolated-assumptions-list');
 
-        if (!banner || !list) return;
+        console.log('Banner element:', banner ? 'found' : 'NOT FOUND');
+        console.log('List element:', list ? 'found' : 'NOT FOUND');
+
+        if (!banner || !list) {
+            console.error('❌ [updateIsolatedAssumptionsOverlay] Required elements not found in DOM');
+            return;
+        }
+
+        console.log('Isolated nodes count:', this.isolatedNodes.length);
+        console.log('Isolated nodes:', this.isolatedNodes);
 
         if (this.isolatedNodes.length > 0) {
             const labels = this.isolatedNodes.map(n => n.label || n.id);
+            console.log('📋 [updateIsolatedAssumptionsOverlay] Setting labels:', labels);
             list.textContent = labels.join(', ');
             banner.removeAttribute('hidden');
+            console.log('✅ [updateIsolatedAssumptionsOverlay] Banner shown with', labels.length, 'items');
         } else {
             banner.setAttribute('hidden', '');
+            console.log('✅ [updateIsolatedAssumptionsOverlay] Banner hidden (no isolated nodes)');
         }
     }
 

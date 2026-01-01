@@ -478,8 +478,10 @@ class WABAPlayground {
     // Graph Visualization
     // ===================================
     async regenerateGraph() {
+        console.log('🔄 [regenerateGraph] CALLED');
         // Store currently highlighted extension (if any)
         const activeExtension = this.outputManager.getActiveExtensionData();
+        console.log('📊 [regenerateGraph] Active extension ID:', activeExtension);
 
         let framework;
         if (this.inputMode.value === 'simple') {
@@ -493,16 +495,22 @@ class WABAPlayground {
 
             // Restore highlighted extension after graph update
             if (activeExtension) {
+                console.log('⏱️ [regenerateGraph] Scheduling extension restoration in 500ms...');
                 setTimeout(() => {
                     // Verify header element exists before restoring
                     const header = this.output.querySelector(`.answer-header[data-extension-id="${activeExtension}"]`);
+                    console.log('🔍 [regenerateGraph] Looking for header with ID:', activeExtension);
+                    console.log('Header element:', header ? 'FOUND' : 'NOT FOUND');
                     if (header) {
-                        console.log('Restoring active extension:', activeExtension);
+                        console.log('✅ [regenerateGraph] Restoring active extension:', activeExtension);
                         this.outputManager.restoreActiveExtension();
                     } else {
-                        console.warn('Could not restore extension - header not found:', activeExtension);
+                        console.error('❌ [regenerateGraph] Could not restore extension - header not found:', activeExtension);
+                        console.log('Available headers in output:', Array.from(this.output.querySelectorAll('.answer-header')).map(h => h.dataset.extensionId));
                     }
                 }, 500);  // Increased delay to allow graph to fully render
+            } else {
+                console.log('ℹ️ [regenerateGraph] No active extension to restore');
             }
         }
     }
