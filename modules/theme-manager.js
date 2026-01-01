@@ -1,6 +1,8 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
+import { GraphUtils } from './graph-utils.js';
+
 export class ThemeManager {
     constructor(themeToggleBtn, themeIcon, network, networkData) {
         this.themeToggleBtn = themeToggleBtn;
@@ -44,7 +46,9 @@ export class ThemeManager {
     updateGraphTheme() {
         if (!this.network) return;
 
-        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        // Get current theme-appropriate font settings from GraphUtils
+        const edgeFontSettings = GraphUtils.getEdgeFontColor();
+        const nodeFontColor = GraphUtils.getFontColor();
 
         // Update edge font colors (for weight labels)
         const edges = this.networkData.edges.get();
@@ -52,8 +56,7 @@ export class ThemeManager {
             id: edge.id,
             font: {
                 ...edge.font,
-                color: isDark ? '#cbd5e1' : '#64748b',
-                background: isDark ? '#1e293b' : '#ffffff'
+                ...edgeFontSettings  // Use GraphUtils settings with strokeWidth and strokeColor
             }
         }));
 
@@ -65,7 +68,7 @@ export class ThemeManager {
             id: node.id,
             font: {
                 ...node.font,
-                color: isDark ? '#f1f5f9' : '#1e293b'
+                color: nodeFontColor  // Use GraphUtils font color
             }
         }));
 
