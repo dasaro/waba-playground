@@ -256,24 +256,6 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 /* ===================================
-   Panels (Unified Component)
-   =================================== */
-
-.config-panel,
-.editor-container,
-.output-container,
-.graph-container,
-.docs-panel {
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    padding: var(--space-lg);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-}
-
-/* ===================================
    Panel System (Unified Collapse/Expand)
    =================================== */
 
@@ -828,7 +810,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Graph Visualization
    =================================== */
 
-.graph-container {
+.graph-panel {
     min-height: 400px;
 }
 
@@ -878,11 +860,6 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .graph-controls {
     display: flex;
     gap: var(--space-xs);
-}
-
-.graph-container:fullscreen {
-    padding: var(--space-lg);
-    background: var(--bg-primary);
 }
 
 .graph-canvas {
@@ -1481,7 +1458,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     color: var(--primary-color);
 }
 
-.output-container {
+.output-panel {
     position: relative;
 }
 
