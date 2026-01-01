@@ -810,7 +810,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Graph Visualization
    =================================== */
 
-.graph-panel {
+/* Only set min-height when panel is expanded */
+.graph-panel[data-collapsed="false"] {
     min-height: 400px;
 }
 

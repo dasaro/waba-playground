@@ -2,11 +2,11 @@
  * ExportManager - PNG/PDF export with watermarks
  */
 export class ExportManager {
-    constructor(graphManager, exportPngBtn, exportPdfBtn, themeManager) {
+    constructor(graphManager, exportPngBtn, exportPdfBtn, app) {
         this.graphManager = graphManager;
         this.exportPngBtn = exportPngBtn;
         this.exportPdfBtn = exportPdfBtn;
-        this.themeManager = themeManager;
+        this.app = app;  // App instance for exportGraphInLightMode
 
         this.attachEventListeners();
     }
@@ -80,7 +80,7 @@ export class ExportManager {
         }
 
         // Export in light mode
-        this.themeManager.exportGraphInLightMode(() => {
+        this.app.exportGraphInLightMode(() => {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
@@ -102,7 +102,7 @@ export class ExportManager {
         }
 
         // Export in light mode
-        this.themeManager.exportGraphInLightMode(() => {
+        this.app.exportGraphInLightMode(() => {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
