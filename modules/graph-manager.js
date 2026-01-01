@@ -4,6 +4,7 @@
  */
 import { GraphUtils } from './graph-utils.js?v=20260101-1';
 import { ParserUtils } from './parser-utils.js?v=20260101-1';
+import { UIManager } from './ui-manager.js?v=20260101-1';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn) {
@@ -646,7 +647,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            document.getElementById('graph-empty-state')?.setAttribute('hidden', '');
+            UIManager.hideGraphEmptyState();
 
             // Update banner with isolated assumptions
             this.updateIsolatedAssumptionsOverlay();
@@ -904,7 +905,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            document.getElementById('graph-empty-state')?.setAttribute('hidden', '');
+            UIManager.hideGraphEmptyState();
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
@@ -1234,7 +1235,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.edges.add(visEdges);
 
             // Hide graph empty state after successful render
-            document.getElementById('graph-empty-state')?.setAttribute('hidden', '');
+            UIManager.hideGraphEmptyState();
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
