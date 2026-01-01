@@ -478,6 +478,9 @@ class WABAPlayground {
     // Graph Visualization
     // ===================================
     async regenerateGraph() {
+        // Store currently highlighted extension (if any)
+        const activeExtension = this.outputManager.getActiveExtensionData();
+
         let framework;
         if (this.inputMode.value === 'simple') {
             framework = this.parseSimpleABA();
@@ -487,6 +490,13 @@ class WABAPlayground {
 
         if (framework) {
             await this.updateGraph(framework);
+
+            // Restore highlighted extension after graph update
+            if (activeExtension) {
+                setTimeout(() => {
+                    this.outputManager.restoreActiveExtension();
+                }, 200);  // Delay to allow graph to render
+            }
         }
     }
 

@@ -500,6 +500,21 @@ export class OutputManager {
         this.output.scrollTop = this.output.scrollHeight;
     }
 
+    getActiveExtensionData() {
+        // Return the active extension ID if one is highlighted
+        return this.activeExtensionId;
+    }
+
+    restoreActiveExtension() {
+        // Re-trigger the click on the previously active extension
+        if (this.activeExtensionId !== null) {
+            const header = this.output.querySelector(`.answer-header[data-extension-id="${this.activeExtensionId}"]`);
+            if (header) {
+                header.click();
+            }
+        }
+    }
+
     clearOutput() {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
