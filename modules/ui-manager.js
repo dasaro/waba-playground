@@ -8,6 +8,11 @@ export class UIManager {
         this.syntaxGuideClose = syntaxGuideClose;
         this.fullscreenBtn = fullscreenBtn;
         this.graphContainer = graphContainer;
+        this.onFullscreenChange = null;  // Callback for fullscreen changes
+    }
+
+    setFullscreenChangeCallback(callback) {
+        this.onFullscreenChange = callback;
     }
 
     // ===================================
@@ -45,6 +50,14 @@ export class UIManager {
             this.fullscreenBtn.textContent = '✕ Exit Fullscreen';
         } else {
             this.fullscreenBtn.textContent = '⛶ Fullscreen';
+        }
+
+        // Trigger callback to resize graph
+        if (this.onFullscreenChange) {
+            // Delay to allow CSS transitions to complete
+            setTimeout(() => {
+                this.onFullscreenChange();
+            }, 100);
         }
     }
 

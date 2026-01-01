@@ -165,6 +165,14 @@ class WABAPlayground {
             (edge, x, y) => this.handleEdgeClick(edge, x, y)
         );
 
+        // Setup fullscreen change callback to resize graph
+        this.uiManager.setFullscreenChangeCallback(() => {
+            if (this.network) {
+                this.network.redraw();
+                this.network.fit();
+            }
+        });
+
         // Attach event listeners
         this.attachEventListeners();
 

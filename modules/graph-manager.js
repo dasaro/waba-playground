@@ -114,13 +114,14 @@ export class GraphManager {
         }));
         this.networkData.nodes.update(nodeUpdates);
 
-        // Reset all edges to original colors, widths, and dashes
+        // Reset all edges to original colors, widths, dashes, and opacity
         const edges = this.networkData.edges.get();
         const edgeUpdates = edges.map(edge => ({
             id: edge.id,
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
-            dashes: edge.originalDashes || false
+            dashes: edge.originalDashes || false,
+            opacity: 1.0  // Reset to full opacity
         }));
         this.networkData.edges.update(edgeUpdates);
 
@@ -258,6 +259,11 @@ export class GraphManager {
 
             if (!matched) {
                 console.log(`  ✗ No match for this edge`);
+                // Dim non-matched edges (unless they're already discarded)
+                edgeUpdates.push({
+                    id: edge.id,
+                    opacity: 0.2  // Dim to 20% opacity
+                });
             }
         });
 

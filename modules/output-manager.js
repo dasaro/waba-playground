@@ -373,7 +373,7 @@ export class OutputManager {
                 return;
             }
 
-            // Extract supported atoms
+            // Extract supported atoms (legacy - no longer in output)
             const supportedMatch = pred.match(/^supported\(([^)]+)\)$/);
             if (supportedMatch) {
                 result.supported.push(supportedMatch[1]);
@@ -386,6 +386,10 @@ export class OutputManager {
                 const atom = weightMatch[1];
                 const weight = weightMatch[2];
                 result.weights.set(atom, weight);
+                // Also add to supported array since supported/1 is no longer in output
+                if (!result.supported.includes(atom)) {
+                    result.supported.push(atom);
+                }
                 return;
             }
 

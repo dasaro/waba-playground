@@ -1016,6 +1016,32 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 /* ===================================
+   Fullscreen Mode
+   =================================== */
+
+#graph-container:fullscreen,
+#graph-container:-webkit-full-screen,
+#graph-container:-moz-full-screen,
+#graph-container:-ms-fullscreen {
+    display: flex;
+    flex-direction: column;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: var(--space-md);
+    background: var(--bg-primary);
+}
+
+#graph-container:fullscreen #cy,
+#graph-container:-webkit-full-screen #cy,
+#graph-container:-moz-full-screen #cy,
+#graph-container:-ms-fullscreen #cy {
+    flex: 1;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: unset !important;
+}
+
+/* ===================================
    Syntax Highlighting
    =================================== */
 
