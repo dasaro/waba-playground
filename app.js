@@ -3,7 +3,7 @@
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
-import { UIManager } from './modules/ui-manager.js?v=20260101-1';
+import { UIManager } from './modules/ui-manager.js?v=20260101-6';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
@@ -209,101 +209,48 @@ class WABAPlayground {
 
     /**
      * Resize graph to fit container dimensions
-     * Handles both normal and fullscreen modes
+     * In fullscreen: triggers vis.js to re-measure its flex-sized container
+     * In normal mode: no-op (CSS handles sizing)
      */
     resizeGraphToContainer() {
         if (!this.network) return;
 
-        // Set flag to prevent ResizeObserver feedback loop
-        this.isResizing = true;
-
-        const canvas = document.getElementById('cy');
-        const container = document.getElementById('graph-container');
-
-        if (!canvas || !container) {
-            this.isResizing = false;
+        // Only resize in fullscreen mode
+        // In normal mode, CSS sets fixed 500px height - no resize needed
+        if (!document.fullscreenElement) {
+            console.log('📐 Normal mode: CSS handles sizing, skipping resize');
             return;
         }
 
-        let width, height;
+        console.log('📐 Fullscreen: Triggering vis.js resize to fit flex container');
 
-        // If in fullscreen, calculate from container (vis.js inline styles can't be trusted)
-        if (document.fullscreenElement) {
-            const containerRect = container.getBoundingClientRect();
-            const containerStyle = window.getComputedStyle(container);
-            const header = container.querySelector('.graph-header');
-            const banner = container.querySelector('.isolated-assumptions-banner');
-
-            // Start with container dimensions
-            width = containerRect.width;
-            height = containerRect.height;
-
-            // Subtract container padding (top + bottom for height, left + right for width)
-            const paddingTop = parseFloat(containerStyle.paddingTop);
-            const paddingBottom = parseFloat(containerStyle.paddingBottom);
-            const paddingLeft = parseFloat(containerStyle.paddingLeft);
-            const paddingRight = parseFloat(containerStyle.paddingRight);
-
-            width -= (paddingLeft + paddingRight);
-            height -= (paddingTop + paddingBottom);
-
-            // Subtract header height
-            if (header) height -= header.offsetHeight;
-            // Subtract banner height if visible
-            if (banner && !banner.hidden) height -= banner.offsetHeight;
-
-            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Padding ${paddingTop + paddingBottom}px, Available ${width}x${height}`);
-        } else {
-            // Normal mode: use #cy dimensions
-            width = canvas.offsetWidth;
-            height = canvas.offsetHeight;
-            console.log(`📐 Normal: Resizing vis.js network to ${width}x${height}`);
-        }
-
-        // Explicitly set the size - forces vis.js to resize the canvas
-        this.network.setSize(width + 'px', height + 'px');
-
-        // Redraw and fit the graph
+        // Just tell vis.js to re-measure and fit
+        // CSS flex layout has already sized the #cy container correctly
         this.network.redraw();
         this.network.fit();
-
-        // Clear flag after DOM settles (prevents feedback loop)
-        setTimeout(() => {
-            this.isResizing = false;
-        }, 200);
     }
 
     /**
-     * Setup ResizeObserver to automatically resize graph when container size changes
-     * Only observes in fullscreen mode to prevent feedback loops
+     * Setup ResizeObserver to automatically resize graph in fullscreen
+     * Simplified version - just triggers redraw/fit when container resizes
      */
     setupGraphResizeObserver() {
         const container = document.getElementById('graph-container');
         if (!container) return;
 
-        this.isResizing = false; // Flag to prevent feedback loops
-
-        // Create ResizeObserver to watch container size changes
-        this.resizeObserver = new ResizeObserver((entries) => {
-            // CRITICAL: Only resize in fullscreen mode
-            // In normal mode, layout is fixed by CSS - observing creates feedback loops
-            if (!document.fullscreenElement) return;
-
-            // Skip if we're currently resizing (prevents recursion)
-            if (this.isResizing) return;
-
-            // Debounce rapid resize events
-            clearTimeout(this.resizeTimeout);
-            this.resizeTimeout = setTimeout(() => {
-                if (this.network && document.fullscreenElement) {
+        this.resizeObserver = new ResizeObserver(() => {
+            // Only respond to fullscreen resizes (window resize, browser chrome changes)
+            if (document.fullscreenElement && this.network) {
+                // Debounce rapid events
+                clearTimeout(this.resizeTimeout);
+                this.resizeTimeout = setTimeout(() => {
                     this.resizeGraphToContainer();
-                }
-            }, 100); // Small delay to batch rapid changes
+                }, 100);
+            }
         });
 
-        // Observe the container
         this.resizeObserver.observe(container);
-        console.log('✅ ResizeObserver attached (only active in fullscreen mode)');
+        console.log('✅ ResizeObserver attached (fullscreen-only)');
     }
 
     // ===================================

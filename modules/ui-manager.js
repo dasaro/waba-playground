@@ -46,25 +46,18 @@ export class UIManager {
     }
 
     updateFullscreenButton() {
-        console.log('🖥️ [updateFullscreenButton] CALLED');
-        console.log('Fullscreen element:', document.fullscreenElement ? 'YES' : 'NO');
+        console.log('🖥️ Fullscreen state changed:', document.fullscreenElement ? 'ENTERED' : 'EXITED');
 
+        // Update button text
         if (document.fullscreenElement) {
             this.fullscreenBtn.textContent = '✕ Exit Fullscreen';
-            console.log('Button text set to: Exit Fullscreen');
         } else {
             this.fullscreenBtn.textContent = '⛶ Fullscreen';
-            console.log('Button text set to: Fullscreen');
         }
 
-        // Trigger callback to notify about fullscreen change
-        // ResizeObserver will handle automatic resizing when layout completes
+        // Trigger resize callback (simplified - just redraw/fit)
         if (this.onFullscreenChange) {
-            console.log('✅ [updateFullscreenButton] Triggering fullscreen callback...');
             this.onFullscreenChange();
-            console.log('✅ [updateFullscreenButton] Callback executed (ResizeObserver will handle timing)');
-        } else {
-            console.warn('⚠️ [updateFullscreenButton] No callback set!');
         }
     }
 

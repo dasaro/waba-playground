@@ -1070,54 +1070,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Fullscreen Mode
    =================================== */
 
-#graph-container:fullscreen,
-#graph-container:-webkit-full-screen,
-#graph-container:-moz-full-screen,
-#graph-container:-ms-fullscreen {
-    display: flex;
-    flex-direction: column;
-    width: 100vw !important;
-    height: 100vh !important;
-    padding: var(--space-md) !important; /* Add padding so border is visible */
-    background: var(--bg-primary);
-}
-
-#graph-container:fullscreen #cy,
-#graph-container:-webkit-full-screen #cy,
-#graph-container:-moz-full-screen #cy,
-#graph-container:-ms-fullscreen #cy {
-    flex: 1;
-    width: 100% !important;
-    /* Don't force height - let JavaScript setSize() set it via inline styles */
-    min-height: 0;
-    max-height: none;
-}
-
-#graph-container:fullscreen .graph-header,
-#graph-container:-webkit-full-screen .graph-header,
-#graph-container:-moz-full-screen .graph-header,
-#graph-container:-ms-fullscreen .graph-header {
-    flex-shrink: 0; /* Prevent header from shrinking */
-}
-
-#graph-container:fullscreen .isolated-assumptions-banner,
-#graph-container:-webkit-full-screen .isolated-assumptions-banner,
-#graph-container:-moz-full-screen .isolated-assumptions-banner,
-#graph-container:-ms-fullscreen .isolated-assumptions-banner {
-    flex-shrink: 0; /* Prevent banner from shrinking */
-}
-
-/* ===================================
-   Syntax Highlighting
-   =================================== */
-
-.keyword { color: #c678dd; }
-.string { color: #98c379; }
-.comment { color: #5c6370; font-style: italic; }
-.number { color: #d19a66; }
-.predicate { color: #61afef; }
-
-/* Ensure fullscreen element fills entire viewport and has proper stacking */
+/* Fullscreen container - uses flex layout */
 #graph-container:fullscreen,
 #graph-container:-webkit-full-screen,
 #graph-container:-moz-full-screen,
@@ -1129,9 +1082,36 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     height: 100vh !important;
     z-index: 9999 !important;
     margin: 0 !important;
+    padding: var(--space-lg) !important; /* Border visibility padding */
+    background: var(--bg-primary);
+
+    /* Flexbox layout for children */
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md); /* Space between header, legend, canvas */
 }
 
-/* Hide specific interfering elements when graph is fullscreen */
+/* Header stays at top, fixed size */
+#graph-container:fullscreen .graph-header,
+#graph-container:-webkit-full-screen .graph-header,
+#graph-container:-moz-full-screen .graph-header,
+#graph-container:-ms-fullscreen .graph-header {
+    flex-shrink: 0; /* Never shrink */
+}
+
+/* Canvas fills remaining space */
+#graph-container:fullscreen #cy,
+#graph-container:-webkit-full-screen #cy,
+#graph-container:-moz-full-screen #cy,
+#graph-container:-ms-fullscreen #cy {
+    flex: 1; /* Take all remaining space */
+    width: 100% !important;
+    min-height: 0; /* Allow flex to control size */
+    max-height: none;
+    border: 1px solid var(--border-color); /* Keep border visible */
+}
+
+/* Hide interfering page elements */
 body:has(#graph-container:fullscreen) .header,
 body:has(#graph-container:fullscreen) .left-panel,
 body:has(#graph-container:fullscreen) .footer,
@@ -1152,6 +1132,16 @@ body:has(#graph-container:-moz-full-screen) .footer,
 body:has(#graph-container:-moz-full-screen) .intro-section {
     display: none !important;
 }
+
+/* ===================================
+   Syntax Highlighting
+   =================================== */
+
+.keyword { color: #c678dd; }
+.string { color: #98c379; }
+.comment { color: #5c6370; font-style: italic; }
+.number { color: #d19a66; }
+.predicate { color: #61afef; }
 
 /* ===================================
    Mobile Optimizations
