@@ -274,6 +274,100 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 /* ===================================
+   Panel System (Unified Collapse/Expand)
+   =================================== */
+
+/* Panel container */
+.panel {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--space-md);
+}
+
+/* Panel header with toggle button */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+/* Panel toggle button */
+.panel-toggle {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+    font-size: var(--text-lg);
+    line-height: 1;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    min-width: 32px;
+    min-height: 32px;
+}
+
+.panel-toggle:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary);
+}
+
+.panel-toggle:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Panel content area */
+.panel-content {
+    padding: var(--space-lg);
+    transition: all var(--transition-normal);
+}
+
+/* Collapsed state */
+.panel[data-collapsed="true"] .panel-content {
+    display: none;
+}
+
+.panel[data-collapsed="true"] .panel-header {
+    border-radius: var(--radius-lg);
+    border-bottom: none;
+}
+
+.panel[data-collapsed="true"] .icon-collapse {
+    display: none;
+}
+
+.panel[data-collapsed="true"] .icon-expand {
+    display: inline;
+}
+
+/* Expanded state (default) */
+.panel[data-collapsed="false"] .icon-expand {
+    display: none;
+}
+
+.panel[data-collapsed="false"] .icon-collapse {
+    display: inline;
+}
+
+/* Panel icons */
+.icon-collapse, .icon-expand {
+    font-weight: bold;
+    user-select: none;
+}
+
+/* ===================================
    Configuration Panel
    =================================== */
 
@@ -450,6 +544,13 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     resize: vertical;
     height: 400px; /* Fixed height with manual resize capability */
     tab-size: 4;
+}
+
+/* Code editor textarea specific styles (separation of concerns) */
+.code-editor-textarea {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .simple-textarea {
@@ -1081,6 +1182,22 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    =================================== */
 
 @media (max-width: 640px) {
+    /* Mobile: Stack panels vertically and make them collapsible */
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+
+    .panel {
+        margin-bottom: var(--space-sm);
+    }
+
+    /* Panels can be collapsed to save space on mobile */
+    .panel-toggle {
+        min-width: 28px;
+        min-height: 28px;
+        padding: var(--space-xs);
+    }
+
     .header {
         padding: var(--space-md);
     }

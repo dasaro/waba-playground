@@ -1,9 +1,10 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260101-1 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260101-9 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
 import { UIManager } from './modules/ui-manager.js?v=20260101-8';
+import { PanelManager } from './modules/panel-manager.js?v=20260101-8';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
@@ -112,6 +113,13 @@ class WABAPlayground {
             this.syntaxGuideClose,
             this.graphContainer
         );
+
+        // Initialize Panel Manager
+        this.panelManager = new PanelManager();
+        this.panelManager.registerPanel('config', true);
+        this.panelManager.registerPanel('editor', true);
+        this.panelManager.registerPanel('graph', true);
+        this.panelManager.registerPanel('output', true);
 
         // Initialize File Manager
         this.fileManager = new FileManager(
@@ -262,6 +270,15 @@ class WABAPlayground {
 
         // Legend toggle button
         this.legendToggleBtn.addEventListener('click', () => this.toggleLegend());
+
+        // Panel toggle buttons
+        document.querySelectorAll('.panel-toggle').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const panel = e.target.closest('.panel');
+                const panelId = panel.dataset.panel;
+                this.panelManager.togglePanel(panelId);
+            });
+        });
 
         // Export buttons (handled by ExportManager)
     }

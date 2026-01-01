@@ -74,9 +74,15 @@
             <!-- Left Panel -->
             <div class="left-panel">
                 <!-- Configuration Panel -->
-                <div class="config-panel">
-                    <h3>Configuration</h3>
-
+                <section class="panel config-panel" data-panel="config" role="region" aria-label="Configuration">
+                    <div class="panel-header">
+                        <h3>Configuration</h3>
+                        <button class="panel-toggle" aria-expanded="true" aria-controls="panel-config-content" aria-label="Toggle configuration panel">
+                            <span class="icon-collapse">−</span>
+                            <span class="icon-expand" hidden>+</span>
+                        </button>
+                    </div>
+                    <div class="panel-content" id="panel-config-content">
                     <div class="config-grid">
                         <div class="config-item">
                             <label for="semiring-select">Semiring (Weight Propagation)</label>
@@ -199,14 +205,21 @@
                             </label>
                         </div>
                     </div>
-
-                </div>
+                    </div>
+                </section>
 
                 <!-- Editor Container -->
-                <div class="editor-container">
+                <section class="panel editor-panel" data-panel="editor" role="region" aria-label="Framework Editor">
+                    <div class="panel-header">
+                        <h3>Framework Definition</h3>
+                        <button class="panel-toggle" aria-expanded="true" aria-controls="panel-editor-content" aria-label="Toggle editor panel">
+                            <span class="icon-collapse">−</span>
+                            <span class="icon-expand" hidden>+</span>
+                        </button>
+                    </div>
+                    <div class="panel-content" id="panel-editor-content">
                     <div class="editor-header">
                         <div class="editor-controls">
-                            <h3>Framework Definition</h3>
                             <select id="input-mode" class="select input-mode-select" aria-label="Select input mode">
                                 <option value="simple">Simple Mode (ABA)</option>
                                 <option value="advanced">Advanced Mode (ASP)</option>
@@ -220,7 +233,7 @@
                     </div>
 
                     <!-- Advanced Mode: Code Editor -->
-                    <textarea id="code-editor" class="code-editor" style="display: none;" placeholder="Enter your WABA framework here...
+                    <textarea id="code-editor" class="code-editor code-editor-textarea" style="display: none;" placeholder="Enter your WABA framework here...
 Example:
 assumption(a).
 assumption(b).
@@ -259,15 +272,23 @@ c_a: 70"></textarea>
                             </div>
                         </div>
                     </div>
-                </div>
+                    </div>
+                </section>
             </div>
 
             <!-- Right Panel -->
             <div class="right-panel">
                 <!-- Graph Visualization -->
-                <div class="graph-container" id="graph-container">
-                    <div class="graph-header">
+                <section class="panel graph-panel" data-panel="graph" role="region" aria-label="Argumentation Graph">
+                    <div class="panel-header">
                         <h3>Argumentation Graph</h3>
+                        <button class="panel-toggle" aria-expanded="true" aria-controls="panel-graph-content" aria-label="Toggle graph panel">
+                            <span class="icon-collapse">−</span>
+                            <span class="icon-expand" hidden>+</span>
+                        </button>
+                    </div>
+                    <div class="panel-content" id="panel-graph-content">
+                    <div class="graph-header">
                         <div class="graph-mode-selector">
                             <label class="mode-option">
                                 <input type="radio" name="graph-mode" value="standard">
@@ -356,12 +377,20 @@ c_a: 70"></textarea>
                         <p>Run a WABA framework to visualize the argumentation graph.</p>
                         <p class="empty-state-hint">Click "▶️ Run WABA" above to get started.</p>
                     </div>
-                </div>
+                    </div>
+                </section>
 
                 <!-- Output Container -->
-                <div class="output-container">
-                    <div class="output-header">
+                <section class="panel output-panel" data-panel="output" role="region" aria-label="Results">
+                    <div class="panel-header">
                         <h3>Results</h3>
+                        <button class="panel-toggle" aria-expanded="true" aria-controls="panel-output-content" aria-label="Toggle output panel">
+                            <span class="icon-collapse">−</span>
+                            <span class="icon-expand" hidden>+</span>
+                        </button>
+                    </div>
+                    <div class="panel-content" id="panel-output-content">
+                    <div class="output-header">
                         <button id="clear-btn" class="clear-btn" aria-label="Clear output results">🗑️ Clear Output</button>
                     </div>
                     <div id="output" class="output" role="log" aria-live="polite" aria-atomic="false">
@@ -373,7 +402,8 @@ c_a: 70"></textarea>
                         </div>
                     </div>
                     <div id="stats" class="stats" role="status" aria-live="polite"></div>
-                </div>
+                    </div>
+                </section>
             </div>
         </div>
 
@@ -495,6 +525,6 @@ budget(50).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260101-8"></script>
+    <script type="module" src="app.js?v=20260101-9"></script>
 </body>
 </html>
