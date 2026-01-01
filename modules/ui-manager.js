@@ -54,10 +54,15 @@ export class UIManager {
 
         // Trigger callback to resize graph
         if (this.onFullscreenChange) {
-            // Delay to allow CSS transitions to complete
+            // Delay to allow CSS transitions to complete (increased for better reliability)
             setTimeout(() => {
                 this.onFullscreenChange();
-            }, 100);
+                // Force canvas height recalculation
+                const canvas = document.getElementById('cy');
+                if (canvas) {
+                    canvas.style.height = canvas.offsetHeight + 'px';
+                }
+            }, 300);
         }
     }
 
