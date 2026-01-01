@@ -16,6 +16,37 @@ export class GraphManager {
         this.currentGraphMode = 'standard';
     }
 
+    /**
+     * Convert color to RGBA with specified opacity
+     * @param {string|object} color - Color in hex, rgb, or vis.js object format
+     * @param {number} opacity - Opacity value (0-1)
+     * @returns {string} RGBA color string
+     */
+    colorToRGBA(color, opacity = 0.3) {
+        // Handle vis.js color object
+        if (typeof color === 'object' && color.color) {
+            color = color.color;
+        }
+
+        // If already RGBA, extract RGB and replace opacity
+        const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbaMatch) {
+            return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${opacity})`;
+        }
+
+        // Handle hex color
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+        }
+
+        // Fallback to gray if color format is unknown
+        return `rgba(156, 163, 175, ${opacity})`;
+    }
+
     initGraph() {
         // Initialize vis.js DataSets
         this.networkData.nodes = new vis.DataSet([]);
@@ -114,13 +145,14 @@ export class GraphManager {
         }));
         this.networkData.nodes.update(nodeUpdates);
 
-        // Reset all edges to original colors, widths, and dashes
+        // Reset all edges to original colors, widths, dashes, and smooth curves
         const edges = this.networkData.edges.get();
         const edgeUpdates = edges.map(edge => ({
             id: edge.id,
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
-            dashes: edge.originalDashes || false
+            dashes: edge.originalDashes || false,
+            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
         }));
         this.networkData.edges.update(edgeUpdates);
 
@@ -229,8 +261,9 @@ export class GraphManager {
                     edgeUpdates.push({
                         id: edge.id,
                         color: { color: '#9ca3af', highlight: '#6b7280' },
-                        width: 2,  // Thin line
-                        dashes: [5, 5]  // Explicit dash pattern
+                        width: 3,  // Slightly thicker for visibility
+                        dashes: [8, 4],  // Longer dashes for better visibility
+                        smooth: { enabled: false }  // Disable smooth curves for dashed lines to make pattern clearer
                     });
                     discardedCount++;
                     matched = true;
@@ -263,10 +296,13 @@ export class GraphManager {
 
             if (!matched) {
                 console.log(`  ✗ No match for this edge`);
-                // Dim non-matched edges using semi-transparent grey color
+                // Dim non-matched edges by reducing opacity of original color
+                const originalColor = edge.originalColor || edge.color || '#9ca3af';
+                const dimmedColor = this.colorToRGBA(originalColor, 0.2);
+                const dimmedHighlight = this.colorToRGBA(originalColor, 0.4);
                 edgeUpdates.push({
                     id: edge.id,
-                    color: { color: 'rgba(156, 163, 175, 0.3)', highlight: 'rgba(156, 163, 175, 0.5)' }
+                    color: { color: dimmedColor, highlight: dimmedHighlight }
                 });
             }
         });

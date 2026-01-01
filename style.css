@@ -1037,8 +1037,22 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 #graph-container:-ms-fullscreen #cy {
     flex: 1;
     width: 100% !important;
-    height: 100% !important;
     min-height: unset !important;
+    /* Don't set height: 100% - let flex: 1 handle vertical sizing */
+}
+
+#graph-container:fullscreen .graph-header,
+#graph-container:-webkit-full-screen .graph-header,
+#graph-container:-moz-full-screen .graph-header,
+#graph-container:-ms-fullscreen .graph-header {
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+#graph-container:fullscreen .isolated-assumptions-banner,
+#graph-container:-webkit-full-screen .isolated-assumptions-banner,
+#graph-container:-moz-full-screen .isolated-assumptions-banner,
+#graph-container:-ms-fullscreen .isolated-assumptions-banner {
+    flex-shrink: 0; /* Prevent banner from shrinking */
 }
 
 /* ===================================

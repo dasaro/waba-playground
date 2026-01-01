@@ -217,7 +217,12 @@ class WABAPlayground {
         this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
         this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
         this.graphModeRadios.forEach(radio => {
-            radio.addEventListener('change', () => this.regenerateGraph());
+            radio.addEventListener('change', () => {
+                // Clear active extension when switching graph modes (different structures)
+                this.outputManager.clearActiveExtension();
+                this.graphManager.resetGraphColors();
+                this.regenerateGraph();
+            });
         });
 
         // Disable budget when optimization is enabled

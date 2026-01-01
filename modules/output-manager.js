@@ -314,8 +314,8 @@ export class OutputManager {
     }
 
     findSupportingAssumptions(element, parsed) {
-        // If element is an assumption in the extension, return it
-        if (parsed.in.includes(element)) {
+        // If element is an assumption (in or out), return it
+        if (parsed.assumptions.has(element)) {
             return [element];
         }
 
@@ -545,6 +545,14 @@ export class OutputManager {
                 header.click();
             }
         }
+    }
+
+    clearActiveExtension() {
+        // Clear the active extension and remove visual highlights
+        this.activeExtensionId = null;
+        document.querySelectorAll('.answer-header').forEach(h => {
+            h.classList.remove('active-extension');
+        });
     }
 
     clearOutput() {
