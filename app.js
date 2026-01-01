@@ -175,54 +175,13 @@ class WABAPlayground {
             (edge, x, y) => this.handleEdgeClick(edge, x, y)
         );
 
-        // Setup fullscreen change callback to resize graph
+        // Setup ResizeObserver for automatic resize detection
+        this.setupGraphResizeObserver();
+
+        // Setup fullscreen change callback (triggers initial resize)
         this.uiManager.setFullscreenChangeCallback(() => {
             if (this.network) {
-                const resizeNetwork = () => {
-                    const canvas = document.getElementById('cy');
-                    const container = document.getElementById('graph-container');
-
-                    if (canvas && container) {
-                        let width, height;
-
-                        // If in fullscreen, use container dimensions (not #cy which has inline styles)
-                        if (document.fullscreenElement) {
-                            // Get container dimensions and subtract header/banner space
-                            const containerRect = container.getBoundingClientRect();
-                            const header = container.querySelector('.graph-header');
-                            const banner = container.querySelector('.isolated-assumptions-banner');
-
-                            width = containerRect.width;
-                            height = containerRect.height;
-
-                            // Subtract header height
-                            if (header) height -= header.offsetHeight;
-                            // Subtract banner height if visible
-                            if (banner && !banner.hidden) height -= banner.offsetHeight;
-
-                            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Available ${width}x${height}`);
-                        } else {
-                            // Normal mode: use #cy dimensions
-                            width = canvas.offsetWidth;
-                            height = canvas.offsetHeight;
-                            console.log(`📐 Normal: Resizing vis.js network to ${width}x${height}`);
-                        }
-
-                        // Explicitly set the size - this forces vis.js to resize the canvas
-                        this.network.setSize(width + 'px', height + 'px');
-
-                        // Then redraw and fit
-                        this.network.redraw();
-                        this.network.fit();
-                    }
-                };
-
-                // Immediate resize attempt
-                resizeNetwork();
-
-                // Delayed resize to catch flexbox layout completion (100ms, 250ms)
-                setTimeout(resizeNetwork, 100);
-                setTimeout(resizeNetwork, 250);
+                this.resizeGraphToContainer();
             }
         });
 
@@ -242,6 +201,78 @@ class WABAPlayground {
                 this.loadExample(selectedExample);
             }
         }, 100);
+    }
+
+    // ===================================
+    // Graph Resize Management
+    // ===================================
+
+    /**
+     * Resize graph to fit container dimensions
+     * Handles both normal and fullscreen modes
+     */
+    resizeGraphToContainer() {
+        if (!this.network) return;
+
+        const canvas = document.getElementById('cy');
+        const container = document.getElementById('graph-container');
+
+        if (!canvas || !container) return;
+
+        let width, height;
+
+        // If in fullscreen, calculate from container (vis.js inline styles can't be trusted)
+        if (document.fullscreenElement) {
+            const containerRect = container.getBoundingClientRect();
+            const header = container.querySelector('.graph-header');
+            const banner = container.querySelector('.isolated-assumptions-banner');
+
+            width = containerRect.width;
+            height = containerRect.height;
+
+            // Subtract header height
+            if (header) height -= header.offsetHeight;
+            // Subtract banner height if visible
+            if (banner && !banner.hidden) height -= banner.offsetHeight;
+
+            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Available ${width}x${height}`);
+        } else {
+            // Normal mode: use #cy dimensions
+            width = canvas.offsetWidth;
+            height = canvas.offsetHeight;
+            console.log(`📐 Normal: Resizing vis.js network to ${width}x${height}`);
+        }
+
+        // Explicitly set the size - forces vis.js to resize the canvas
+        this.network.setSize(width + 'px', height + 'px');
+
+        // Redraw and fit the graph
+        this.network.redraw();
+        this.network.fit();
+    }
+
+    /**
+     * Setup ResizeObserver to automatically resize graph when container size changes
+     * This eliminates the need for setTimeout delays and manual resize triggers
+     */
+    setupGraphResizeObserver() {
+        const container = document.getElementById('graph-container');
+        if (!container) return;
+
+        // Create ResizeObserver to watch container size changes
+        this.resizeObserver = new ResizeObserver((entries) => {
+            // Debounce rapid resize events
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(() => {
+                if (this.network) {
+                    this.resizeGraphToContainer();
+                }
+            }, 100); // Small delay to batch rapid changes
+        });
+
+        // Observe the container
+        this.resizeObserver.observe(container);
+        console.log('✅ ResizeObserver attached to graph container');
     }
 
     // ===================================

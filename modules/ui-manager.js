@@ -57,20 +57,14 @@ export class UIManager {
             console.log('Button text set to: Fullscreen');
         }
 
-        // Trigger callback to resize graph using requestAnimationFrame
-        // This ensures the DOM has updated after fullscreen transition
+        // Trigger callback to notify about fullscreen change
+        // ResizeObserver will handle automatic resizing when layout completes
         if (this.onFullscreenChange) {
-            console.log('✅ [updateFullscreenButton] Scheduling graph resize...');
-            // Use requestAnimationFrame to let browser complete fullscreen layout
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    console.log('📞 [updateFullscreenButton] Executing vis.js resize...');
-                    this.onFullscreenChange();
-                    console.log('✅ [updateFullscreenButton] Graph resized via vis.js redraw() and fit()');
-                });
-            });
+            console.log('✅ [updateFullscreenButton] Triggering fullscreen callback...');
+            this.onFullscreenChange();
+            console.log('✅ [updateFullscreenButton] Callback executed (ResizeObserver will handle timing)');
         } else {
-            console.warn('⚠️ [updateFullscreenButton] No callback set! Graph will not be resized.');
+            console.warn('⚠️ [updateFullscreenButton] No callback set!');
         }
     }
 
