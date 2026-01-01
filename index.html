@@ -80,10 +80,10 @@
             </div>
             <div class="header-links">
                 <button id="font-decrease-btn" class="link-btn" title="Decrease font size" aria-label="Decrease font size">
-                    <span style="font-size: 1.2em; font-weight: bold;" aria-hidden="true">−</span>
+                    <span class="font-control-symbol" aria-hidden="true">−</span>
                 </button>
                 <button id="font-increase-btn" class="link-btn" title="Increase font size" aria-label="Increase font size">
-                    <span style="font-size: 1.2em; font-weight: bold;" aria-hidden="true">+</span>
+                    <span class="font-control-symbol" aria-hidden="true">+</span>
                 </button>
                 <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
                     <span id="theme-icon" aria-hidden="true">🌙</span>
@@ -230,13 +230,13 @@
 
                         <div class="config-item">
                             <label for="file-upload-btn">Upload Framework</label>
-                            <input type="file" id="file-upload-input" accept=".lp,.waba" style="display: none;">
-                            <button id="file-upload-btn" class="select" style="cursor: pointer; text-align: left;">📁 Choose File (.lp / .waba)</button>
+                            <input type="file" id="file-upload-input" accept=".lp,.waba" class="file-upload-hidden">
+                            <button id="file-upload-btn" class="select file-upload-button">📁 Choose File (.lp / .waba)</button>
                         </div>
 
-                        <div class="config-item" style="display: flex; align-items: center;">
-                            <label style="display: flex; align-items: center; gap: 8px; margin: 0;">
-                                <input type="checkbox" id="flat-constraint" style="margin: 0;"> Flat-WABA Constraint
+                        <div class="config-item checkbox-container">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="flat-constraint" class="checkbox-input"> Flat-WABA Constraint
                             </label>
                         </div>
                     </div>
@@ -248,12 +248,12 @@
                     <div class="editor-header">
                         <div class="editor-controls">
                             <h3>Framework Definition</h3>
-                            <select id="input-mode" class="select" style="margin-left: 20px;" aria-label="Select input mode">
+                            <select id="input-mode" class="select input-mode-select" aria-label="Select input mode">
                                 <option value="simple">Simple Mode (ABA)</option>
                                 <option value="advanced">Advanced Mode (ASP)</option>
                             </select>
                         </div>
-                        <div style="display: flex; gap: 10px;">
+                        <div class="download-buttons">
                             <button id="run-btn" class="run-btn" aria-label="Execute WABA framework">▶️ Run WABA</button>
                             <button id="download-lp-btn" class="clear-btn" aria-label="Download current framework as .lp file">💾 .lp</button>
                             <button id="download-waba-btn" class="clear-btn" aria-label="Download current framework as .waba file">💾 .waba</button>
