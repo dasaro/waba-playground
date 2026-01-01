@@ -293,8 +293,15 @@ export class OutputManager {
                     chipElement.addEventListener('click', (e) => {
                         e.stopPropagation(); // Don't trigger extension highlight
                         console.log('✅ [Derived atom click] Atom clicked:', atom);
-                        console.log('Calling PopupManager.showDerivationChain...');
-                        PopupManager.showDerivationChain(atom, parsed, chipElement);
+                        console.log('About to call showDerivationChain');
+                        console.log('PopupManager available?', typeof PopupManager);
+                        console.log('showDerivationChain exists?', typeof PopupManager.showDerivationChain);
+                        try {
+                            PopupManager.showDerivationChain(atom, parsed, chipElement);
+                        } catch (error) {
+                            console.error('❌ Error calling showDerivationChain:', error);
+                            console.error('Error stack:', error.stack);
+                        }
                     });
                     console.log(`  ✅ Click handler attached to ${atomId}`);
                 } else {
