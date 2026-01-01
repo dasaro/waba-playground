@@ -5,3 +5,8 @@ server.log
 node_modules/
 .DS_Store
 clingo-wasm-0.3.2.tgz
+
+# Build artifacts - unused files
+waba-modules.js
+sync-modules.js
+synced-modules.txt
