@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module Load Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+        }
+        .error {
+            background: #ef4444;
+            color: white;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>WABA Playground Module Load Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        log('Starting module load tests...', 'info');
+
+        try {
+            log('✓ Script tag with type="module" is working', 'success');
+        } catch (e) {
+            log(`✗ Module script error: ${e.message}`, 'error');
+        }
+
+        // Test each module individually
+        const modules = [
+            { name: 'ThemeManager', path: './modules/theme-manager.js' },
+            { name: 'FontManager', path: './modules/font-manager.js' },
+            { name: 'UIManager', path: './modules/ui-manager.js' },
+            { name: 'FileManager', path: './modules/file-manager.js' },
+            { name: 'ParserUtils', path: './modules/parser-utils.js' },
+            { name: 'GraphUtils', path: './modules/graph-utils.js' },
+            { name: 'GraphManager', path: './modules/graph-manager.js' },
+            { name: 'PopupManager', path: './modules/popup-manager.js' },
+            { name: 'ClingoManager', path: './modules/clingo-manager.js' },
+            { name: 'OutputManager', path: './modules/output-manager.js' }
+        ];
+
+        async function testModule(name, path) {
+            try {
+                const module = await import(path);
+                if (module[name]) {
+                    log(`✓ ${name} loaded successfully`, 'success');
+                    console.log(`${name}:`, module[name]);
+                    return true;
+                } else {
+                    log(`✗ ${name} loaded but class not found in exports`, 'error');
+                    console.error(`Module exports:`, module);
+                    return false;
+                }
+            } catch (e) {
+                log(`✗ ${name} failed to load: ${e.message}`, 'error');
+                console.error(`Error loading ${name}:`, e);
+                return false;
+            }
+        }
+
+        async function runTests() {
+            let passCount = 0;
+            let failCount = 0;
+
+            for (const mod of modules) {
+                const passed = await testModule(mod.name, mod.path);
+                if (passed) passCount++;
+                else failCount++;
+            }
+
+            log('', 'info');
+            log(`Test Summary: ${passCount} passed, ${failCount} failed`,
+                failCount === 0 ? 'success' : 'error');
+
+            if (failCount === 0) {
+                log('All modules loaded successfully! Main app should work.', 'success');
+            } else {
+                log('Some modules failed to load. Check console for details.', 'error');
+            }
+
+            // Test PopupManager specifically
+            log('', 'info');
+            log('Testing PopupManager.showDerivationChain...', 'info');
+            try {
+                const { PopupManager } = await import('./modules/popup-manager.js');
+                if (typeof PopupManager.showDerivationChain === 'function') {
+                    log('✓ PopupManager.showDerivationChain exists and is a function', 'success');
+                } else {
+                    log('✗ PopupManager.showDerivationChain is not a function', 'error');
+                }
+            } catch (e) {
+                log(`✗ Error checking PopupManager.showDerivationChain: ${e.message}`, 'error');
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>
