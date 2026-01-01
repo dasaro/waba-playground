@@ -180,12 +180,33 @@ class WABAPlayground {
             if (this.network) {
                 const resizeNetwork = () => {
                     const canvas = document.getElementById('cy');
-                    if (canvas) {
-                        // Get the actual computed dimensions
-                        const width = canvas.offsetWidth;
-                        const height = canvas.offsetHeight;
+                    const container = document.getElementById('graph-container');
 
-                        console.log(`📐 Resizing vis.js network to ${width}x${height}`);
+                    if (canvas && container) {
+                        let width, height;
+
+                        // If in fullscreen, use container dimensions (not #cy which has inline styles)
+                        if (document.fullscreenElement) {
+                            // Get container dimensions and subtract header/banner space
+                            const containerRect = container.getBoundingClientRect();
+                            const header = container.querySelector('.graph-header');
+                            const banner = container.querySelector('.isolated-assumptions-banner');
+
+                            width = containerRect.width;
+                            height = containerRect.height;
+
+                            // Subtract header height
+                            if (header) height -= header.offsetHeight;
+                            // Subtract banner height if visible
+                            if (banner && !banner.hidden) height -= banner.offsetHeight;
+
+                            console.log(`📐 Fullscreen: Container ${containerRect.width}x${containerRect.height}, Available ${width}x${height}`);
+                        } else {
+                            // Normal mode: use #cy dimensions
+                            width = canvas.offsetWidth;
+                            height = canvas.offsetHeight;
+                            console.log(`📐 Normal: Resizing vis.js network to ${width}x${height}`);
+                        }
 
                         // Explicitly set the size - this forces vis.js to resize the canvas
                         this.network.setSize(width + 'px', height + 'px');
@@ -199,10 +220,9 @@ class WABAPlayground {
                 // Immediate resize attempt
                 resizeNetwork();
 
-                // Delayed resize to catch flexbox layout completion (100ms, 250ms, 500ms)
+                // Delayed resize to catch flexbox layout completion (100ms, 250ms)
                 setTimeout(resizeNetwork, 100);
                 setTimeout(resizeNetwork, 250);
-                setTimeout(resizeNetwork, 500);
             }
         });
 
