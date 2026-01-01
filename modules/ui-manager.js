@@ -2,11 +2,10 @@
  * UIManager - Handles UI interactions (modals, overlays, empty states)
  */
 export class UIManager {
-    constructor(syntaxGuideBtn, syntaxGuideModal, syntaxGuideClose, graphContainer) {
+    constructor(syntaxGuideBtn, syntaxGuideModal, syntaxGuideClose) {
         this.syntaxGuideBtn = syntaxGuideBtn;
         this.syntaxGuideModal = syntaxGuideModal;
         this.syntaxGuideClose = syntaxGuideClose;
-        this.graphContainer = graphContainer;
     }
 
     // ===================================

@@ -48,7 +48,6 @@ class WABAPlayground {
 
         // Graph visualization elements
         this.graphCanvas = document.getElementById('cy');
-        this.graphContainer = document.getElementById('graph-container');
         this.resetLayoutBtn = document.getElementById('reset-layout-btn');
 
         // Syntax guide and download
@@ -110,8 +109,7 @@ class WABAPlayground {
         this.uiManager = new UIManager(
             this.syntaxGuideBtn,
             this.syntaxGuideModal,
-            this.syntaxGuideClose,
-            this.graphContainer
+            this.syntaxGuideClose
         );
 
         // Initialize Panel Manager
