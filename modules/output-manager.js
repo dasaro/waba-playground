@@ -78,6 +78,12 @@ export class OutputManager {
             if (result.Result === 'OPTIMUM FOUND') {
                 this.log(`\n✓ Found ${witnesses.length} optimal extension(s)`, 'success');
             }
+
+            // Store witnesses for download
+            this.storedWitnesses = witnessesWithCosts;
+
+            // Add download button if there are extensions
+            this.addDownloadButton();
         }
 
         // Display statistics
@@ -88,6 +94,70 @@ export class OutputManager {
             Semiring: ${this.semiringSelect.options[this.semiringSelect.selectedIndex].text} |
             Monoid: ${this.monoidSelect.options[this.monoidSelect.selectedIndex].text}
         `;
+    }
+
+    addDownloadButton() {
+        // Check if button already exists
+        if (document.getElementById('download-all-extensions-btn')) {
+            return;
+        }
+
+        // Create download button
+        const button = document.createElement('button');
+        button.id = 'download-all-extensions-btn';
+        button.className = 'download-all-btn';
+        button.innerHTML = '💾 Download All Extensions';
+        button.addEventListener('click', () => this.downloadAllExtensions());
+
+        // Insert at the top of output
+        this.output.insertBefore(button, this.output.firstChild);
+    }
+
+    downloadAllExtensions() {
+        if (!this.storedWitnesses || this.storedWitnesses.length === 0) {
+            return;
+        }
+
+        let textContent = '';
+
+        this.storedWitnesses.forEach((item, index) => {
+            const parsed = item.parsed;
+            const extensionNumber = index + 1;
+
+            // Build textual representation for this extension
+            let extensionText = `${extensionNumber}: `;
+            let parts = [];
+
+            // In assumptions
+            if (parsed.in && parsed.in.length > 0) {
+                parts.push(parsed.in.map(a => `in(${a})`).join('. ') + '.');
+            }
+
+            // Supported atoms
+            if (parsed.supported && parsed.supported.length > 0) {
+                parts.push(parsed.supported.map(a => `supported(${a})`).join('. ') + '.');
+            }
+
+            // Cost
+            if (item.cost !== null) {
+                parts.push(`cost(${item.cost}).`);
+            }
+
+            extensionText += parts.join(' ');
+            textContent += extensionText + '\n';
+        });
+
+        // Create and download file
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        link.download = `waba-extensions-${timestamp}.txt`;
+
+        link.click();
+        URL.revokeObjectURL(url);
     }
 
     appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null) {
@@ -217,10 +287,12 @@ export class OutputManager {
             contentHTML += '</div></div>';
         }
 
-        // Textual Result (Clingo-like format)
-        contentHTML += '<div class="assumption-section">';
-        contentHTML += '<span class="section-label">Textual Result:</span>';
-        contentHTML += '<div class="textual-result">';
+        // Textual Result (Clingo-like format) - Collapsible
+        contentHTML += '<div class="assumption-section textual-result-section">';
+        contentHTML += '<span class="section-label textual-result-toggle" data-extension="${answerNumber}" style="cursor: pointer; user-select: none;">';
+        contentHTML += '<span class="toggle-icon">▶</span> Textual Result';
+        contentHTML += '</span>';
+        contentHTML += '<div class="textual-result" data-extension="${answerNumber}" style="display: none;">';
 
         // Build textual representation
         let textualLines = [];
@@ -340,6 +412,22 @@ export class OutputManager {
             });
         } else {
             console.log('ℹ️ [appendAnswerSet] No derived atoms to attach handlers to');
+        }
+
+        // Add click handler for textual result toggle
+        const toggleButton = answerDiv.querySelector('.textual-result-toggle');
+        const textualContent = answerDiv.querySelector('.textual-result');
+        if (toggleButton && textualContent) {
+            toggleButton.addEventListener('click', () => {
+                const isHidden = textualContent.style.display === 'none';
+                textualContent.style.display = isHidden ? 'block' : 'none';
+
+                // Update icon
+                const icon = toggleButton.querySelector('.toggle-icon');
+                if (icon) {
+                    icon.textContent = isHidden ? '▼' : '▶';
+                }
+            });
         }
     }
 

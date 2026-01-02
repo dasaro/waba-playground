@@ -862,6 +862,49 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     overflow-x: auto;
     line-height: 1.6;
     margin: 0;
+    margin-top: var(--space-xs);
+}
+
+.textual-result-toggle {
+    cursor: pointer;
+    user-select: none;
+    transition: color var(--transition-fast);
+}
+
+.textual-result-toggle:hover {
+    color: var(--primary-color);
+}
+
+.toggle-icon {
+    display: inline-block;
+    font-size: var(--text-xs);
+    margin-right: var(--space-xs);
+    transition: transform var(--transition-fast);
+}
+
+.download-all-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-base);
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: var(--space-lg);
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+.download-all-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.download-all-btn:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
 }
 
 .chip {
