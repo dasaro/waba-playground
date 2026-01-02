@@ -882,11 +882,18 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .graph-panel:fullscreen #cy,
 .graph-panel:-webkit-full-screen #cy,
 .graph-panel:-moz-full-screen #cy,
-.graph-panel:-ms-fullscreen #cy {
-    flex: 1;
+.graph-panel:-ms-fullscreen #cy,
+.graph-panel:fullscreen .graph-canvas,
+.graph-panel:-webkit-full-screen .graph-canvas,
+.graph-panel:-moz-full-screen .graph-canvas,
+.graph-panel:-ms-fullscreen .graph-canvas {
+    flex: 1 1 auto !important;
     width: 100% !important;
     height: 100% !important;
     min-height: unset !important;
+    max-height: unset !important;
+    border: none;
+    border-radius: 0;
 }
 
 /* Legend in fullscreen */
