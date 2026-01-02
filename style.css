@@ -831,6 +831,116 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     min-height: 400px;
 }
 
+/* ===================================
+   Custom Fullscreen Modal Overlay
+   =================================== */
+
+#graph-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-primary);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.fullscreen-header {
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border-color);
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.fullscreen-header h3 {
+    margin: 0;
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+}
+
+.fullscreen-controls {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.fullscreen-btn {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.fullscreen-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.fullscreen-btn.fullscreen-close {
+    background: var(--error-color);
+    color: white;
+    border-color: var(--error-color);
+}
+
+.fullscreen-btn.fullscreen-close:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+.fullscreen-graph-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Graph canvas in fullscreen modal */
+#graph-fullscreen-overlay #cy {
+    flex: 1;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+/* Legend in fullscreen modal */
+#graph-fullscreen-overlay .graph-legend {
+    position: absolute;
+    top: var(--space-lg);
+    left: var(--space-lg);
+    max-width: 300px;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Isolated banner in fullscreen modal */
+#graph-fullscreen-overlay .isolated-assumptions-banner {
+    position: absolute;
+    bottom: var(--space-lg);
+    left: var(--space-lg);
+    right: var(--space-lg);
+    z-index: 100;
+}
+
 /* Fullscreen mode styling */
 .graph-panel:fullscreen,
 .graph-panel:-webkit-full-screen,

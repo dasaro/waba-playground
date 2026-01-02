@@ -1272,93 +1272,171 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
      */
     initFullscreen(graphPanel) {
         this.graphPanel = graphPanel;
+        this.isFullscreen = false;
+        this.fullscreenOverlay = null;
 
         // Add fullscreen button click handler
         if (this.fullscreenBtn) {
             this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
         }
-
-        // Listen for fullscreen changes (user pressing ESC or clicking browser exit)
-        document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
-        document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
-        document.addEventListener('mozfullscreenchange', () => this.handleFullscreenChange());
-        document.addEventListener('MSFullscreenChange', () => this.handleFullscreenChange());
     }
 
     /**
      * Toggle fullscreen mode for the graph panel
      */
-    async toggleFullscreen() {
-        if (!this.graphPanel) {
-            console.error('Graph panel not initialized for fullscreen');
-            return;
-        }
-
-        try {
-            if (!this.isFullscreen) {
-                // Enter fullscreen
-                if (this.graphPanel.requestFullscreen) {
-                    await this.graphPanel.requestFullscreen();
-                } else if (this.graphPanel.webkitRequestFullscreen) {
-                    await this.graphPanel.webkitRequestFullscreen();
-                } else if (this.graphPanel.mozRequestFullScreen) {
-                    await this.graphPanel.mozRequestFullScreen();
-                } else if (this.graphPanel.msRequestFullscreen) {
-                    await this.graphPanel.msRequestFullscreen();
-                }
-            } else {
-                // Exit fullscreen
-                if (document.exitFullscreen) {
-                    await document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    await document.webkitExitFullscreen();
-                } else if (document.mozCancelFullScreen) {
-                    await document.mozCancelFullScreen();
-                } else if (document.msExitFullscreen) {
-                    await document.msExitFullscreen();
-                }
-            }
-        } catch (error) {
-            console.error('Fullscreen error:', error);
+    toggleFullscreen() {
+        if (!this.isFullscreen) {
+            this.enterFullscreen();
+        } else {
+            this.exitFullscreen();
         }
     }
 
     /**
-     * Handle fullscreen state changes (including ESC key exit)
+     * Enter custom fullscreen modal mode
+     */
+    enterFullscreen() {
+        if (this.isFullscreen) return;
+
+        // Create fullscreen overlay
+        this.fullscreenOverlay = document.createElement('div');
+        this.fullscreenOverlay.id = 'graph-fullscreen-overlay';
+        this.fullscreenOverlay.innerHTML = `
+            <div class="fullscreen-header">
+                <h3>Argumentation Graph</h3>
+                <div class="fullscreen-controls">
+                    <button id="fullscreen-legend-btn" class="fullscreen-btn" aria-label="Toggle legend">📖 Legend</button>
+                    <button id="fullscreen-reset-btn" class="fullscreen-btn" aria-label="Reset layout">🔄 Reset Layout</button>
+                    <button id="fullscreen-close-btn" class="fullscreen-btn fullscreen-close" aria-label="Exit fullscreen">✕ Close</button>
+                </div>
+            </div>
+            <div id="fullscreen-graph-container" class="fullscreen-graph-container"></div>
+        `;
+
+        document.body.appendChild(this.fullscreenOverlay);
+
+        // Move graph canvas to fullscreen container
+        const fullscreenContainer = document.getElementById('fullscreen-graph-container');
+        const graphCanvas = document.getElementById('cy');
+        const graphHeader = this.graphPanel.querySelector('.graph-header');
+        const graphLegend = this.graphPanel.querySelector('.graph-legend');
+        const isolatedBanner = this.graphPanel.querySelector('.isolated-assumptions-banner');
+
+        // Store original parent for restoration
+        this.originalParent = graphCanvas.parentNode;
+        this.originalNextSibling = graphCanvas.nextSibling;
+
+        // Move elements to fullscreen
+        fullscreenContainer.appendChild(graphCanvas);
+        if (graphLegend) {
+            fullscreenContainer.appendChild(graphLegend);
+        }
+        if (isolatedBanner && !isolatedBanner.hasAttribute('hidden')) {
+            fullscreenContainer.appendChild(isolatedBanner);
+        }
+
+        // Setup close handlers
+        const closeBtn = document.getElementById('fullscreen-close-btn');
+        const resetBtn = document.getElementById('fullscreen-reset-btn');
+        const legendBtn = document.getElementById('fullscreen-legend-btn');
+
+        closeBtn.addEventListener('click', () => this.exitFullscreen());
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => this.resetLayout());
+        }
+
+        if (legendBtn && graphLegend) {
+            legendBtn.addEventListener('click', () => {
+                graphLegend.toggleAttribute('hidden');
+                legendBtn.setAttribute('aria-expanded', !graphLegend.hasAttribute('hidden'));
+            });
+        }
+
+        // ESC key handler
+        this.escHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.exitFullscreen();
+            }
+        };
+        document.addEventListener('keydown', this.escHandler);
+
+        // Update state
+        this.isFullscreen = true;
+        if (this.fullscreenBtn) {
+            this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
+            this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
+        }
+
+        // Trigger network redraw to adjust to new container size
+        setTimeout(() => {
+            if (this.network) {
+                this.network.fit();
+            }
+        }, 100);
+    }
+
+    /**
+     * Exit custom fullscreen modal mode
+     */
+    exitFullscreen() {
+        if (!this.isFullscreen) return;
+
+        const graphCanvas = document.getElementById('cy');
+        const graphLegend = this.graphPanel.querySelector('.graph-legend');
+        const isolatedBanner = document.getElementById('isolated-assumptions-banner');
+
+        // Restore elements to original positions
+        if (this.originalNextSibling) {
+            this.originalParent.insertBefore(graphCanvas, this.originalNextSibling);
+        } else {
+            this.originalParent.appendChild(graphCanvas);
+        }
+
+        // Restore legend and banner if they exist
+        const panelContent = this.graphPanel.querySelector('.panel-content');
+        if (graphLegend && !panelContent.contains(graphLegend)) {
+            // Insert after graph-header
+            const graphHeader = panelContent.querySelector('.graph-header');
+            graphHeader.insertAdjacentElement('afterend', graphLegend);
+        }
+
+        if (isolatedBanner && !panelContent.contains(isolatedBanner)) {
+            // Insert after graph canvas
+            graphCanvas.insertAdjacentElement('afterend', isolatedBanner);
+        }
+
+        // Remove overlay
+        if (this.fullscreenOverlay) {
+            this.fullscreenOverlay.remove();
+            this.fullscreenOverlay = null;
+        }
+
+        // Remove ESC handler
+        if (this.escHandler) {
+            document.removeEventListener('keydown', this.escHandler);
+            this.escHandler = null;
+        }
+
+        // Update state
+        this.isFullscreen = false;
+        if (this.fullscreenBtn) {
+            this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
+            this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
+        }
+
+        // Trigger network redraw
+        setTimeout(() => {
+            if (this.network) {
+                this.network.fit();
+            }
+        }, 100);
+    }
+
+    /**
+     * Handle fullscreen state changes (legacy - no longer used with custom overlay)
      */
     handleFullscreenChange() {
-        const isCurrentlyFullscreen = !!(
-            document.fullscreenElement ||
-            document.webkitFullscreenElement ||
-            document.mozFullScreenElement ||
-            document.msFullscreenElement
-        );
-
-        this.isFullscreen = isCurrentlyFullscreen;
-
-        // Update button text and icon
-        if (this.fullscreenBtn) {
-            if (this.isFullscreen) {
-                this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
-                this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
-                this.graphPanel.classList.add('fullscreen-active');
-            } else {
-                this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
-                this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
-                this.graphPanel.classList.remove('fullscreen-active');
-            }
-        }
-
-        // Redraw graph to fit new container size
-        if (this.network) {
-            setTimeout(() => {
-                this.network.fit({
-                    animation: {
-                        duration: 300,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-            }, 100);
-        }
+        // Legacy method - kept for compatibility but not used with custom overlay
     }
 }
