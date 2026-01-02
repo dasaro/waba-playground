@@ -887,11 +887,10 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .graph-panel:-webkit-full-screen .graph-canvas,
 .graph-panel:-moz-full-screen .graph-canvas,
 .graph-panel:-ms-fullscreen .graph-canvas {
-    flex: 1 1 auto !important;
+    flex: 1 1 0 !important;
     width: 100% !important;
-    height: 100% !important;
-    min-height: unset !important;
-    max-height: unset !important;
+    min-height: 0 !important;
+    max-height: none !important;
     border: none;
     border-radius: 0;
 }
@@ -906,6 +905,29 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     left: var(--space-lg);
     max-width: 300px;
     z-index: 100;
+}
+
+/* Isolated assumptions banner in fullscreen */
+.graph-panel:fullscreen .isolated-assumptions-banner,
+.graph-panel:-webkit-full-screen .isolated-assumptions-banner,
+.graph-panel:-moz-full-screen .isolated-assumptions-banner,
+.graph-panel:-ms-fullscreen .isolated-assumptions-banner {
+    position: absolute;
+    bottom: var(--space-md);
+    left: var(--space-md);
+    right: var(--space-md);
+    z-index: 100;
+}
+
+/* Empty state in fullscreen */
+.graph-panel:fullscreen .graph-empty-state,
+.graph-panel:-webkit-full-screen .graph-empty-state,
+.graph-panel:-moz-full-screen .graph-empty-state,
+.graph-panel:-ms-fullscreen .graph-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .graph-mode-selector {
