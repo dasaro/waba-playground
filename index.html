@@ -218,7 +218,7 @@
                     <div class="editor-header">
                         <div class="editor-controls">
                             <select id="input-mode" class="select input-mode-select" aria-label="Select input mode">
-                                <option value="simple">Simple Mode (ABA)</option>
+                                <option value="simple">Simple Editor</option>
                                 <option value="advanced">Advanced Mode (ASP)</option>
                             </select>
                         </div>
@@ -242,6 +242,12 @@ contrary(b, c_b)."></textarea>
 
                     <!-- Simple Mode: Structured Input -->
                     <div id="simple-mode" class="simple-mode">
+                        <!-- Description Box (shown only if description exists) -->
+                        <div id="simple-description-box" class="simple-description-box" hidden>
+                            <div class="description-header">Description</div>
+                            <div id="simple-description-content" class="description-content"></div>
+                        </div>
+
                         <div class="simple-grid">
                             <div class="simple-field">
                                 <label for="assumptions-input">Assumptions (one per line)</label>

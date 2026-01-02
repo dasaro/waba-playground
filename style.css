@@ -596,6 +596,35 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     font-size: var(--text-sm);
 }
 
+/* Simple Editor Description Box */
+.simple-description-box {
+    background: var(--bg-secondary);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.simple-description-box[hidden] {
+    display: none;
+}
+
+.description-header {
+    font-weight: 700;
+    font-size: var(--text-base);
+    color: var(--primary-color);
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.description-content {
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
 /* ===================================
    Output Display
    =================================== */

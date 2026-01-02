@@ -496,16 +496,18 @@ class WABAPlayground {
             if (e.target.value === 'simple') {
                 this.simpleMode.style.display = 'block';
                 this.editor.style.display = 'none';
+                this.updateSimpleDescription();
             } else {
                 this.simpleMode.style.display = 'none';
                 this.editor.style.display = 'block';
             }
         });
 
-        // Update graph when simple mode inputs change
+        // Update graph and description when simple mode inputs change
         [this.assumptionsInput, this.rulesInput, this.contrariesInput, this.weightsInput].forEach(input => {
             input.addEventListener('input', () => {
                 if (this.inputMode.value === 'simple') {
+                    this.updateSimpleDescription();
                     this.regenerateGraph();
                 }
             });
@@ -521,13 +523,139 @@ class WABAPlayground {
         }
     }
 
-    parseSimpleABA() {
-        const rulesText = this.rulesInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const assumptions = this.assumptionsInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const contrariesText = this.contrariesInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const weightsText = this.weightsInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
+    updateSimpleDescription() {
+        // Extract description from all inputs
+        const allInputs = [
+            ...this.assumptionsInput.value.split('\n'),
+            ...this.rulesInput.value.split('\n'),
+            ...this.contrariesInput.value.split('\n'),
+            ...this.weightsInput.value.split('\n')
+        ];
 
-        let clingoCode = '%% Auto-generated from Simple ABA Mode\n\n';
+        let description = [];
+        let inCommentBlock = false;
+
+        for (let line of allInputs) {
+            const trimmed = line.trim();
+
+            // Check for % COMMENT marker
+            if (trimmed === '% COMMENT') {
+                inCommentBlock = true;
+                continue;
+            }
+
+            // If we're in a comment block and line starts with %
+            if (inCommentBlock && trimmed.startsWith('%')) {
+                const content = trimmed.substring(1).trim();
+                description.push(content);
+                continue;
+            }
+
+            // If we hit a non-comment line, we're out of the comment block
+            if (inCommentBlock && !trimmed.startsWith('%')) {
+                break; // Stop looking once we exit the comment block
+            }
+        }
+
+        // Update description box
+        const descriptionBox = document.getElementById('simple-description-box');
+        const descriptionContent = document.getElementById('simple-description-content');
+
+        if (description.length > 0) {
+            descriptionContent.textContent = description.join('\n');
+            descriptionBox.removeAttribute('hidden');
+        } else {
+            descriptionBox.setAttribute('hidden', '');
+        }
+    }
+
+    parseSimpleABA() {
+        // Helper function to extract description and filter comments
+        const extractDescriptionAndFilter = (lines) => {
+            let description = [];
+            let inCommentBlock = false;
+            const filtered = [];
+
+            for (let line of lines) {
+                const trimmed = line.trim();
+
+                // Check for % COMMENT marker
+                if (trimmed === '% COMMENT') {
+                    inCommentBlock = true;
+                    continue;
+                }
+
+                // If we're in a comment block and line starts with %
+                if (inCommentBlock && trimmed.startsWith('%')) {
+                    // Remove leading % and trim
+                    const content = trimmed.substring(1).trim();
+                    description.push(content);
+                    continue;
+                }
+
+                // If we hit a non-comment line, we're out of the comment block
+                if (inCommentBlock && !trimmed.startsWith('%')) {
+                    inCommentBlock = false;
+                }
+
+                // Skip inline comments
+                if (trimmed.startsWith('%')) {
+                    continue;
+                }
+
+                // Add non-comment, non-empty lines to filtered
+                if (trimmed) {
+                    filtered.push(trimmed);
+                }
+            }
+
+            return { description, filtered };
+        };
+
+        // Process all inputs and extract description
+        const allInputs = [
+            ...this.assumptionsInput.value.split('\n'),
+            ...this.rulesInput.value.split('\n'),
+            ...this.contrariesInput.value.split('\n'),
+            ...this.weightsInput.value.split('\n')
+        ];
+
+        const { description, filtered: allFiltered } = extractDescriptionAndFilter(allInputs);
+
+        // Update description box
+        const descriptionBox = document.getElementById('simple-description-box');
+        const descriptionContent = document.getElementById('simple-description-content');
+
+        if (description.length > 0) {
+            descriptionContent.textContent = description.join('\n');
+            descriptionBox.removeAttribute('hidden');
+        } else {
+            descriptionBox.setAttribute('hidden', '');
+        }
+
+        // Now process each input separately, filtering out comments
+        const assumptionsResult = extractDescriptionAndFilter(this.assumptionsInput.value.split('\n'));
+        const rulesResult = extractDescriptionAndFilter(this.rulesInput.value.split('\n'));
+        const contrariesResult = extractDescriptionAndFilter(this.contrariesInput.value.split('\n'));
+        const weightsResult = extractDescriptionAndFilter(this.weightsInput.value.split('\n'));
+
+        const rulesText = rulesResult.filtered;
+        const assumptions = assumptionsResult.filtered;
+        const contrariesText = contrariesResult.filtered;
+        const weightsText = weightsResult.filtered;
+
+        let clingoCode = '%% Auto-generated from Simple Editor\n';
+
+        // Add description as comments if it exists
+        if (description.length > 0) {
+            clingoCode += '%% COMMENT\n';
+            description.forEach(line => {
+                clingoCode += `%% ${line}\n`;
+            });
+            clingoCode += '\n';
+        }
+
+        clingoCode += '\n';
 
         // Parse assumptions
         if (assumptions.length > 0) {
