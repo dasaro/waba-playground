@@ -619,10 +619,24 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 .description-content {
+    width: 100%;
+    background: var(--bg-primary);
     color: var(--text-primary);
     font-size: var(--text-sm);
     line-height: 1.6;
     white-space: pre-wrap;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.description-content:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 /* Add Comment Button */

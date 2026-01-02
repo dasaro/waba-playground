@@ -519,6 +519,17 @@ class WABAPlayground {
             addCommentBtn.addEventListener('click', () => this.addDescriptionTemplate());
         }
 
+        // Sync description textarea changes back to % COMMENT block
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.addEventListener('input', () => {
+                if (this.inputMode.value === 'simple') {
+                    this.syncDescriptionToComment();
+                    this.regenerateGraph();
+                }
+            });
+        }
+
         // Initial state
         if (this.inputMode.value === 'simple') {
             this.simpleMode.style.display = 'block';
@@ -570,7 +581,7 @@ class WABAPlayground {
         const addCommentContainer = document.getElementById('simple-add-comment-container');
 
         if (description.length > 0) {
-            descriptionContent.textContent = description.join('\n');
+            descriptionContent.value = description.join('\n');
             descriptionBox.removeAttribute('hidden');
             addCommentContainer.setAttribute('hidden', '');
         } else {
@@ -597,6 +608,56 @@ class WABAPlayground {
 
         // Update the description box
         this.updateSimpleDescription();
+    }
+
+    syncDescriptionToComment() {
+        // Sync description textarea content back to % COMMENT block in assumptions input
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (!descriptionContent) return;
+
+        const newDescription = descriptionContent.value;
+        const lines = this.assumptionsInput.value.split('\n');
+
+        // Find and replace the % COMMENT block
+        let inCommentBlock = false;
+        let commentStartIndex = -1;
+        let commentEndIndex = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+
+            if (trimmed === '% COMMENT') {
+                inCommentBlock = true;
+                commentStartIndex = i;
+                continue;
+            }
+
+            if (inCommentBlock && !trimmed.startsWith('%')) {
+                commentEndIndex = i;
+                break;
+            }
+        }
+
+        // If we found the comment block, replace it
+        if (commentStartIndex !== -1) {
+            if (commentEndIndex === -1) {
+                commentEndIndex = lines.length;
+            }
+
+            // Build new comment block
+            const newCommentLines = ['% COMMENT'];
+            newDescription.split('\n').forEach(line => {
+                newCommentLines.push('% ' + line);
+            });
+            newCommentLines.push(''); // Add blank line after comment
+
+            // Replace old comment block with new one
+            lines.splice(commentStartIndex, commentEndIndex - commentStartIndex, ...newCommentLines);
+
+            // Update the assumptions input (without triggering input event)
+            const oldValue = this.assumptionsInput.value;
+            this.assumptionsInput.value = lines.join('\n');
+        }
     }
 
     parseSimpleABA() {
@@ -657,7 +718,7 @@ class WABAPlayground {
         const descriptionContent = document.getElementById('simple-description-content');
 
         if (description.length > 0) {
-            descriptionContent.textContent = description.join('\n');
+            descriptionContent.value = description.join('\n');
             descriptionBox.removeAttribute('hidden');
         } else {
             descriptionBox.setAttribute('hidden', '');
