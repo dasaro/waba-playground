@@ -856,17 +856,72 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+}
+
+.fullscreen-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    flex: 1;
+    min-width: 0;
 }
 
 .fullscreen-header h3 {
     margin: 0;
     font-size: var(--text-xl);
     color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.fullscreen-mode-selector {
+    display: flex;
+    gap: 0;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.fullscreen-mode-selector .mode-option {
+    position: relative;
+    cursor: pointer;
+    margin: 0;
+}
+
+.fullscreen-mode-selector .mode-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.fullscreen-mode-selector .mode-option span {
+    display: block;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.fullscreen-mode-selector .mode-option input[type="radio"]:checked + span {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.fullscreen-mode-selector .mode-option:hover span {
+    color: var(--text-primary);
 }
 
 .fullscreen-controls {
     display: flex;
     gap: var(--space-sm);
+    flex-wrap: wrap;
 }
 
 .fullscreen-btn {

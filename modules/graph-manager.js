@@ -1301,12 +1301,34 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         // Create fullscreen overlay
         this.fullscreenOverlay = document.createElement('div');
         this.fullscreenOverlay.id = 'graph-fullscreen-overlay';
+
+        // Get current graph mode from the regular graph header
+        const currentMode = document.querySelector('input[name="graph-mode"]:checked')?.value || 'assumption-direct';
+
         this.fullscreenOverlay.innerHTML = `
             <div class="fullscreen-header">
-                <h3>Argumentation Graph</h3>
+                <div class="fullscreen-header-left">
+                    <h3>Argumentation Graph</h3>
+                    <div class="fullscreen-mode-selector" role="radiogroup" aria-label="Graph visualization mode">
+                        <label class="mode-option">
+                            <input type="radio" name="fullscreen-graph-mode" value="standard" ${currentMode === 'standard' ? 'checked' : ''} aria-label="Standard graph mode">
+                            <span>Standard</span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="fullscreen-graph-mode" value="assumption-direct" ${currentMode === 'assumption-direct' ? 'checked' : ''} aria-label="Assumption-Direct mode">
+                            <span>Assumption-Direct</span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="fullscreen-graph-mode" value="assumption-branching" ${currentMode === 'assumption-branching' ? 'checked' : ''} aria-label="Assumption-Branching mode">
+                            <span>Assumption-Branching</span>
+                        </label>
+                    </div>
+                </div>
                 <div class="fullscreen-controls">
+                    <button id="fullscreen-export-png-btn" class="fullscreen-btn" aria-label="Export graph as PNG">💾 PNG</button>
+                    <button id="fullscreen-export-pdf-btn" class="fullscreen-btn" aria-label="Export graph as PDF">📄 PDF</button>
                     <button id="fullscreen-legend-btn" class="fullscreen-btn" aria-label="Toggle legend">📖 Legend</button>
-                    <button id="fullscreen-reset-btn" class="fullscreen-btn" aria-label="Reset layout">🔄 Reset Layout</button>
+                    <button id="fullscreen-reset-btn" class="fullscreen-btn" aria-label="Reset layout">🔄 Reset</button>
                     <button id="fullscreen-close-btn" class="fullscreen-btn fullscreen-close" aria-label="Exit fullscreen">✕ Close</button>
                 </div>
             </div>
@@ -1344,10 +1366,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         // Populate extensions panel
         this.populateExtensionsPanel();
 
-        // Setup close handlers
+        // Setup control handlers
         const closeBtn = document.getElementById('fullscreen-close-btn');
         const resetBtn = document.getElementById('fullscreen-reset-btn');
         const legendBtn = document.getElementById('fullscreen-legend-btn');
+        const exportPngBtn = document.getElementById('fullscreen-export-png-btn');
+        const exportPdfBtn = document.getElementById('fullscreen-export-pdf-btn');
 
         closeBtn.addEventListener('click', () => this.exitFullscreen());
 
@@ -1361,6 +1385,37 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 legendBtn.setAttribute('aria-expanded', !graphLegend.hasAttribute('hidden'));
             });
         }
+
+        // Export buttons - trigger the original export buttons
+        if (exportPngBtn) {
+            exportPngBtn.addEventListener('click', () => {
+                const originalBtn = document.getElementById('export-png-btn');
+                if (originalBtn) originalBtn.click();
+            });
+        }
+
+        if (exportPdfBtn) {
+            exportPdfBtn.addEventListener('click', () => {
+                const originalBtn = document.getElementById('export-pdf-btn');
+                if (originalBtn) originalBtn.click();
+            });
+        }
+
+        // Graph mode selector - sync with original and trigger regeneration
+        const fullscreenModeRadios = document.querySelectorAll('input[name="fullscreen-graph-mode"]');
+        fullscreenModeRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    // Sync with the original graph mode selector
+                    const originalRadio = document.querySelector(`input[name="graph-mode"][value="${e.target.value}"]`);
+                    if (originalRadio) {
+                        originalRadio.checked = true;
+                        // Trigger change event on original to regenerate graph
+                        originalRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            });
+        });
 
         // ESC key handler
         this.escHandler = (e) => {
