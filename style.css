@@ -941,6 +941,87 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     z-index: 100;
 }
 
+/* ===================================
+   Fullscreen Extensions Panel
+   =================================== */
+
+.fullscreen-extensions-panel {
+    background: var(--bg-secondary);
+    border-top: 2px solid var(--border-color);
+    padding: var(--space-sm) var(--space-md);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    overflow-x: auto;
+    max-height: 80px;
+}
+
+.fullscreen-extensions-panel[hidden] {
+    display: none;
+}
+
+.extensions-panel-header {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.fullscreen-extensions-list {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.fullscreen-extension-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-xs) var(--space-md);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.fullscreen-extension-btn:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.fullscreen-extension-btn.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.extension-number {
+    font-weight: 600;
+    font-size: var(--text-sm);
+}
+
+.extension-cost {
+    font-size: var(--text-xs);
+    opacity: 0.9;
+}
+
+.fullscreen-extension-btn.active .extension-number,
+.fullscreen-extension-btn.active .extension-cost {
+    color: white;
+}
+
 /* Fullscreen mode styling */
 .graph-panel:fullscreen,
 .graph-panel:-webkit-full-screen,

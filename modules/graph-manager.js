@@ -1311,6 +1311,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 </div>
             </div>
             <div id="fullscreen-graph-container" class="fullscreen-graph-container"></div>
+            <div id="fullscreen-extensions-panel" class="fullscreen-extensions-panel" hidden>
+                <div class="extensions-panel-header">
+                    <span>Extensions:</span>
+                </div>
+                <div id="fullscreen-extensions-list" class="fullscreen-extensions-list"></div>
+            </div>
         `;
 
         document.body.appendChild(this.fullscreenOverlay);
@@ -1334,6 +1340,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         if (isolatedBanner && !isolatedBanner.hasAttribute('hidden')) {
             fullscreenContainer.appendChild(isolatedBanner);
         }
+
+        // Populate extensions panel
+        this.populateExtensionsPanel();
 
         // Setup close handlers
         const closeBtn = document.getElementById('fullscreen-close-btn');
@@ -1431,6 +1440,74 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 this.network.fit();
             }
         }, 100);
+    }
+
+    /**
+     * Populate the extensions panel with available extensions
+     */
+    populateExtensionsPanel() {
+        const extensionsPanel = document.getElementById('fullscreen-extensions-panel');
+        const extensionsList = document.getElementById('fullscreen-extensions-list');
+
+        if (!extensionsPanel || !extensionsList) return;
+
+        // Find all extension headers in the output panel
+        const answerHeaders = document.querySelectorAll('.answer-header');
+
+        if (answerHeaders.length === 0) {
+            // No extensions, keep panel hidden
+            extensionsPanel.setAttribute('hidden', '');
+            return;
+        }
+
+        // Show panel
+        extensionsPanel.removeAttribute('hidden');
+
+        // Clear existing content
+        extensionsList.innerHTML = '';
+
+        // Create a button for each extension
+        answerHeaders.forEach((header, index) => {
+            const extensionId = header.dataset.extensionId;
+            const answerNumber = parseInt(extensionId);
+            const isActive = header.classList.contains('active-extension');
+
+            // Extract cost/reward from the badge
+            const costBadge = header.querySelector('.extension-cost-badge');
+            const costText = costBadge ? costBadge.textContent.trim() : '';
+
+            // Create extension button
+            const button = document.createElement('button');
+            button.className = 'fullscreen-extension-btn';
+            button.dataset.extensionId = extensionId;
+
+            if (isActive) {
+                button.classList.add('active');
+            }
+
+            button.innerHTML = `
+                <span class="extension-number">Ext ${answerNumber}</span>
+                ${costText ? `<span class="extension-cost">${costText}</span>` : ''}
+            `;
+
+            // Click handler - trigger the original header's click
+            button.addEventListener('click', () => {
+                // Trigger click on the original header to reuse all existing logic
+                header.click();
+
+                // Update active state on all fullscreen buttons
+                document.querySelectorAll('.fullscreen-extension-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+
+                // Check if this extension is now active (could have been toggled off)
+                if (header.classList.contains('active-extension')) {
+                    button.classList.add('active');
+                }
+            });
+
+            extensionsList.appendChild(button);
+        });
     }
 
     /**
