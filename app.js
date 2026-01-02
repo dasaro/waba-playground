@@ -736,12 +736,8 @@ class WABAPlayground {
         if (contrariesText.length > 0) {
             clingoCode += '%% Contraries\n';
             contrariesText.forEach(line => {
-                // Support both formats: (assumption, contrary) and assumption: contrary (legacy)
-                let match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
-                if (!match) {
-                    // Try legacy format: assumption: contrary
-                    match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*([a-z_][a-z0-9_]*)$/i);
-                }
+                // Format: (assumption, contrary)
+                const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
                 if (match) {
                     const [, assumption, contrary] = match;
                     clingoCode += `contrary(${assumption}, ${contrary}).\n`;
