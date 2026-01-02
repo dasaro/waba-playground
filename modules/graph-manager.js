@@ -383,6 +383,12 @@ export class GraphManager {
         this.currentFrameworkCode = frameworkCode;
         this.currentGraphMode = graphMode;
 
+        // Show empty state if no framework code
+        if (!frameworkCode || !frameworkCode.trim()) {
+            UIManager.showGraphEmptyState();
+            return;
+        }
+
         if (graphMode === 'assumption-direct') {
             await this.updateGraphAssumptionLevelDirect(frameworkCode, clingoManager);
         } else if (graphMode === 'assumption-branching') {
@@ -722,8 +728,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
+            // Show/hide empty state based on graph content
+            if (visNodes.length === 0 && visEdges.length === 0) {
+                UIManager.showGraphEmptyState();
+            } else {
+                UIManager.hideGraphEmptyState();
+            }
 
             // Update banner with isolated assumptions
             this.updateIsolatedAssumptionsOverlay();
@@ -743,6 +753,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating graph:', error);
+            UIManager.showGraphEmptyState();
         }
     }
 
@@ -981,8 +992,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
+            // Show/hide empty state based on graph content
+            if (visNodes.length === 0 && visEdges.length === 0) {
+                UIManager.showGraphEmptyState();
+            } else {
+                UIManager.hideGraphEmptyState();
+            }
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
@@ -1003,6 +1018,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating assumption-level graph (direct):', error);
+            UIManager.showGraphEmptyState();
         }
     }
 
@@ -1312,8 +1328,12 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
+            // Show/hide empty state based on graph content
+            if (visNodes.length === 0 && visEdges.length === 0) {
+                UIManager.showGraphEmptyState();
+            } else {
+                UIManager.hideGraphEmptyState();
+            }
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
@@ -1334,6 +1354,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating assumption-level graph:', error);
+            UIManager.showGraphEmptyState();
         }
     }
 
