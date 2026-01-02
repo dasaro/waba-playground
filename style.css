@@ -953,8 +953,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     display: flex;
     align-items: center;
     gap: var(--space-md);
-    overflow-x: auto;
     max-height: 80px;
+    min-height: 60px;
+    overflow: visible;
 }
 
 .fullscreen-extensions-panel[hidden] {
@@ -972,8 +973,31 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .fullscreen-extensions-list {
     display: flex;
     gap: var(--space-sm);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    padding-bottom: var(--space-xs);
+}
+
+/* Scrollbar styling for extensions list */
+.fullscreen-extensions-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.fullscreen-extensions-list::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.fullscreen-extensions-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.fullscreen-extensions-list::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
 }
 
 .fullscreen-extension-btn {
@@ -991,6 +1015,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     cursor: pointer;
     transition: all 0.2s;
     min-width: 80px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .fullscreen-extension-btn:hover {
