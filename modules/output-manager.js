@@ -833,4 +833,23 @@ export class OutputManager {
         // Note: Don't clear isolatedNodes here - they're populated by updateGraph()
         // and needed for displayResults()
     }
+
+    clearPreviousRun(onResetGraph) {
+        // Clear all information from previous WABA run
+
+        // Clear output and stats
+        this.clearOutput();
+
+        // Clear stored data
+        this.storedWitnesses = null;
+        this.storedMetricsData = null;
+        this.activeExtensionId = null;
+
+        // Reset graph highlighting
+        if (onResetGraph) {
+            onResetGraph();
+        }
+
+        this.log('🔄 Previous run cleared. Ready to load new framework.', 'info');
+    }
 }

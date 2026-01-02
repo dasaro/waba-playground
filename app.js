@@ -226,7 +226,8 @@ class WABAPlayground {
                 e,
                 (code) => this.updateGraph(code),
                 () => this.parseSimpleABA(),
-                (msg, type) => this.outputManager.log(msg, type)
+                (msg, type) => this.outputManager.log(msg, type),
+                () => this.clearPreviousRun()
             );
         });
 
@@ -350,7 +351,8 @@ class WABAPlayground {
                     syntheticEvent,
                     (code) => this.updateGraph(code),
                     () => this.parseSimpleABA(),
-                    (msg, type) => this.outputManager.log(msg, type)
+                    (msg, type) => this.outputManager.log(msg, type),
+                    () => this.clearPreviousRun()
                 );
             }
         });
@@ -544,6 +546,13 @@ class WABAPlayground {
 
         // Delegate to GraphManager
         await this.graphManager.updateGraph(frameworkCode, mode, this.clingoManager);
+    }
+
+    clearPreviousRun() {
+        // Clear all information from previous WABA run when loading new file
+        this.outputManager.clearPreviousRun(() => {
+            this.graphManager.resetGraphColors();
+        });
     }
 
     // Note: Graph update methods have been moved to GraphManager class in modules/graph-manager.js
