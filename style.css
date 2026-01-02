@@ -844,6 +844,26 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     min-width: 120px;
 }
 
+/* Textual Result */
+.textual-result {
+    width: 100%;
+    margin-top: var(--space-xs);
+}
+
+.textual-result-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    font-family: 'Courier New', monospace;
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    overflow-x: auto;
+    line-height: 1.6;
+    margin: 0;
+}
+
 .chip {
     display: inline-flex;
     align-items: center;

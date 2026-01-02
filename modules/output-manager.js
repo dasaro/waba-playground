@@ -217,6 +217,36 @@ export class OutputManager {
             contentHTML += '</div></div>';
         }
 
+        // Textual Result (Clingo-like format)
+        contentHTML += '<div class="assumption-section">';
+        contentHTML += '<span class="section-label">Textual Result:</span>';
+        contentHTML += '<div class="textual-result">';
+
+        // Build textual representation
+        let textualLines = [];
+
+        // In assumptions
+        if (parsed.in.length > 0) {
+            const inPredicates = parsed.in.map(a => `in(${a})`).join('. ') + '.';
+            textualLines.push(inPredicates);
+        }
+
+        // Supported atoms (all of them, including assumptions)
+        if (parsed.supported && parsed.supported.length > 0) {
+            const supportedPredicates = parsed.supported.map(a => `supported(${a})`).join('. ') + '.';
+            textualLines.push(supportedPredicates);
+        }
+
+        // Cost information
+        if (parsed.cost !== null) {
+            textualLines.push(`cost(${parsed.cost}).`);
+        }
+
+        // Join all lines with newlines
+        const textualResult = textualLines.join('\n');
+        contentHTML += `<pre class="textual-result-content">${textualResult}</pre>`;
+        contentHTML += '</div></div>';
+
         contentHTML += '</div>';
 
         answerDiv.innerHTML = `
