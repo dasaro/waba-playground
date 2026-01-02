@@ -513,10 +513,17 @@ class WABAPlayground {
             });
         });
 
+        // Add Description button
+        const addCommentBtn = document.getElementById('simple-add-comment-btn');
+        if (addCommentBtn) {
+            addCommentBtn.addEventListener('click', () => this.addDescriptionTemplate());
+        }
+
         // Initial state
         if (this.inputMode.value === 'simple') {
             this.simpleMode.style.display = 'block';
             this.editor.style.display = 'none';
+            this.updateSimpleDescription();
         } else {
             this.simpleMode.style.display = 'none';
             this.editor.style.display = 'block';
@@ -557,16 +564,39 @@ class WABAPlayground {
             }
         }
 
-        // Update description box
+        // Update description box and add comment button
         const descriptionBox = document.getElementById('simple-description-box');
         const descriptionContent = document.getElementById('simple-description-content');
+        const addCommentContainer = document.getElementById('simple-add-comment-container');
 
         if (description.length > 0) {
             descriptionContent.textContent = description.join('\n');
             descriptionBox.removeAttribute('hidden');
+            addCommentContainer.setAttribute('hidden', '');
         } else {
             descriptionBox.setAttribute('hidden', '');
+            addCommentContainer.removeAttribute('hidden');
         }
+    }
+
+    addDescriptionTemplate() {
+        // Add % COMMENT template to the first textarea (assumptions)
+        const template = '% COMMENT\n% Enter your description here\n\n';
+        const currentValue = this.assumptionsInput.value;
+
+        // If there's already content, prepend the template
+        if (currentValue.trim()) {
+            this.assumptionsInput.value = template + currentValue;
+        } else {
+            this.assumptionsInput.value = template;
+        }
+
+        // Focus the assumptions textarea and position cursor after the template
+        this.assumptionsInput.focus();
+        this.assumptionsInput.setSelectionRange(template.length - 1, template.length - 1);
+
+        // Update the description box
+        this.updateSimpleDescription();
     }
 
     parseSimpleABA() {
@@ -706,7 +736,12 @@ class WABAPlayground {
         if (contrariesText.length > 0) {
             clingoCode += '%% Contraries\n';
             contrariesText.forEach(line => {
-                const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+                // Support both formats: (assumption, contrary) and assumption: contrary (legacy)
+                let match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+                if (!match) {
+                    // Try legacy format: assumption: contrary
+                    match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*([a-z_][a-z0-9_]*)$/i);
+                }
                 if (match) {
                     const [, assumption, contrary] = match;
                     clingoCode += `contrary(${assumption}, ${contrary}).\n`;

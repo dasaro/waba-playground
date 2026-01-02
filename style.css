@@ -625,6 +625,44 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     white-space: pre-wrap;
 }
 
+/* Add Comment Button */
+.simple-add-comment-container {
+    margin-bottom: var(--space-lg);
+    display: flex;
+    justify-content: center;
+}
+
+.simple-add-comment-container[hidden] {
+    display: none;
+}
+
+.add-comment-btn {
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-lg);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.add-comment-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.add-comment-btn:active {
+    transform: translateY(0);
+}
+
 /* ===================================
    Output Display
    =================================== */

@@ -248,6 +248,13 @@ contrary(b, c_b)."></textarea>
                             <div id="simple-description-content" class="description-content"></div>
                         </div>
 
+                        <!-- Add Comment Button (shown only when no description exists) -->
+                        <div id="simple-add-comment-container" class="simple-add-comment-container">
+                            <button id="simple-add-comment-btn" class="add-comment-btn">
+                                <span>💬 Add Description</span>
+                            </button>
+                        </div>
+
                         <div class="simple-grid">
                             <div class="simple-field">
                                 <label for="assumptions-input">Assumptions (one per line)</label>
@@ -262,9 +269,9 @@ c"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label for="contraries-input">Contraries (format: assumption: contrary)</label>
-                                <textarea id="contraries-input" class="simple-textarea" placeholder="a: c_a
-b: c_b"></textarea>
+                                <label for="contraries-input">Contraries (format: (assumption, contrary))</label>
+                                <textarea id="contraries-input" class="simple-textarea" placeholder="(a, c_a)
+(b, c_b)"></textarea>
                             </div>
 
                             <div class="simple-field">
