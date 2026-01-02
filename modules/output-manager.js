@@ -133,9 +133,16 @@ export class OutputManager {
                 parts.push(parsed.in.map(a => `in(${a})`).join('. ') + '.');
             }
 
-            // Supported atoms
+            // Supported atoms with weights
             if (parsed.supported && parsed.supported.length > 0) {
-                parts.push(parsed.supported.map(a => `supported(${a})`).join('. ') + '.');
+                const supportedPredicates = parsed.supported.map(a => {
+                    const weight = parsed.weights.get(a);
+                    if (weight !== undefined) {
+                        return `supported_with_weight(${a}, ${weight})`;
+                    }
+                    return `supported(${a})`;
+                }).join('. ') + '.';
+                parts.push(supportedPredicates);
             }
 
             // Discarded attacks
@@ -315,9 +322,15 @@ export class OutputManager {
             textualLines.push(inPredicates);
         }
 
-        // Supported atoms (all of them, including assumptions)
+        // Supported atoms with weights
         if (parsed.supported && parsed.supported.length > 0) {
-            const supportedPredicates = parsed.supported.map(a => `supported(${a})`).join('. ') + '.';
+            const supportedPredicates = parsed.supported.map(a => {
+                const weight = parsed.weights.get(a);
+                if (weight !== undefined) {
+                    return `supported_with_weight(${a}, ${weight})`;
+                }
+                return `supported(${a})`;
+            }).join('. ') + '.';
             textualLines.push(supportedPredicates);
         }
 
