@@ -13,6 +13,7 @@ import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
 import { ClingoManager } from './modules/clingo-manager.js?v=20260101-1';
 import { OutputManager } from './modules/output-manager.js?v=20260101-1';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
+import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
 import { examples } from './examples.js?v=20260101-1';
 
 class WABAPlayground {
@@ -162,6 +163,9 @@ class WABAPlayground {
 
         // Initialize font size
         this.fontManager.initFontSize();
+
+        // Run metrics unit tests (silent in production)
+        MetricsManager.runUnitTest();
 
         // Initialize Clingo
         await this.clingoManager.initClingo();

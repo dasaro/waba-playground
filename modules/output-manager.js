@@ -2,6 +2,7 @@
  * OutputManager - Handles result display, parsing, and logging
  */
 import { PopupManager } from './popup-manager.js?v=20260101-1';
+import { MetricsManager } from './metrics-manager.js?v=20260102-1';
 
 export class OutputManager {
     constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {
@@ -82,8 +83,9 @@ export class OutputManager {
             // Store witnesses for download
             this.storedWitnesses = witnessesWithCosts;
 
-            // Add download button if there are extensions
+            // Add download and metrics buttons if there are extensions
             this.addDownloadButton();
+            this.addMetricsButton();
         }
 
         // Display statistics
@@ -177,6 +179,81 @@ export class OutputManager {
 
         link.click();
         URL.revokeObjectURL(url);
+    }
+
+    addMetricsButton() {
+        // Check if button already exists
+        if (document.getElementById('metrics-toggle-btn')) {
+            return;
+        }
+
+        // Create metrics toggle button
+        const button = document.createElement('button');
+        button.id = 'metrics-toggle-btn';
+        button.className = 'metrics-toggle-btn';
+        button.innerHTML = '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+        button.addEventListener('click', () => this.toggleMetrics(button));
+
+        // Insert after download button
+        const downloadBtn = document.getElementById('download-all-extensions-btn');
+        if (downloadBtn && downloadBtn.nextSibling) {
+            this.output.insertBefore(button, downloadBtn.nextSibling);
+        } else {
+            this.output.insertBefore(button, this.output.firstChild);
+        }
+    }
+
+    toggleMetrics(button) {
+        const metricsDiv = document.getElementById('metrics-display');
+
+        if (metricsDiv) {
+            // Toggle visibility
+            const isHidden = metricsDiv.style.display === 'none';
+            metricsDiv.style.display = isHidden ? 'block' : 'none';
+            button.innerHTML = isHidden
+                ? '<span class="toggle-icon">▼</span> Hide Metrics'
+                : '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+            button.classList.toggle('expanded', isHidden);
+        } else {
+            // Compute and display metrics for the first time
+            this.displayMetrics(button);
+        }
+    }
+
+    displayMetrics(button) {
+        if (!this.storedWitnesses || this.storedWitnesses.length === 0) {
+            return;
+        }
+
+        // Compute metrics
+        const metricsData = MetricsManager.computeMetrics(this.storedWitnesses);
+
+        if (!metricsData) {
+            this.log('⚠️ Could not compute metrics', 'warning');
+            return;
+        }
+
+        // Create metrics display div
+        let metricsDiv = document.getElementById('metrics-display');
+        if (!metricsDiv) {
+            metricsDiv = document.createElement('div');
+            metricsDiv.id = 'metrics-display';
+            metricsDiv.style.display = 'block';
+
+            // Insert after metrics button
+            if (button.nextSibling) {
+                this.output.insertBefore(metricsDiv, button.nextSibling);
+            } else {
+                this.output.appendChild(metricsDiv);
+            }
+        }
+
+        // Render metrics HTML
+        metricsDiv.innerHTML = MetricsManager.formatMetricsHTML(metricsData);
+
+        // Update button text
+        button.innerHTML = '<span class="toggle-icon">▼</span> Hide Metrics';
+        button.classList.add('expanded');
     }
 
     appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null) {
