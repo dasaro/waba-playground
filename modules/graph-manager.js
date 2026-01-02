@@ -393,6 +393,75 @@ export class GraphManager {
     }
 
     /**
+     * Filter sets to keep only minimal attacking sets
+     * For each attack, keep only the minimal set(s) that can perform it
+     * @param {Map} setsMap - Map of all sets with their attacks
+     * @returns {Map} - Filtered map containing only minimal attacking sets
+     */
+    filterToMinimalAttackingSets(setsMap) {
+        const minimalSets = new Map();
+
+        // Always include the empty set as a baseline
+        const emptySet = setsMap.get('∅');
+        if (emptySet) {
+            minimalSets.set('∅', emptySet);
+        }
+
+        // Group sets by the attacks they perform
+        // attackKey -> [sets that perform this attack]
+        const attackGroups = new Map();
+
+        setsMap.forEach(set => {
+            set.attacks.forEach(attack => {
+                // Create unique key for this attack: "attackingElement -> assumption"
+                const attackKey = `${attack.attackingElement}->${attack.assumption}`;
+
+                if (!attackGroups.has(attackKey)) {
+                    attackGroups.set(attackKey, []);
+                }
+                attackGroups.get(attackKey).push(set);
+            });
+        });
+
+        // For each attack, keep only minimal sets that can perform it
+        attackGroups.forEach((sets, attackKey) => {
+            // Sort by set size (smaller sets first)
+            sets.sort((a, b) => a.assumptions.length - b.assumptions.length);
+
+            // Filter to minimal sets: keep a set if no smaller set is a subset
+            const minimalForThisAttack = [];
+            for (const set of sets) {
+                const isMinimal = !minimalForThisAttack.some(minSet =>
+                    this.isSubsetOf(minSet.assumptions, set.assumptions)
+                );
+                if (isMinimal) {
+                    minimalForThisAttack.push(set);
+                }
+            }
+
+            // Add these minimal sets to the result
+            minimalForThisAttack.forEach(set => {
+                if (!minimalSets.has(set.id)) {
+                    minimalSets.set(set.id, set);
+                }
+            });
+        });
+
+        return minimalSets;
+    }
+
+    /**
+     * Check if setA is a subset of setB
+     * @param {Array} setA - First set (as sorted array)
+     * @param {Array} setB - Second set (as sorted array)
+     * @returns {boolean} - True if setA ⊆ setB
+     */
+    isSubsetOf(setA, setB) {
+        if (setA.length > setB.length) return false;
+        return setA.every(elem => setB.includes(elem));
+    }
+
+    /**
      * Standard graph visualization: sets as attack graph
      * @param {string} frameworkCode - The WABA framework code
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
@@ -506,11 +575,15 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 });
             }
 
+            // Filter to keep only minimal attacking sets
+            const minimalSetsMap = this.filterToMinimalAttackingSets(setsMap);
+            console.log(`Filtered from ${setsMap.size} total sets to ${minimalSetsMap.size} minimal attacking sets`);
+
             // Build graph elements
             const elements = [];
 
             // Add nodes for each set
-            setsMap.forEach(set => {
+            minimalSetsMap.forEach(set => {
                 const label = set.id;
                 const isEmptySet = set.assumptions.length === 0;
                 const hasAttacks = set.attacks.length > 0;
@@ -528,7 +601,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             });
 
             // Add attack edges from sets to assumptions
-            setsMap.forEach(set => {
+            minimalSetsMap.forEach(set => {
                 set.attacks.forEach(attack => {
                     const { assumption, attackingElement, weight, derivedBy } = attack;
                     const displayWeight = weight === Infinity ? '#sup' : (weight === -Infinity ? '#inf' : weight);
@@ -538,7 +611,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
                     // Attack edge from set to assumption (shown as attacking any set containing that assumption)
                     // For visualization, we'll create edges to all sets that contain the attacked assumption
-                    setsMap.forEach(targetSet => {
+                    minimalSetsMap.forEach(targetSet => {
                         if (targetSet.assumptions.includes(assumption)) {
                             // Include attacking element in edge ID to ensure uniqueness
                             const edgeId = `${set.id}-attacks-${targetSet.id}-via-${assumption}-from-${attackingElement}`;
