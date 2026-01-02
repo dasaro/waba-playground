@@ -138,6 +138,18 @@ export class OutputManager {
                 parts.push(parsed.supported.map(a => `supported(${a})`).join('. ') + '.');
             }
 
+            // Discarded attacks
+            if (parsed.discarded && parsed.discarded.length > 0) {
+                const discardedPredicates = parsed.discarded.map(attack => {
+                    const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+                    if (match) {
+                        return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                    }
+                    return attack;
+                }).join('. ') + '.';
+                parts.push(discardedPredicates);
+            }
+
             // Cost
             if (item.cost !== null) {
                 parts.push(`cost(${item.cost}).`);
@@ -307,6 +319,18 @@ export class OutputManager {
         if (parsed.supported && parsed.supported.length > 0) {
             const supportedPredicates = parsed.supported.map(a => `supported(${a})`).join('. ') + '.';
             textualLines.push(supportedPredicates);
+        }
+
+        // Discarded attacks
+        if (parsed.discarded && parsed.discarded.length > 0) {
+            const discardedPredicates = parsed.discarded.map(attack => {
+                const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+                if (match) {
+                    return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                }
+                return attack;
+            }).join('. ') + '.';
+            textualLines.push(discardedPredicates);
         }
 
         // Cost information
