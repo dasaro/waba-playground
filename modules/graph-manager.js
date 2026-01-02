@@ -399,10 +399,11 @@ export class GraphManager {
     }
 
     /**
-     * Filter sets to keep only minimal attacking sets
+     * Filter sets to keep only minimal attacking sets AND sets that are attacked
      * For each attack, keep only the minimal set(s) that can perform it
+     * Also include minimal sets that contain attacked assumptions
      * @param {Map} setsMap - Map of all sets with their attacks
-     * @returns {Map} - Filtered map containing only minimal attacking sets
+     * @returns {Map} - Filtered map containing minimal attacking sets and attacked sets
      */
     filterToMinimalAttackingSets(setsMap) {
         const minimalSets = new Map();
@@ -416,11 +417,15 @@ export class GraphManager {
         // Group sets by the attacks they perform
         // attackKey -> [sets that perform this attack]
         const attackGroups = new Map();
+        const attackedAssumptions = new Set(); // Track which assumptions are attacked
 
         setsMap.forEach(set => {
             set.attacks.forEach(attack => {
                 // Create unique key for this attack: "attackingElement -> assumption"
                 const attackKey = `${attack.attackingElement}->${attack.assumption}`;
+
+                // Track attacked assumption
+                attackedAssumptions.add(attack.assumption);
 
                 if (!attackGroups.has(attackKey)) {
                     attackGroups.set(attackKey, []);
@@ -451,6 +456,28 @@ export class GraphManager {
                     minimalSets.set(set.id, set);
                 }
             });
+        });
+
+        // Also include minimal sets containing attacked assumptions (to show attack targets)
+        attackedAssumptions.forEach(assumption => {
+            // Find all sets containing this assumption
+            const setsWithAssumption = [];
+            setsMap.forEach(set => {
+                if (set.assumptions.includes(assumption)) {
+                    setsWithAssumption.push(set);
+                }
+            });
+
+            // Sort by size and add minimal ones
+            setsWithAssumption.sort((a, b) => a.assumptions.length - b.assumptions.length);
+
+            // Add the minimal set containing this assumption
+            if (setsWithAssumption.length > 0) {
+                const minSet = setsWithAssumption[0]; // Smallest set containing this assumption
+                if (!minimalSets.has(minSet.id)) {
+                    minimalSets.set(minSet.id, minSet);
+                }
+            }
         });
 
         return minimalSets;
