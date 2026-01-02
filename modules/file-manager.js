@@ -129,7 +129,7 @@ export class FileManager {
             // Parse contraries
             match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
             if (match) {
-                contraries.push(`${match[1]}: ${match[2]}`);
+                contraries.push(`(${match[1]}, ${match[2]})`);
                 return;
             }
 
@@ -268,17 +268,17 @@ export class FileManager {
                 continue;
             }
 
-            // Check for weight first (has colon + number): "d : 10" or "a: 80"
-            const weightMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
-            if (weightMatch) {
-                weights.push(line);
+            // Check for contrary first (has parentheses): "(a, c_a)" format
+            const contraryMatch = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+            if (contraryMatch) {
+                contraries.push(line);
                 continue;
             }
 
-            // Check for contrary (has colon + atom): "a: attack_element" format
-            const contraryMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*([a-z_][a-z0-9_]*)$/i);
-            if (contraryMatch) {
-                contraries.push(line);
+            // Check for weight (has colon + number): "d : 10" or "a: 80"
+            const weightMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
+            if (weightMatch) {
+                weights.push(line);
                 continue;
             }
 
