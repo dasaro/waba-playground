@@ -301,17 +301,20 @@ c_a: 70"></textarea>
                     <div class="graph-header">
                         <div class="graph-mode-selector" role="radiogroup" aria-label="Graph visualization mode">
                             <label class="mode-option">
-                                <input type="radio" name="graph-mode" value="standard" aria-label="Standard graph mode - show all nodes and edges">
+                                <input type="radio" name="graph-mode" value="standard" checked aria-label="Standard graph mode - show all nodes and edges">
                                 <span>Standard</span>
                             </label>
+                            <!-- TEMPORARILY DISABLED: Assumption-Direct and Assumption-Branching modes (contain bugs) -->
+                            <!--
                             <label class="mode-option">
-                                <input type="radio" name="graph-mode" value="assumption-direct" checked aria-label="Assumption-Direct mode - show only assumptions with direct attacks">
+                                <input type="radio" name="graph-mode" value="assumption-direct" aria-label="Assumption-Direct mode - show only assumptions with direct attacks">
                                 <span>Assumption-Direct</span>
                             </label>
                             <label class="mode-option">
                                 <input type="radio" name="graph-mode" value="assumption-branching" aria-label="Assumption-Branching mode - show assumptions with full branching attack paths">
                                 <span>Assumption-Branching</span>
                             </label>
+                            -->
                         </div>
                         <div class="graph-controls">
                             <button id="reset-layout-btn" class="clear-btn" aria-label="Reset graph layout">🔄 Reset Layout</button>

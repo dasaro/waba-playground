@@ -1378,7 +1378,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
         this.fullscreenOverlay.id = 'graph-fullscreen-overlay';
 
         // Get current graph mode from the regular graph header
-        const currentMode = document.querySelector('input[name="graph-mode"]:checked')?.value || 'assumption-direct';
+        const currentMode = document.querySelector('input[name="graph-mode"]:checked')?.value || 'standard';
 
         this.fullscreenOverlay.innerHTML = `
             <div class="fullscreen-header">
@@ -1389,6 +1389,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             <input type="radio" name="fullscreen-graph-mode" value="standard" ${currentMode === 'standard' ? 'checked' : ''} aria-label="Standard graph mode">
                             <span>Standard</span>
                         </label>
+                        <!-- TEMPORARILY DISABLED: Assumption-Direct and Assumption-Branching modes (contain bugs) -->
+                        <!--
                         <label class="mode-option">
                             <input type="radio" name="fullscreen-graph-mode" value="assumption-direct" ${currentMode === 'assumption-direct' ? 'checked' : ''} aria-label="Assumption-Direct mode">
                             <span>Assumption-Direct</span>
@@ -1397,6 +1399,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             <input type="radio" name="fullscreen-graph-mode" value="assumption-branching" ${currentMode === 'assumption-branching' ? 'checked' : ''} aria-label="Assumption-Branching mode">
                             <span>Assumption-Branching</span>
                         </label>
+                        -->
                     </div>
                 </div>
                 <div class="fullscreen-controls">
