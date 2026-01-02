@@ -2,7 +2,7 @@
  * MetricsManager - Computes domain-independent entailment and recommendation metrics
  *
  * Provides:
- * - Global metrics: optCost, gap, epsilon, diversity
+ * - Global metrics: optCost, gap, near-optimal set S (level-based selection)
  * - Per-atom metrics: brave/cautious entailment, regret, penalty, possibilistic measures
  */
 
@@ -25,11 +25,8 @@ export class MetricsManager {
             contraries: w.parsed.contraries || new Map()
         }));
 
-        // Compute global metrics
-        const global = this.computeGlobalMetrics(models);
-
-        // Get epsilon-bounded set S
-        const S = models.filter(m => m.cost <= global.optCost + global.epsilon);
+        // Compute global metrics and near-optimal set S
+        const { global, S } = this.computeGlobalMetrics(models);
 
         // Collect all atoms (union of inAtoms and support keys)
         const allAtoms = this.collectAllAtoms(models);
@@ -37,49 +34,61 @@ export class MetricsManager {
         // Check if we have support data
         const hasSupport = models.some(m => m.support && m.support.size > 0);
 
+        // Get global contraries map (from first model that has it)
+        const contraries = models.find(m => m.contraries && m.contraries.size > 0)?.contraries || new Map();
+
         // Compute per-atom metrics
         const atoms = {};
         allAtoms.forEach(atom => {
-            atoms[atom] = this.computeAtomMetrics(atom, models, S, global.optCost, hasSupport);
+            atoms[atom] = this.computeAtomMetrics(atom, models, S, global.optCost, hasSupport, contraries);
         });
 
         return { global, atoms, hasSupport };
     }
 
     /**
-     * Compute global metrics
+     * Compute global metrics and select near-optimal set S
+     * Uses level-based selection: K=2 initial levels, extend to m=3 models minimum
      */
-    static computeGlobalMetrics(models) {
-        // Sort models by cost
-        const costs = models.map(m => m.cost).sort((a, b) => a - b);
-        const uniqueCosts = [...new Set(costs)].sort((a, b) => a - b);
+    static computeGlobalMetrics(models, K = 2, m = 3) {
+        // Get sorted distinct cost levels
+        const costs = models.map(model => model.cost);
+        const levels = [...new Set(costs)].sort((a, b) => a - b);
 
-        const optCost = uniqueCosts[0];
-        const secondBestCost = uniqueCosts.length > 1 ? uniqueCosts[1] : null;
+        const optCost = levels[0];
+        const secondBestCost = levels.length > 1 ? levels[1] : null;
         const gap = secondBestCost !== null ? secondBestCost - optCost : null;
 
-        // Choose epsilon
-        let epsilon;
-        if (gap !== null && gap > 0) {
-            epsilon = Math.min(5, gap);
-        } else {
-            epsilon = 5;
+        // Start with K cost levels
+        let allowedLevels = levels.slice(0, Math.min(K, levels.length));
+        let S = models.filter(m => allowedLevels.includes(m.cost));
+
+        // Coverage fallback: extend until |S| >= m
+        let levelIndex = K;
+        while (S.length < m && levelIndex < levels.length) {
+            allowedLevels.push(levels[levelIndex]);
+            S = models.filter(m => allowedLevels.includes(m.cost));
+            levelIndex++;
         }
 
-        // Get epsilon-bounded set S
-        const S = models.filter(m => m.cost <= optCost + epsilon);
+        // Derive epsilon implicitly (for display only)
+        const epsilon = allowedLevels.length > 0 ? Math.max(...allowedLevels) - optCost : 0;
 
         // Compute diversity (average pairwise Jaccard distance)
         const diversity = this.computeDiversity(S);
 
         return {
-            optCost,
-            secondBestCost,
-            gap,
-            epsilon,
-            numInS: S.length,
-            diversity,
-            totalModels: models.length
+            global: {
+                optCost,
+                secondBestCost,
+                gap,
+                epsilon,  // Derived, for display only
+                allowedLevels,
+                numInS: S.length,
+                diversity,
+                totalModels: models.length
+            },
+            S  // Return S for use in per-atom metrics
         };
     }
 
@@ -133,15 +142,16 @@ export class MetricsManager {
 
     /**
      * Compute per-atom metrics
+     * Boolean entailment over S; cost sensitivity over ALL models
      */
-    static computeAtomMetrics(atom, models, S, optCost, hasSupport) {
+    static computeAtomMetrics(atom, models, S, optCost, hasSupport, contraries) {
         const metrics = {};
 
-        // Boolean entailment (epsilon-bounded)
-        metrics.brave_eps = S.some(m => m.inAtoms.has(atom));
-        metrics.cautious_eps = S.every(m => m.inAtoms.has(atom));
+        // Boolean entailment (S-bounded)
+        metrics.brave_S = S.some(m => m.inAtoms.has(atom));
+        metrics.cautious_S = S.length > 0 && S.every(m => m.inAtoms.has(atom));
 
-        // Cost sensitivity
+        // Cost sensitivity (computed over ALL models, not just S)
         const costsWithAtom = models
             .filter(m => m.inAtoms.has(atom))
             .map(m => m.cost);
@@ -157,7 +167,7 @@ export class MetricsManager {
             ? metrics.bestWith - metrics.bestWithout
             : null;
 
-        // Support-based metrics (if available)
+        // Support-based metrics (if available, computed over S)
         if (hasSupport) {
             const supportsInS = S.map(m => {
                 if (m.support instanceof Map) {
@@ -166,46 +176,33 @@ export class MetricsManager {
                 return 0;
             });
 
-            metrics.Pi_eps = supportsInS.length > 0 ? Math.max(...supportsInS) : 0;
-            metrics.N_eps = supportsInS.length > 0 ? Math.min(...supportsInS) : 0;
+            metrics.Pi_S = supportsInS.length > 0 ? Math.max(...supportsInS) : 0;
+            metrics.N_S = supportsInS.length > 0 ? Math.min(...supportsInS) : 0;
 
             // Net support (if contrary exists)
-            const contraryAtom = this.findContrary(atom, models);
+            const contraryAtom = contraries instanceof Map ? contraries.get(atom) : null;
             if (contraryAtom) {
                 const netSupports = S.map(m => {
                     const sp = (m.support instanceof Map ? m.support.get(atom) : null) || 0;
                     const sc = (m.support instanceof Map ? m.support.get(contraryAtom) : null) || 0;
                     return sp - sc;
                 });
-                metrics.net_eps = netSupports.length > 0
+                metrics.net_S = netSupports.length > 0
                     ? netSupports.reduce((a, b) => a + b, 0) / netSupports.length
                     : null;
                 metrics.contrary = contraryAtom;
             } else {
-                metrics.net_eps = null;
+                metrics.net_S = null;
                 metrics.contrary = null;
             }
         } else {
-            metrics.Pi_eps = null;
-            metrics.N_eps = null;
-            metrics.net_eps = null;
+            metrics.Pi_S = null;
+            metrics.N_S = null;
+            metrics.net_S = null;
             metrics.contrary = null;
         }
 
         return metrics;
-    }
-
-    /**
-     * Find the contrary atom for a given atom
-     */
-    static findContrary(atom, models) {
-        for (const m of models) {
-            if (m.contraries instanceof Map) {
-                const contrary = m.contraries.get(atom);
-                if (contrary) return contrary;
-            }
-        }
-        return null;
     }
 
     /**
@@ -222,13 +219,14 @@ export class MetricsManager {
 
         // Global metrics section
         html += '<div class="metrics-section">';
-        html += '<h3 class="metrics-header">Global Metrics</h3>';
+        html += '<h3 class="metrics-header">Global Metrics (Near-Optimal Set S)</h3>';
         html += '<div class="metrics-grid">';
         html += `<div class="metric-item"><span class="metric-label">Optimal Cost:</span> <span class="metric-value">${global.optCost.toFixed(2)}</span></div>`;
         html += `<div class="metric-item"><span class="metric-label">Second-Best Cost:</span> <span class="metric-value">${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}</span></div>`;
         html += `<div class="metric-item"><span class="metric-label">Gap (Δ):</span> <span class="metric-value">${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Epsilon (ε):</span> <span class="metric-value">${global.epsilon.toFixed(2)}</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Models in S (≤ opt+ε):</span> <span class="metric-value">${global.numInS} / ${global.totalModels}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Cost Levels in S:</span> <span class="metric-value">[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Derived ε (max-opt):</span> <span class="metric-value">${global.epsilon.toFixed(2)}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Models in S:</span> <span class="metric-value">${global.numInS} / ${global.totalModels}</span></div>`;
         html += `<div class="metric-item"><span class="metric-label">Diversity:</span> <span class="metric-value">${global.diversity.toFixed(3)}</span></div>`;
         html += '</div></div>';
 
@@ -241,15 +239,15 @@ export class MetricsManager {
         // Table header
         html += '<thead><tr>';
         html += '<th>Atom</th>';
-        html += '<th title="Exists in at least one model in S">Brave (ε)</th>';
-        html += '<th title="Exists in all models in S">Cautious (ε)</th>';
-        html += '<th title="Best cost with atom - optimal cost">Regret</th>';
-        html += '<th title="Best cost with atom - best cost without atom">Penalty</th>';
+        html += '<th title="Exists in at least one model in S">Brave<sub>S</sub></th>';
+        html += '<th title="Exists in all models in S">Cautious<sub>S</sub></th>';
+        html += '<th title="Best cost with atom - optimal cost (all models)">Regret</th>';
+        html += '<th title="Best cost with atom - best cost without atom (all models)">Penalty</th>';
 
         if (hasSupport) {
-            html += '<th title="Max support in S (possibilistic plausibility)">Π<sub>ε</sub></th>';
-            html += '<th title="Min support in S (necessity)">N<sub>ε</sub></th>';
-            html += '<th title="Avg(support(p) - support(contrary)) in S">Net<sub>ε</sub></th>';
+            html += '<th title="Max support in S (possibilistic plausibility)">Π<sub>S</sub></th>';
+            html += '<th title="Min support in S (necessity)">N<sub>S</sub></th>';
+            html += '<th title="Avg(support(p) - support(contrary)) in S">Net<sub>S</sub></th>';
             html += '<th>Contrary</th>';
         }
 
@@ -266,15 +264,15 @@ export class MetricsManager {
 
             html += '<tr>';
             html += `<td class="atom-name">${atom}</td>`;
-            html += `<td class="metric-bool">${m.brave_eps ? '✓' : '✗'}</td>`;
-            html += `<td class="metric-bool">${m.cautious_eps ? '✓' : '✗'}</td>`;
+            html += `<td class="metric-bool">${m.brave_S ? '✓' : '✗'}</td>`;
+            html += `<td class="metric-bool">${m.cautious_S ? '✓' : '✗'}</td>`;
             html += `<td class="metric-num">${m.regret !== null ? m.regret.toFixed(2) : '∞'}</td>`;
             html += `<td class="metric-num">${m.penalty !== null ? m.penalty.toFixed(2) : 'N/A'}</td>`;
 
             if (hasSupport) {
-                html += `<td class="metric-num">${m.Pi_eps !== null ? m.Pi_eps.toFixed(2) : 'N/A'}</td>`;
-                html += `<td class="metric-num">${m.N_eps !== null ? m.N_eps.toFixed(2) : 'N/A'}</td>`;
-                html += `<td class="metric-num">${m.net_eps !== null ? m.net_eps.toFixed(2) : 'N/A'}</td>`;
+                html += `<td class="metric-num">${m.Pi_S !== null ? m.Pi_S.toFixed(2) : 'N/A'}</td>`;
+                html += `<td class="metric-num">${m.N_S !== null ? m.N_S.toFixed(2) : 'N/A'}</td>`;
+                html += `<td class="metric-num">${m.net_S !== null ? m.net_S.toFixed(2) : 'N/A'}</td>`;
                 html += `<td class="contrary-name">${m.contrary || '-'}</td>`;
             }
 
@@ -292,58 +290,58 @@ export class MetricsManager {
 
     /**
      * Unit test with mocked dataset
+     * Validates: S selection (K=2 levels, coverage to m=3), brave/cautious/regret/penalty
      */
     static runUnitTest() {
         console.log('🧪 Running MetricsManager unit tests...');
 
-        // Mock dataset
-        const mockWitnesses = [
-            {
-                cost: 10,
-                parsed: {
-                    in: ['a', 'b'],
-                    weights: new Map([['a', 100], ['b', 80], ['c', 0]]),
-                    contraries: new Map([['a', 'c_a'], ['b', 'c_b']])
-                }
-            },
-            {
-                cost: 10,
-                parsed: {
-                    in: ['a', 'c'],
-                    weights: new Map([['a', 100], ['c', 60]]),
-                    contraries: new Map([['a', 'c_a'], ['c', 'c_c']])
-                }
-            },
-            {
-                cost: 15,
-                parsed: {
-                    in: ['b', 'd'],
-                    weights: new Map([['b', 90], ['d', 50]]),
-                    contraries: new Map([['b', 'c_b'], ['d', 'c_d']])
-                }
-            }
+        // Test 1: Basic S selection with K=2 levels, already have m=3 models
+        const mock1 = [
+            { cost: 10, parsed: { in: ['a', 'b'], weights: new Map([['a', 100], ['b', 80]]), contraries: new Map([['a', 'c_a'], ['b', 'c_b']]) } },
+            { cost: 10, parsed: { in: ['a', 'c'], weights: new Map([['a', 100], ['c', 60]]), contraries: new Map([['a', 'c_a']]) } },
+            { cost: 15, parsed: { in: ['b', 'd'], weights: new Map([['b', 90], ['d', 50]]), contraries: new Map([['b', 'c_b']]) } },
+            { cost: 20, parsed: { in: ['e'], weights: new Map([['e', 40]]), contraries: new Map() } }
         ];
 
-        const metrics = MetricsManager.computeMetrics(mockWitnesses);
+        const metrics1 = MetricsManager.computeMetrics(mock1);
 
-        // Test global metrics
-        console.assert(metrics.global.optCost === 10, '❌ optCost should be 10');
-        console.assert(metrics.global.secondBestCost === 15, '❌ secondBestCost should be 15');
-        console.assert(metrics.global.gap === 5, '❌ gap should be 5');
-        console.assert(metrics.global.epsilon === 5, '❌ epsilon should be 5');
-        console.assert(metrics.global.numInS === 3, '❌ numInS should be 3');
+        // Global: K=2 levels [10, 15], m=3 already satisfied
+        console.assert(metrics1.global.optCost === 10, '❌ Test 1: optCost should be 10');
+        console.assert(metrics1.global.secondBestCost === 15, '❌ Test 1: secondBestCost should be 15');
+        console.assert(metrics1.global.gap === 5, '❌ Test 1: gap should be 5');
+        console.assert(JSON.stringify(metrics1.global.allowedLevels) === JSON.stringify([10, 15]), '❌ Test 1: allowedLevels should be [10, 15]');
+        console.assert(metrics1.global.epsilon === 5, '❌ Test 1: derived epsilon should be 5');
+        console.assert(metrics1.global.numInS === 3, '❌ Test 1: numInS should be 3 (2 at cost 10, 1 at cost 15)');
 
-        // Test per-atom metrics
-        console.assert(metrics.atoms['a'].brave_eps === true, '❌ a should be brave');
-        console.assert(metrics.atoms['a'].cautious_eps === false, '❌ a should not be cautious');
-        console.assert(metrics.atoms['a'].regret === 0, '❌ a regret should be 0');
+        // Per-atom: brave/cautious over S (cost 10, 10, 15)
+        console.assert(metrics1.atoms['a'].brave_S === true, '❌ Test 1: a should be brave_S');
+        console.assert(metrics1.atoms['a'].cautious_S === false, '❌ Test 1: a should not be cautious_S (not in 3rd model)');
+        console.assert(metrics1.atoms['b'].brave_S === true, '❌ Test 1: b should be brave_S');
+        console.assert(metrics1.atoms['b'].cautious_S === false, '❌ Test 1: b not in all S models');
+        console.assert(metrics1.atoms['e'].brave_S === false, '❌ Test 1: e not in S (cost 20 not in allowedLevels)');
 
-        console.assert(metrics.atoms['d'].brave_eps === true, '❌ d should be brave');
-        console.assert(metrics.atoms['d'].regret === 5, '❌ d regret should be 5');
+        // Cost sensitivity: regret/penalty over ALL models
+        console.assert(metrics1.atoms['a'].regret === 0, '❌ Test 1: a regret should be 0 (best at opt)');
+        console.assert(metrics1.atoms['d'].regret === 5, '❌ Test 1: d regret should be 5 (15-10)');
+        console.assert(metrics1.atoms['e'].regret === 10, '❌ Test 1: e regret should be 10 (20-10)');
 
-        // Test support metrics
-        console.assert(metrics.atoms['a'].Pi_eps === 100, '❌ a Pi_eps should be 100');
-        console.assert(metrics.atoms['a'].N_eps === 100, '❌ a N_eps should be 100');
+        // Support metrics over S
+        console.assert(metrics1.atoms['a'].Pi_S === 100, '❌ Test 1: a Pi_S should be 100');
+        console.assert(metrics1.atoms['a'].N_S === 100, '❌ Test 1: a N_S should be 100');
+
+        // Test 2: Coverage fallback (fewer than m=3 models in K=2 levels)
+        const mock2 = [
+            { cost: 5, parsed: { in: ['x'], weights: new Map(), contraries: new Map() } },
+            { cost: 10, parsed: { in: ['y'], weights: new Map(), contraries: new Map() } },
+            { cost: 15, parsed: { in: ['z'], weights: new Map(), contraries: new Map() } }
+        ];
+
+        const metrics2 = MetricsManager.computeMetrics(mock2);
+
+        // Should have K=2 levels initially [5, 10], but only 2 models, so extend to [5, 10, 15] to reach m=3
+        console.assert(metrics2.global.numInS === 3, '❌ Test 2: numInS should be 3 (coverage fallback)');
+        console.assert(JSON.stringify(metrics2.global.allowedLevels) === JSON.stringify([5, 10, 15]), '❌ Test 2: allowedLevels should extend to [5, 10, 15]');
+        console.assert(metrics2.global.epsilon === 10, '❌ Test 2: derived epsilon should be 10 (15-5)');
 
         console.log('✅ All unit tests passed!');
     }
