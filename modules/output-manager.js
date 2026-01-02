@@ -111,8 +111,14 @@ export class OutputManager {
         button.innerHTML = '💾 Download All Extensions';
         button.addEventListener('click', () => this.downloadAllExtensions());
 
-        // Insert at the top of output
-        this.output.insertBefore(button, this.output.firstChild);
+        // Insert into export section (Analysis panel)
+        const exportSection = document.getElementById('export-section');
+        if (exportSection) {
+            exportSection.appendChild(button);
+        } else {
+            // Fallback: insert at top of output if export section not found
+            this.output.insertBefore(button, this.output.firstChild);
+        }
     }
 
     downloadAllExtensions() {
@@ -194,12 +200,18 @@ export class OutputManager {
         button.innerHTML = '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
         button.addEventListener('click', () => this.toggleMetrics(button));
 
-        // Insert after download button
-        const downloadBtn = document.getElementById('download-all-extensions-btn');
-        if (downloadBtn && downloadBtn.nextSibling) {
-            this.output.insertBefore(button, downloadBtn.nextSibling);
+        // Insert into metrics section (Analysis panel)
+        const metricsSection = document.getElementById('metrics-section');
+        if (metricsSection) {
+            metricsSection.appendChild(button);
         } else {
-            this.output.insertBefore(button, this.output.firstChild);
+            // Fallback: insert after download button if metrics section not found
+            const downloadBtn = document.getElementById('download-all-extensions-btn');
+            if (downloadBtn && downloadBtn.nextSibling) {
+                this.output.insertBefore(button, downloadBtn.nextSibling);
+            } else {
+                this.output.insertBefore(button, this.output.firstChild);
+            }
         }
     }
 
@@ -240,11 +252,17 @@ export class OutputManager {
             metricsDiv.id = 'metrics-display';
             metricsDiv.style.display = 'block';
 
-            // Insert after metrics button
-            if (button.nextSibling) {
-                this.output.insertBefore(metricsDiv, button.nextSibling);
+            // Insert into metrics section (Analysis panel)
+            const metricsSection = document.getElementById('metrics-section');
+            if (metricsSection && button.parentNode === metricsSection) {
+                metricsSection.appendChild(metricsDiv);
             } else {
-                this.output.appendChild(metricsDiv);
+                // Fallback: insert after button
+                if (button.nextSibling) {
+                    button.parentNode.insertBefore(metricsDiv, button.nextSibling);
+                } else {
+                    button.parentNode.appendChild(metricsDiv);
+                }
             }
         }
 
@@ -790,6 +808,13 @@ export class OutputManager {
     clearOutput() {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
+
+        // Clear analysis panel sections
+        const exportSection = document.getElementById('export-section');
+        const metricsSection = document.getElementById('metrics-section');
+        if (exportSection) exportSection.innerHTML = '';
+        if (metricsSection) metricsSection.innerHTML = '';
+
         // Show output empty state after clearing
         if (window.showOutputEmptyState) {
             window.showOutputEmptyState();

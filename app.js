@@ -122,6 +122,7 @@ class WABAPlayground {
         this.panelManager.registerPanel('editor', true);
         this.panelManager.registerPanel('graph', true);
         this.panelManager.registerPanel('output', true);
+        this.panelManager.registerPanel('analysis', true);
 
         // Initialize File Manager
         this.fileManager = new FileManager(

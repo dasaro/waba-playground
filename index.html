@@ -426,6 +426,30 @@ c_a: 70"></textarea>
             </div>
         </div>
 
+        <!-- Analysis Panel (Full Width) -->
+        <section class="panel analysis-panel" data-panel="analysis" role="region" aria-label="Analysis Tools">
+            <div class="panel-header">
+                <h3>📊 Analysis & Export</h3>
+                <button class="panel-toggle" aria-expanded="true" aria-controls="panel-analysis-content" aria-label="Toggle analysis panel">
+                    <span class="icon-collapse">−</span>
+                    <span class="icon-expand" hidden>+</span>
+                </button>
+            </div>
+            <div class="panel-content" id="panel-analysis-content">
+                <div class="analysis-content">
+                    <!-- Export section (download buttons will be added here dynamically) -->
+                    <div id="export-section" class="analysis-section">
+                        <!-- Download buttons inserted by JS -->
+                    </div>
+
+                    <!-- Metrics section (metrics display will be added here dynamically) -->
+                    <div id="metrics-section" class="analysis-section">
+                        <!-- Metrics button and display inserted by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Footer -->
         <div class="footer">
             <p>WABA Playground | Powered by <a href="https://potassco.org/clingo/" target="_blank">Clingo</a> & <a href="https://visjs.github.io/vis-network/" target="_blank">vis.js</a></p>

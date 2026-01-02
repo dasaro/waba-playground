@@ -2919,3 +2919,109 @@ button:focus-visible,
     color: #ffffff;
     border-color: #667eea;
 }
+
+/* ================================================================
+   Analysis Panel (Full Width)
+   ================================================================ */
+
+.analysis-panel {
+    grid-column: 1 / -1; /* Span all columns */
+    margin-top: var(--space-lg);
+}
+
+.analysis-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.analysis-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+/* Export section styling */
+#export-section {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-lg);
+}
+
+#export-section:empty {
+    display: none;
+}
+
+/* Metrics section styling */
+#metrics-section:empty {
+    display: none;
+}
+
+/* Button row for download/metrics */
+.analysis-section > .download-all-btn,
+.analysis-section > .metrics-toggle-btn {
+    align-self: flex-start;
+}
+
+/* Improve metrics table spacing in full-width layout */
+.analysis-panel .metrics-table-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.analysis-panel .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Hide analysis panel when empty */
+.analysis-panel:has(#export-section:empty):has(#metrics-section:empty) {
+    display: none;
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 768px) {
+    .analysis-content {
+        gap: var(--space-lg);
+    }
+}
+
+/* Light theme adjustments for Analysis panel */
+[data-theme="light"] .analysis-panel {
+    background: #f8fafc;
+}
+
+[data-theme="light"] .analysis-section {
+    border-color: #e2e8f0;
+}
+
+/* Better visual separation for Analysis panel */
+.analysis-panel .panel-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+}
+
+.analysis-panel .panel-header h3 {
+    color: white;
+}
+
+.analysis-panel .panel-toggle {
+    color: white;
+}
+
+.analysis-panel .panel-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Improve button spacing in analysis sections */
+.analysis-section .download-all-btn,
+.analysis-section .metrics-toggle-btn {
+    margin-bottom: var(--space-md);
+}
+
+/* Add subtle background to analysis content */
+.analysis-panel .panel-content {
+    background: rgba(102, 126, 234, 0.03);
+}
+
+[data-theme="light"] .analysis-panel .panel-content {
+    background: rgba(102, 126, 234, 0.02);
+}
