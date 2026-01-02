@@ -84,11 +84,12 @@ export class ExportManager {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             watermarkedCanvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'waba-graph.png';
+                link.download = `waba-graph-${timestamp}.png`;
                 link.click();
                 URL.revokeObjectURL(url);
             });
