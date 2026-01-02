@@ -245,6 +245,9 @@ export class OutputManager {
             return;
         }
 
+        // Store metrics data for CSV export
+        this.storedMetricsData = metricsData;
+
         // Create metrics display div
         let metricsDiv = document.getElementById('metrics-display');
         if (!metricsDiv) {
@@ -268,6 +271,14 @@ export class OutputManager {
 
         // Render metrics HTML
         metricsDiv.innerHTML = MetricsManager.formatMetricsHTML(metricsData);
+
+        // Wire up CSV export button
+        const csvButton = document.getElementById('export-metrics-csv-btn');
+        if (csvButton) {
+            csvButton.addEventListener('click', () => {
+                MetricsManager.downloadMetricsCSV(this.storedMetricsData);
+            });
+        }
 
         // Update button text
         button.innerHTML = '<span class="toggle-icon">▼</span> Hide Metrics';

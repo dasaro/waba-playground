@@ -2841,6 +2841,54 @@ button:focus-visible,
     color: var(--text-secondary);
 }
 
+/* Metrics info icons */
+.info-icon {
+    cursor: help;
+    color: var(--primary-color);
+    font-size: 0.9em;
+    margin-left: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.info-icon:hover {
+    opacity: 1;
+    color: var(--primary-dark);
+}
+
+/* Metrics actions section */
+.metrics-actions {
+    margin-bottom: var(--space-lg);
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--space-md);
+}
+
+/* Export metrics button */
+.export-metrics-btn {
+    background: var(--success-color);
+    color: white;
+    border: none;
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    transition: background 0.2s ease, transform 0.1s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.export-metrics-btn:hover {
+    background: var(--success-dark);
+    transform: translateY(-1px);
+}
+
+.export-metrics-btn:active {
+    transform: translateY(0);
+}
+
 /* Metrics toggle button */
 .metrics-toggle-btn {
     background: var(--bg-tertiary);
