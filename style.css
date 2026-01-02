@@ -956,6 +956,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .fullscreen-graph-container {
     flex: 1;
+    min-height: 0;
     position: relative;
     overflow: hidden;
     padding: var(--space-md);
