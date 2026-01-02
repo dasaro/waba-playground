@@ -103,12 +103,28 @@ export class FileManager {
     convertLpToWaba(clingoCode) {
         // Parse .lp format and convert to .waba Simple Mode format
         const preprocessed = clingoCode.replace(/\.\s+/g, '.\n');
-        const lines = preprocessed.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('%'));
+        const allLines = preprocessed.split('\n').map(l => l.trim()).filter(l => l);
 
         const assumptions = [];
         const weights = [];
         const contraries = [];
         const rules = new Map();
+        const description = [];
+
+        // Extract description lines (% //) and filter out other comments
+        const lines = allLines.filter(line => {
+            // Extract description lines
+            if (line.startsWith('% //')) {
+                const content = line.substring(4).trim();
+                description.push(content);
+                return false;
+            }
+            // Filter out other comments
+            if (line.startsWith('%')) {
+                return false;
+            }
+            return true;
+        });
 
         // Parse each line
         lines.forEach(line => {
@@ -162,6 +178,14 @@ export class FileManager {
 
         // Generate .waba format
         let content = '';
+
+        // Add description at the beginning
+        if (description.length > 0) {
+            description.forEach(line => {
+                content += `// ${line}\n`;
+            });
+            content += '\n';
+        }
 
         if (assumptions.length > 0) {
             content += '% Assumptions:\n' + assumptions.join('\n') + '\n\n';
@@ -258,8 +282,8 @@ export class FileManager {
         const weights = [];
 
         for (const line of lines) {
-            // Skip empty lines and comments (% is ASP/WABA standard)
-            if (!line || line.startsWith('%')) continue;
+            // Skip empty lines, comments (%), and descriptions (//)
+            if (!line || line.startsWith('%') || line.startsWith('//')) continue;
 
             // Check for rule: "a <- b,d" or "d <- c"
             const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);

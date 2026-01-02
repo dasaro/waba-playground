@@ -598,7 +598,7 @@ class WABAPlayground {
     }
 
     updateSimpleDescription() {
-        // Extract description from all inputs
+        // Extract description from all inputs (look for // lines)
         const allInputs = [
             ...this.assumptionsInput.value.split('\n'),
             ...this.rulesInput.value.split('\n'),
@@ -607,27 +607,14 @@ class WABAPlayground {
         ];
 
         let description = [];
-        let inCommentBlock = false;
 
         for (let line of allInputs) {
             const trimmed = line.trim();
 
-            // Check for % COMMENT marker
-            if (trimmed === '% COMMENT') {
-                inCommentBlock = true;
-                continue;
-            }
-
-            // If we're in a comment block and line starts with %
-            if (inCommentBlock && trimmed.startsWith('%')) {
-                const content = trimmed.substring(1).trim();
+            // Check for description lines starting with //
+            if (trimmed.startsWith('//')) {
+                const content = trimmed.substring(2).trim();
                 description.push(content);
-                continue;
-            }
-
-            // If we hit a non-comment line, we're out of the comment block
-            if (inCommentBlock && !trimmed.startsWith('%')) {
-                break; // Stop looking once we exit the comment block
             }
         }
 
@@ -647,8 +634,8 @@ class WABAPlayground {
     }
 
     addDescriptionTemplate() {
-        // Add % COMMENT template to the first textarea (assumptions)
-        const template = '% COMMENT\n% Enter your description here\n\n';
+        // Add // description template to the first textarea (assumptions)
+        const template = '// Enter your description here\n\n';
         const currentValue = this.assumptionsInput.value;
 
         // If there's already content, prepend the template
@@ -667,85 +654,45 @@ class WABAPlayground {
     }
 
     syncDescriptionToComment() {
-        // Sync description textarea content back to % COMMENT block in assumptions input
+        // Sync description textarea content back to // description lines in assumptions input
         const descriptionContent = document.getElementById('simple-description-content');
         if (!descriptionContent) return;
 
         const newDescription = descriptionContent.value;
         const lines = this.assumptionsInput.value.split('\n');
 
-        // Find and replace the % COMMENT block
-        let inCommentBlock = false;
-        let commentStartIndex = -1;
-        let commentEndIndex = -1;
+        // Find and remove all existing // description lines
+        const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('//'));
 
-        for (let i = 0; i < lines.length; i++) {
-            const trimmed = lines[i].trim();
+        // Build new description lines
+        const newDescriptionLines = newDescription.split('\n').map(line => '// ' + line);
 
-            if (trimmed === '% COMMENT') {
-                inCommentBlock = true;
-                commentStartIndex = i;
-                continue;
-            }
-
-            if (inCommentBlock && !trimmed.startsWith('%')) {
-                commentEndIndex = i;
-                break;
-            }
+        // Prepend new description lines to the content
+        if (newDescriptionLines.length > 0) {
+            newDescriptionLines.push(''); // Add blank line after description
         }
 
-        // If we found the comment block, replace it
-        if (commentStartIndex !== -1) {
-            if (commentEndIndex === -1) {
-                commentEndIndex = lines.length;
-            }
-
-            // Build new comment block
-            const newCommentLines = ['% COMMENT'];
-            newDescription.split('\n').forEach(line => {
-                newCommentLines.push('% ' + line);
-            });
-            newCommentLines.push(''); // Add blank line after comment
-
-            // Replace old comment block with new one
-            lines.splice(commentStartIndex, commentEndIndex - commentStartIndex, ...newCommentLines);
-
-            // Update the assumptions input (without triggering input event)
-            const oldValue = this.assumptionsInput.value;
-            this.assumptionsInput.value = lines.join('\n');
-        }
+        // Update the assumptions input
+        this.assumptionsInput.value = [...newDescriptionLines, ...nonDescriptionLines].join('\n');
     }
 
     parseSimpleABA() {
-        // Helper function to extract description and filter comments
+        // Helper function to extract description and filter description lines
         const extractDescriptionAndFilter = (lines) => {
             let description = [];
-            let inCommentBlock = false;
             const filtered = [];
 
             for (let line of lines) {
                 const trimmed = line.trim();
 
-                // Check for % COMMENT marker
-                if (trimmed === '% COMMENT') {
-                    inCommentBlock = true;
-                    continue;
-                }
-
-                // If we're in a comment block and line starts with %
-                if (inCommentBlock && trimmed.startsWith('%')) {
-                    // Remove leading % and trim
-                    const content = trimmed.substring(1).trim();
+                // Check for description lines starting with //
+                if (trimmed.startsWith('//')) {
+                    const content = trimmed.substring(2).trim();
                     description.push(content);
                     continue;
                 }
 
-                // If we hit a non-comment line, we're out of the comment block
-                if (inCommentBlock && !trimmed.startsWith('%')) {
-                    inCommentBlock = false;
-                }
-
-                // Skip inline comments
+                // Skip inline comments (%)
                 if (trimmed.startsWith('%')) {
                     continue;
                 }
@@ -793,11 +740,10 @@ class WABAPlayground {
 
         let clingoCode = '%% Auto-generated from Simple Editor\n';
 
-        // Add description as comments if it exists
+        // Add description as special comments (% //) if it exists
         if (description.length > 0) {
-            clingoCode += '%% COMMENT\n';
             description.forEach(line => {
-                clingoCode += `%% ${line}\n`;
+                clingoCode += `% // ${line}\n`;
             });
             clingoCode += '\n';
         }
