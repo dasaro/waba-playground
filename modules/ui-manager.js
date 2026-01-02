@@ -89,20 +89,50 @@ export class UIManager {
     // ===================================
     // Loading Overlay
     // ===================================
+    static loadingStartTime = null;
+    static loadingTimerInterval = null;
+
     static showLoadingOverlay(text = 'Running WABA...', subtext = 'Computing extensions and visualizing results') {
         const overlay = document.getElementById('loading-overlay');
         const loadingText = document.getElementById('loading-text');
         const loadingSubtext = document.getElementById('loading-subtext');
+        const loadingElapsed = document.getElementById('loading-elapsed');
 
         if (overlay) {
             if (loadingText) loadingText.textContent = text;
             if (loadingSubtext) loadingSubtext.textContent = subtext;
+
+            // Start elapsed time timer
+            this.loadingStartTime = Date.now();
+            if (loadingElapsed) loadingElapsed.textContent = 'Elapsed: 0.0s';
+
+            // Clear any existing timer
+            if (this.loadingTimerInterval) {
+                clearInterval(this.loadingTimerInterval);
+            }
+
+            // Update elapsed time every 100ms
+            this.loadingTimerInterval = setInterval(() => {
+                if (this.loadingStartTime && loadingElapsed) {
+                    const elapsed = (Date.now() - this.loadingStartTime) / 1000;
+                    loadingElapsed.textContent = `Elapsed: ${elapsed.toFixed(1)}s`;
+                }
+            }, 100);
+
             overlay.removeAttribute('hidden');
         }
     }
 
     static hideLoadingOverlay() {
         const overlay = document.getElementById('loading-overlay');
+
+        // Stop the timer
+        if (this.loadingTimerInterval) {
+            clearInterval(this.loadingTimerInterval);
+            this.loadingTimerInterval = null;
+        }
+        this.loadingStartTime = null;
+
         if (overlay) {
             overlay.setAttribute('hidden', '');
         }
