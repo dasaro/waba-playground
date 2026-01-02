@@ -217,6 +217,11 @@ export class MetricsManager {
 
         let html = '<div class="metrics-container">';
 
+        // CSV Export button
+        html += '<div class="metrics-actions">';
+        html += '<button id="export-metrics-csv-btn" class="export-metrics-btn">📥 Download Metrics (CSV)</button>';
+        html += '</div>';
+
         // Global metrics section
         html += '<div class="metrics-section">';
         html += '<h3 class="metrics-header">Global Metrics (Near-Optimal Set S)</h3>';
@@ -236,19 +241,19 @@ export class MetricsManager {
         html += '<div class="metrics-table-container">';
         html += '<table class="metrics-table">';
 
-        // Table header
+        // Table header with info icons
         html += '<thead><tr>';
         html += '<th>Atom</th>';
-        html += '<th title="Exists in at least one model in S">Brave<sub>S</sub></th>';
-        html += '<th title="Exists in all models in S">Cautious<sub>S</sub></th>';
-        html += '<th title="Best cost with atom - optimal cost (all models)">Regret</th>';
-        html += '<th title="Best cost with atom - best cost without atom (all models)">Penalty</th>';
+        html += '<th>Brave<sub>S</sub> <span class="info-icon" title="Exists in at least one model in S (credulous reasoning)">ⓘ</span></th>';
+        html += '<th>Cautious<sub>S</sub> <span class="info-icon" title="Exists in all models in S (skeptical reasoning)">ⓘ</span></th>';
+        html += '<th>Regret <span class="info-icon" title="Cost increase for accepting atom: bestWith(p) - optCost (computed over all models)">ⓘ</span></th>';
+        html += '<th>Penalty <span class="info-icon" title="Cost difference with/without atom: bestWith(p) - bestWithout(p) (computed over all models). Negative = accepting atom reduces cost">ⓘ</span></th>';
 
         if (hasSupport) {
-            html += '<th title="Max support in S (possibilistic plausibility)">Π<sub>S</sub></th>';
-            html += '<th title="Min support in S (necessity)">N<sub>S</sub></th>';
-            html += '<th title="Avg(support(p) - support(contrary)) in S">Net<sub>S</sub></th>';
-            html += '<th>Contrary</th>';
+            html += '<th>Π<sub>S</sub> <span class="info-icon" title="Possibilistic plausibility: maximum support value in S (higher = stronger in best scenarios)">ⓘ</span></th>';
+            html += '<th>N<sub>S</sub> <span class="info-icon" title="Possibilistic necessity: minimum support value in S (higher = consistently strong)">ⓘ</span></th>';
+            html += '<th>Net<sub>S</sub> <span class="info-icon" title="Net support: avg(support(p) - support(contrary)) in S. Positive = atom better supported than its contrary">ⓘ</span></th>';
+            html += '<th>Contrary <span class="info-icon" title="The contrary atom that attacks this assumption">ⓘ</span></th>';
         }
 
         html += '</tr></thead>';
@@ -262,10 +267,18 @@ export class MetricsManager {
         sortedAtoms.forEach(atom => {
             const m = atoms[atom];
 
-            html += '<tr>';
+            // Determine row class based on entailment
+            let rowClass = '';
+            if (m.cautious_S) {
+                rowClass = 'cautious-entailed';
+            } else if (m.brave_S) {
+                rowClass = 'brave-entailed';
+            }
+
+            html += `<tr class="${rowClass}">`;
             html += `<td class="atom-name">${atom}</td>`;
-            html += `<td class="metric-bool">${m.brave_S ? '✓' : '✗'}</td>`;
-            html += `<td class="metric-bool">${m.cautious_S ? '✓' : '✗'}</td>`;
+            html += `<td class="metric-bool ${m.brave_S ? 'metric-bool-true' : 'metric-bool-false'}">${m.brave_S ? '✓' : '✗'}</td>`;
+            html += `<td class="metric-bool ${m.cautious_S ? 'metric-bool-true' : 'metric-bool-false'}">${m.cautious_S ? '✓' : '✗'}</td>`;
             html += `<td class="metric-num">${m.regret !== null ? m.regret.toFixed(2) : '∞'}</td>`;
             html += `<td class="metric-num">${m.penalty !== null ? m.penalty.toFixed(2) : 'N/A'}</td>`;
 
@@ -286,6 +299,94 @@ export class MetricsManager {
         html += '</div>';
 
         return html;
+    }
+
+    /**
+     * Export metrics to CSV format
+     */
+    static exportMetricsCSV(metricsData) {
+        if (!metricsData) {
+            return null;
+        }
+
+        const { global, atoms, hasSupport } = metricsData;
+        let csv = '';
+
+        // Global Metrics Section
+        csv += 'GLOBAL METRICS (Near-Optimal Set S)\n';
+        csv += 'Metric,Value\n';
+        csv += `Optimal Cost,${global.optCost.toFixed(2)}\n`;
+        csv += `Second-Best Cost,${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}\n`;
+        csv += `Gap (Δ),${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}\n`;
+        csv += `Cost Levels in S,"[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]"\n`;
+        csv += `Derived ε (max-opt),${global.epsilon.toFixed(2)}\n`;
+        csv += `Models in S,${global.numInS}\n`;
+        csv += `Total Models,${global.totalModels}\n`;
+        csv += `Diversity,${global.diversity.toFixed(3)}\n`;
+        csv += '\n';
+
+        // Per-Atom Metrics Section
+        csv += 'PER-ATOM METRICS\n';
+
+        // CSV Header
+        let headers = ['Atom', 'Brave_S', 'Cautious_S', 'Regret', 'Penalty'];
+        if (hasSupport) {
+            headers.push('Pi_S', 'N_S', 'Net_S', 'Contrary');
+        }
+        csv += headers.join(',') + '\n';
+
+        // Sort atoms alphabetically
+        const sortedAtoms = Object.keys(atoms).sort();
+
+        // CSV Data Rows
+        sortedAtoms.forEach(atom => {
+            const m = atoms[atom];
+            let row = [
+                `"${atom}"`,
+                m.brave_S ? 'TRUE' : 'FALSE',
+                m.cautious_S ? 'TRUE' : 'FALSE',
+                m.regret !== null ? m.regret.toFixed(2) : 'Infinity',
+                m.penalty !== null ? m.penalty.toFixed(2) : 'N/A'
+            ];
+
+            if (hasSupport) {
+                row.push(
+                    m.Pi_S !== null ? m.Pi_S.toFixed(2) : 'N/A',
+                    m.N_S !== null ? m.N_S.toFixed(2) : 'N/A',
+                    m.net_S !== null ? m.net_S.toFixed(2) : 'N/A',
+                    m.contrary ? `"${m.contrary}"` : '-'
+                );
+            }
+
+            csv += row.join(',') + '\n';
+        });
+
+        return csv;
+    }
+
+    /**
+     * Download metrics as CSV file
+     */
+    static downloadMetricsCSV(metricsData) {
+        const csv = this.exportMetricsCSV(metricsData);
+        if (!csv) {
+            console.error('No metrics data to export');
+            return;
+        }
+
+        // Create blob and download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        link.download = `waba-metrics-${timestamp}.csv`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     /**

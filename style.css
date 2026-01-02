@@ -2809,6 +2809,23 @@ button:focus-visible,
     border-bottom: none;
 }
 
+/* Entailment highlighting */
+.metrics-table tbody tr.cautious-entailed {
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.metrics-table tbody tr.cautious-entailed:hover {
+    background: rgba(34, 197, 94, 0.25);
+}
+
+.metrics-table tbody tr.brave-entailed {
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.metrics-table tbody tr.brave-entailed:hover {
+    background: rgba(34, 197, 94, 0.15);
+}
+
 .atom-name {
     font-family: 'Courier New', monospace;
     color: var(--primary-color);
@@ -2827,12 +2844,12 @@ button:focus-visible,
     font-weight: bold;
 }
 
-.metric-bool:has(✓) {
-    color: var(--success-color);
+.metric-bool-true {
+    color: #22c55e;
 }
 
-.metric-bool:has(✗) {
-    color: var(--text-muted);
+.metric-bool-false {
+    color: rgba(255, 255, 255, 0.25);
 }
 
 .metric-num {
