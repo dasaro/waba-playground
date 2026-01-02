@@ -29,6 +29,7 @@ class WABAPlayground {
         this.exampleSelect = document.getElementById('example-select');
         this.budgetInput = document.getElementById('budget-input');
         this.numModelsInput = document.getElementById('num-models-input');
+        this.timeoutInput = document.getElementById('timeout-input');
         this.optimizeSelect = document.getElementById('optimize-select');
         this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
@@ -455,6 +456,7 @@ class WABAPlayground {
                 constraint: this.constraintSelect.value,
                 budget: parseInt(this.budgetInput.value) || 0,
                 numModels: parseInt(this.numModelsInput.value) || 0,
+                timeout: (parseInt(this.timeoutInput.value) || 60) * 1000, // Convert seconds to milliseconds
                 optMode: this.optModeSelect.value, // 'ignore' or 'optN'
                 filterType: 'standard'
             };

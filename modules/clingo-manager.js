@@ -81,19 +81,73 @@ export class ClingoManager {
 
             console.log('Clingo args:', args);
 
-            // Run Clingo
+            // Run Clingo with timeout protection
             const startTime = performance.now();
-            const result = await clingo.run(program, numModels, args);
+            const timeout = config.timeout || 60000; // Default 60 seconds
+
+            const result = await this.runWithTimeout(
+                clingo.run(program, numModels, args),
+                timeout,
+                'Clingo execution timed out. Try simplifying the framework or increasing the timeout.'
+            );
+
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
 
             console.log('Clingo result:', result);
+
+            // Validate result before returning
+            if (!result || typeof result !== 'object') {
+                throw new Error('Clingo returned an invalid result. The solver may have crashed or timed out.');
+            }
+
+            // Check if result indicates an error state
+            if (result.Result === 'ERROR' || result.Result === 'UNKNOWN') {
+                throw new Error(`Clingo encountered an error: ${result.Result}. The problem may be too complex or contain syntax errors.`);
+            }
 
             return { result, elapsed };
 
         } catch (error) {
             console.error('Error running WABA:', error);
-            onLog(`❌ Error: ${error.message}`, 'error');
+
+            // Provide specific error messages based on error type
+            if (error.message.includes('timed out')) {
+                onLog(`⏱️ ${error.message}`, 'error');
+                onLog('💡 Tip: Reduce framework complexity, increase timeout, or try a simpler semantics', 'info');
+            } else if (error.message.includes('invalid result') || error.message.includes('crashed')) {
+                onLog(`❌ ${error.message}`, 'error');
+                onLog('💡 Tip: Check for syntax errors in your framework or try refreshing the page', 'info');
+            } else {
+                onLog(`❌ Error: ${error.message}`, 'error');
+            }
+
             return null;
+        }
+    }
+
+    /**
+     * Runs a promise with a timeout
+     * @param {Promise} promise - The promise to run
+     * @param {number} timeoutMs - Timeout in milliseconds
+     * @param {string} timeoutMessage - Error message if timeout occurs
+     * @returns {Promise} The promise result or throws timeout error
+     */
+    async runWithTimeout(promise, timeoutMs, timeoutMessage) {
+        let timeoutHandle;
+
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+                reject(new Error(timeoutMessage));
+            }, timeoutMs);
+        });
+
+        try {
+            const result = await Promise.race([promise, timeoutPromise]);
+            clearTimeout(timeoutHandle);
+            return result;
+        } catch (error) {
+            clearTimeout(timeoutHandle);
+            throw error;
         }
     }
 
