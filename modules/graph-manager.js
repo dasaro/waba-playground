@@ -714,7 +714,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     font: {
                         color: isDark ? '#f1f5f9' : '#1e293b'
                     },
-                    isAssumption: true
+                    isAssumption: true,
+                    assumptions: [assumption]  // Store for extension highlighting
                 });
             });
 
@@ -980,7 +981,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     font: {
                         color: isDark ? '#f1f5f9' : '#1e293b'
                     },
-                    isAssumption: true
+                    isAssumption: true,
+                    assumptions: [assumption]  // Store for extension highlighting
                 });
             });
 
