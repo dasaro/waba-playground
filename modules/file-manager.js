@@ -182,7 +182,7 @@ export class FileManager {
         // Add description at the beginning
         if (description.length > 0) {
             description.forEach(line => {
-                content += `// ${line}\n`;
+                content += `% // ${line}\n`;
             });
             content += '\n';
         }
@@ -265,10 +265,10 @@ export class FileManager {
                 this.editor.style.display = 'none';
 
                 // Populate description and fields
-                // Description goes in assumptions field with // prefix
+                // Description goes in assumptions field with % // prefix
                 let assumptionsWithDescription = '';
                 if (parsed.description && parsed.description.length > 0) {
-                    assumptionsWithDescription = parsed.description.map(line => `// ${line}`).join('\n') + '\n';
+                    assumptionsWithDescription = parsed.description.map(line => `% // ${line}`).join('\n') + '\n';
                 }
                 assumptionsWithDescription += parsed.assumptions.join('\n');
 
@@ -310,9 +310,9 @@ export class FileManager {
             // Skip empty lines
             if (!line) continue;
 
-            // Extract description lines
-            if (line.startsWith('//')) {
-                const descLine = line.substring(2).trim();
+            // Extract description lines (% //)
+            if (line.startsWith('% //')) {
+                const descLine = line.substring(4).trim();
                 description.push(descLine);
                 continue;
             }

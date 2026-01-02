@@ -627,9 +627,9 @@ class WABAPlayground {
         for (let line of allInputs) {
             const trimmed = line.trim();
 
-            // Check for description lines starting with //
-            if (trimmed.startsWith('//')) {
-                const content = trimmed.substring(2).trim();
+            // Check for description lines starting with % //
+            if (trimmed.startsWith('% //')) {
+                const content = trimmed.substring(4).trim();
                 description.push(content);
             }
         }
@@ -677,11 +677,11 @@ class WABAPlayground {
         const newDescription = descriptionContent.value;
         const lines = this.assumptionsInput.value.split('\n');
 
-        // Find and remove all existing // description lines
-        const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('//'));
+        // Find and remove all existing % // description lines
+        const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('% //'));
 
         // Build new description lines
-        const newDescriptionLines = newDescription.split('\n').map(line => '// ' + line);
+        const newDescriptionLines = newDescription.split('\n').map(line => '% // ' + line);
 
         // Prepend new description lines to the content
         if (newDescriptionLines.length > 0) {
@@ -701,9 +701,9 @@ class WABAPlayground {
             for (let line of lines) {
                 const trimmed = line.trim();
 
-                // Check for description lines starting with //
-                if (trimmed.startsWith('//')) {
-                    const content = trimmed.substring(2).trim();
+                // Check for description lines starting with % //
+                if (trimmed.startsWith('% //')) {
+                    const content = trimmed.substring(4).trim();
                     description.push(content);
                     continue;
                 }
