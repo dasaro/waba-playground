@@ -224,6 +224,9 @@ class WABAPlayground {
             );
         });
 
+        // Drag and drop file upload
+        this.initDragAndDrop();
+
         // Graph mode changes
         this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
         this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
@@ -292,6 +295,59 @@ class WABAPlayground {
         });
 
         // Export buttons (handled by ExportManager)
+    }
+
+    initDragAndDrop() {
+        let dragCounter = 0; // Track enter/leave events
+
+        // Prevent default drag behaviors on the whole document
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        // Add visual feedback when dragging over
+        document.addEventListener('dragenter', (e) => {
+            dragCounter++;
+            if (dragCounter === 1) {
+                document.body.classList.add('drag-over');
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter === 0) {
+                document.body.classList.remove('drag-over');
+            }
+        });
+
+        // Handle dropped files
+        document.addEventListener('drop', (e) => {
+            dragCounter = 0;
+            document.body.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+
+                // Create a synthetic event for the file manager
+                const syntheticEvent = {
+                    target: {
+                        files: [file]
+                    }
+                };
+
+                // Use existing file upload handler
+                this.fileManager.handleFileUpload(
+                    syntheticEvent,
+                    (code) => this.updateGraph(code),
+                    () => this.parseSimpleABA(),
+                    (msg, type) => this.outputManager.log(msg, type)
+                );
+            }
+        });
     }
 
     toggleLegend() {

@@ -101,6 +101,41 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    transition: var(--transition-normal);
+}
+
+/* Drag and Drop Visual Feedback */
+body.drag-over::before {
+    content: '📁 Drop .lp or .waba file here to load';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(102, 126, 234, 0.15);
+    border: 3px dashed var(--primary-color);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--primary-color);
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% {
+        border-color: var(--primary-color);
+        background: rgba(102, 126, 234, 0.15);
+    }
+    50% {
+        border-color: var(--primary-dark);
+        background: rgba(102, 126, 234, 0.25);
+    }
 }
 
 .container {
