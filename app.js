@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260103-5 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260103-6 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -853,7 +853,8 @@ class WABAPlayground {
         const contraryLines = [];
         const weightLines = [];
 
-        let currentSection = null;
+        // Track processed rule IDs to avoid duplicates
+        const processedRules = new Set();
 
         for (const line of lines) {
             // Skip empty lines
@@ -866,60 +867,66 @@ class WABAPlayground {
                 continue;
             }
 
-            // Detect section headers
-            if (line.match(/%+\s*Assumptions/i)) {
-                currentSection = 'assumptions';
-                continue;
-            } else if (line.match(/%+\s*Rules/i)) {
-                currentSection = 'rules';
-                continue;
-            } else if (line.match(/%+\s*Contraries/i)) {
-                currentSection = 'contraries';
-                continue;
-            } else if (line.match(/%+\s*Weights/i)) {
-                currentSection = 'weights';
+            // Skip section header comments
+            if (line.match(/%+\s*(Assumptions|Rules|Contraries|Weights)/i)) {
                 continue;
             }
 
-            // Preserve inline comments in appropriate section
-            if (line.startsWith('%')) {
-                if (currentSection === 'assumptions') assumptionLines.push(line);
-                else if (currentSection === 'rules') ruleLines.push(line);
-                else if (currentSection === 'contraries') contraryLines.push(line);
-                else if (currentSection === 'weights') weightLines.push(line);
+            // Try to match specific patterns (order matters!)
+
+            // 1. Check for assumption
+            let match = line.match(/^assumption\(([^)]+)\)\.$/);
+            if (match) {
+                assumptionLines.push(match[1]);
                 continue;
             }
 
-            // Parse content based on current section
-            if (currentSection === 'assumptions') {
-                const match = line.match(/^assumption\(([^)]+)\)\.$/);
-                if (match) assumptionLines.push(match[1]);
-            } else if (currentSection === 'rules') {
-                // Check for head(...) declarations
-                const headMatch = line.match(/^head\(([^,]+),\s*([^)]+)\)\./);
-                if (headMatch) {
-                    // Extract rule comment if present
-                    const commentMatch = clingoCode.match(new RegExp(`%\\s*${headMatch[1]}:\\s*([^\\n]+)`, 'i'));
-                    if (commentMatch) {
-                        ruleLines.push(`% ${commentMatch[1]}`);
-                    }
+            // 2. Check for weight
+            match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+            if (match) {
+                weightLines.push(`${match[1]}: ${match[2]}`);
+                continue;
+            }
 
-                    // Build rule from head/body predicates
-                    const ruleId = headMatch[1];
-                    const head = headMatch[2];
-                    const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
-                    const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
-                    const bodyAtoms = bodyMatches.map(m => m[1]);
+            // 3. Check for contrary
+            match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                contraryLines.push(`(${match[1]}, ${match[2]})`);
+                continue;
+            }
 
-                    const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
-                    ruleLines.push(`${head} <- ${bodyStr}`);
+            // 4. Check for head (rule)
+            match = line.match(/^head\(([^,]+),\s*([^)]+)\)\./);
+            if (match) {
+                const ruleId = match[1];
+                const head = match[2];
+
+                // Skip if already processed (avoid duplicates from multiple head() calls)
+                if (processedRules.has(ruleId)) continue;
+                processedRules.add(ruleId);
+
+                // Extract rule comment if present
+                const commentMatch = clingoCode.match(new RegExp(`%\\s*${ruleId}:\\s*([^\\n]+)`, 'i'));
+                if (commentMatch) {
+                    ruleLines.push(`% ${commentMatch[1]}`);
                 }
-            } else if (currentSection === 'contraries') {
-                const match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
-                if (match) contraryLines.push(`(${match[1]}, ${match[2]})`);
-            } else if (currentSection === 'weights') {
-                const match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
-                if (match) weightLines.push(`${match[1]}: ${match[2]}`);
+
+                // Build rule from head/body predicates
+                const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
+                const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
+                const bodyAtoms = bodyMatches.map(m => m[1]);
+
+                const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
+                ruleLines.push(`${head} <- ${bodyStr}`);
+                continue;
+            }
+
+            // 5. Preserve other comments (not description, not section headers)
+            if (line.startsWith('%')) {
+                // Try to guess which section this comment belongs to based on context
+                // For now, just skip standalone comments that don't belong to a specific section
+                // (Could be improved by tracking last parsed item type)
+                continue;
             }
         }
 
@@ -931,7 +938,7 @@ class WABAPlayground {
             descriptionContent.value = '';
         }
 
-        // Populate simple mode fields (with comments)
+        // Populate simple mode fields
         this.assumptionsInput.value = assumptionLines.join('\n');
         this.rulesInput.value = ruleLines.join('\n');
         this.contrariesInput.value = contraryLines.join('\n');
