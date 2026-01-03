@@ -170,7 +170,7 @@ export class GraphManager {
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'dynamic', roundness: 0.5 }
+            smooth: edge.originalSmooth || { enabled: true, type: 'continuous', forceDirection: 'none', roundness: 0.5 }
         }));
         this.networkData.edges.update(edgeUpdates);
 

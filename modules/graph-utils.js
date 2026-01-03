@@ -239,7 +239,8 @@ export class GraphUtils {
                 },
                 smooth: {
                     enabled: true,
-                    type: 'dynamic',  // Dynamic curves handle parallel/mutual edges better
+                    type: 'continuous',  // Continuous curves work well with labels and handle parallel edges
+                    forceDirection: 'none',
                     roundness: 0.5
                 },
                 shadow: {
