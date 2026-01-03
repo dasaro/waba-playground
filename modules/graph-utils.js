@@ -234,7 +234,7 @@ export class GraphUtils {
                 },
                 font: {
                     size: 12,
-                    align: 'middle',
+                    align: 'top',  // Position labels above edge for better visibility with curves
                     ...GraphUtils.getEdgeFontColor()
                 },
                 smooth: {
@@ -244,6 +244,10 @@ export class GraphUtils {
                 },
                 shadow: {
                     enabled: false
+                },
+                labelHighlightBold: true,
+                chosen: {
+                    label: true
                 }
             },
             physics: {
