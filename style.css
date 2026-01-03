@@ -3318,6 +3318,35 @@ label:has(> .info-hint) {
     font-weight: bold;
 }
 
+/* Derivation rule display */
+.derivation-rule {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.derivation-rule .arrow {
+    font-size: var(--text-lg);
+    color: var(--text-secondary);
+    font-weight: bold;
+}
+
+/* Weight list container */
+.weight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Individual weight item */
+.weight-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+}
+
 /* Dark mode adjustments */
 [data-theme="dark"] .node-popup,
 [data-theme="dark"] .graph-tooltip {

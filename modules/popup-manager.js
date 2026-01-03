@@ -18,10 +18,18 @@ export class PopupManager {
         document.querySelectorAll('.derivation-tooltip').forEach(t => t.remove());
 
         const tooltip = document.createElement('div');
-        tooltip.className = 'derivation-tooltip';
+        tooltip.className = 'derivation-tooltip node-popup graph-tooltip';
+
+        // Build content with badges and chips
+        let content = '<div class="popup-content">';
+
+        // Header
+        content += `<div class="popup-header">
+            <span class="node-type-badge">🔗 Derivation</span>
+            <strong>${atom}</strong>
+        </div>`;
 
         // Find the rule that derives this atom
-        let derivationHTML = `<strong>Derivation of ${atom}:</strong><br>`;
         let found = false;
 
         console.log('Searching through rules:', parsed.rules);
@@ -29,27 +37,59 @@ export class PopupManager {
             console.log(`  Checking rule ${ruleId}:`, rule);
             if (rule.head === atom) {
                 found = true;
-                const bodyStr = rule.body.length > 0 ? rule.body.join(', ') : '⊤';
-                derivationHTML += `${atom} ← ${bodyStr}<br>`;
 
-                // Show weights if available
-                rule.body.forEach(bodyAtom => {
+                // Rule section
+                content += '<div class="popup-section">';
+                content += '<div class="popup-label">📜 Rule:</div>';
+                content += '<div class="derivation-rule">';
+                content += `<span class="element-chip target">${atom}</span>`;
+                content += '<span class="arrow">←</span>';
+
+                if (rule.body.length > 0) {
+                    content += '<div class="popup-chips">';
+                    rule.body.forEach(bodyAtom => {
+                        content += `<span class="assumption-chip">${bodyAtom}</span>`;
+                    });
+                    content += '</div>';
+                } else {
+                    content += '<span class="element-chip source">⊤</span>';
+                }
+                content += '</div></div>';
+
+                // Weights section
+                const bodyWithWeights = rule.body.filter(bodyAtom => {
                     const weight = parsed.weights.get(bodyAtom);
-                    if (weight !== undefined) {
-                        derivationHTML += `&nbsp;&nbsp;• ${bodyAtom}: ${weight}<br>`;
-                    }
+                    return weight !== undefined;
                 });
+
+                if (bodyWithWeights.length > 0) {
+                    content += '<div class="popup-section">';
+                    content += '<div class="popup-label">⚖️ Weights:</div>';
+                    content += '<div class="weight-list">';
+                    bodyWithWeights.forEach(bodyAtom => {
+                        const weight = parsed.weights.get(bodyAtom);
+                        content += `<div class="weight-item">
+                            <span class="assumption-chip">${bodyAtom}</span>
+                            <span class="weight-badge">${weight}</span>
+                        </div>`;
+                    });
+                    content += '</div></div>';
+                }
+
                 console.log('✅ Found derivation rule:', ruleId);
                 break;
             }
         }
 
         if (!found) {
-            derivationHTML += `<em>No derivation found (fact or assumption)</em>`;
+            content += '<div class="popup-section">';
+            content += '<div class="popup-info">ℹ️ No derivation found (fact or assumption)</div>';
+            content += '</div>';
             console.warn('⚠️ No derivation rule found for atom:', atom);
         }
 
-        tooltip.innerHTML = derivationHTML;
+        content += '</div>';
+        tooltip.innerHTML = content;
         document.body.appendChild(tooltip);
         console.log('✅ Tooltip appended to body');
 
