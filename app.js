@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260101-11 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260103-1 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -205,6 +205,10 @@ class WABAPlayground {
         // Initialize polarity/comparator inference
         this.initPolarityInference();
 
+        // Initialize budget and num models UI states
+        this.updateBudgetInputState();
+        this.updateNumModelsVisibility();
+
         // Preload selected example on startup
         setTimeout(() => {
             const selectedExample = this.exampleSelect.value;
@@ -265,19 +269,14 @@ class WABAPlayground {
             }
         });
 
-        // Disable budget when optimization is enabled
-        this.optimizeSelect.addEventListener('change', (e) => {
-            const isOptimizing = e.target.value !== 'none';
-            this.constraintSelect.disabled = isOptimizing;
-            this.budgetInput.disabled = isOptimizing;
-            if (isOptimizing) {
-                this.constraintSelect.style.opacity = '0.5';
-                this.budgetInput.style.opacity = '0.5';
-            } else {
-                this.constraintSelect.style.opacity = '1';
-                this.budgetInput.style.opacity = '1';
-            }
-        });
+        // Handle constraint changes (enable/disable budget input)
+        this.constraintSelect.addEventListener('change', () => this.updateBudgetInputState());
+
+        // Handle opt mode changes (show/hide num models input)
+        this.optModeSelect.addEventListener('change', () => this.updateNumModelsVisibility());
+
+        // Handle optimization direction changes (show warning if contradicts polarity)
+        this.optimizeSelect.addEventListener('change', () => this.updateOptDirectionWarning());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -474,10 +473,11 @@ class WABAPlayground {
             }
 
             // Build configuration
+            const optDirection = this.optimizeSelect.value; // 'minimize' or 'maximize'
             const config = {
                 semiring: this.semiringSelect.value,
                 monoid: this.monoidSelect.value,
-                direction: 'minimization', // Default to minimization
+                direction: optDirection === 'maximize' ? 'maximization' : 'minimization',
                 semantics: this.semanticsSelect.value,
                 constraint: this.constraintSelect.value,
                 budget: parseInt(this.budgetInput.value) || 0,
@@ -957,6 +957,15 @@ class WABAPlayground {
     }
 
     /**
+     * Infer optimization direction from polarity
+     * @param {string} polarity - 'strength' or 'cost'
+     * @returns {string} 'minimize' or 'maximize'
+     */
+    inferOptDirection(polarity) {
+        return polarity === 'strength' ? 'maximize' : 'minimize';
+    }
+
+    /**
      * Initialize polarity inference system
      */
     initPolarityInference() {
@@ -991,13 +1000,18 @@ class WABAPlayground {
             const semiring = this.semiringSelect.value;
             const polarity = this.inferPolarity(semiring);
             const comparator = this.inferComparator(polarity);
+            const optDirection = this.inferOptDirection(polarity);
 
             this.polaritySelect.value = polarity;
             this.comparatorSelect.value = comparator;
+            this.optimizeSelect.value = optDirection;
 
             // Save to localStorage
             localStorage.setItem('waba_polarity', polarity);
             localStorage.setItem('waba_comparator', comparator);
+
+            // Clear any warnings
+            this.updateOptDirectionWarning();
         }
     }
 
@@ -1060,6 +1074,79 @@ class WABAPlayground {
         } else if (isAdvanced) {
             // Just save the polarity
             localStorage.setItem('waba_polarity', this.polaritySelect.value);
+        }
+
+        if (!isAdvanced) {
+            // Also update optimization direction
+            const polarity = this.polaritySelect.value;
+            const optDirection = this.inferOptDirection(polarity);
+            this.optimizeSelect.value = optDirection;
+        }
+
+        // Update warning
+        this.updateOptDirectionWarning();
+    }
+
+    /**
+     * Update optimization direction warning if direction contradicts polarity
+     */
+    updateOptDirectionWarning() {
+        const warningDiv = document.getElementById('opt-dir-warning');
+        if (!warningDiv) return;
+
+        const isAdvanced = this.advancedModeToggle.checked;
+        const polarity = this.polaritySelect.value;
+        const direction = this.optimizeSelect.value;
+        const expectedDirection = this.inferOptDirection(polarity);
+
+        if (isAdvanced && direction !== expectedDirection) {
+            const polarityLabel = polarity === 'strength' ? 'Strength/Reward' : 'Cost/Weakness';
+            const directionLabel = direction === 'minimize' ? 'Minimize' : 'Maximize';
+            warningDiv.textContent = `⚠️ Warning: ${polarityLabel} polarity typically uses ${expectedDirection === 'minimize' ? 'Minimize' : 'Maximize'}, not ${directionLabel}`;
+            warningDiv.style.display = 'block';
+        } else {
+            warningDiv.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update budget input state based on constraint selection
+     */
+    updateBudgetInputState() {
+        const constraint = this.constraintSelect.value;
+        const budgetInput = this.budgetInput;
+        const budgetLabel = document.getElementById('budget-input-label');
+
+        if (constraint === 'none') {
+            budgetInput.disabled = true;
+            budgetInput.style.opacity = '0.5';
+            if (budgetLabel) {
+                budgetLabel.textContent = 'Budget (β - inactive)';
+                budgetLabel.style.opacity = '0.5';
+            }
+        } else {
+            budgetInput.disabled = false;
+            budgetInput.style.opacity = '1';
+            if (budgetLabel) {
+                budgetLabel.textContent = 'Budget (β)';
+                budgetLabel.style.opacity = '1';
+            }
+        }
+    }
+
+    /**
+     * Update num models input visibility based on optimization mode
+     */
+    updateNumModelsVisibility() {
+        const optMode = this.optModeSelect.value;
+        const numModelsContainer = document.getElementById('num-models-container');
+
+        if (numModelsContainer) {
+            if (optMode === 'ignore') {
+                numModelsContainer.style.display = 'block';
+            } else {
+                numModelsContainer.style.display = 'none';
+            }
         }
     }
 }

@@ -96,7 +96,10 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="monoid-select">Monoid (Cost Aggregation)</label>
+                            <label for="monoid-select">
+                                Monoid (Attack Aggregation)
+                                <span class="info-hint" title="Aggregates attack strength/weakness depending on polarity">ⓘ</span>
+                            </label>
                             <select id="monoid-select" class="select">
                                 <option value="max">MAX - Minimize/Maximize Worst Attack</option>
                                 <option value="sum">SUM - Minimize/Maximize Total Cost</option>
@@ -169,12 +172,15 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="optimize-select">Optimization Direction</label>
+                            <label for="optimize-select">
+                                Optimization Direction
+                                <span class="info-hint" id="opt-dir-hint" title="Automatically inferred from polarity in normal mode">ⓘ</span>
+                            </label>
                             <select id="optimize-select" class="select">
-                                <option value="none">None</option>
                                 <option value="minimize" selected>Minimize (Cost Semantics)</option>
                                 <option value="maximize">Maximize (Reward Semantics)</option>
                             </select>
+                            <div id="opt-dir-warning" class="warning-message" style="display: none; margin-top: 4px; font-size: 0.85em; color: var(--warning-color);"></div>
                         </div>
 
                         <div class="config-item">
@@ -195,12 +201,12 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="budget-input">Budget (β)</label>
+                            <label for="budget-input" id="budget-input-label">Budget (β)</label>
                             <input type="number" id="budget-input" class="select" value="100" min="0" max="1000">
                         </div>
 
-                        <div class="config-item">
-                            <label for="num-models-input">Number of Models (0 = all)</label>
+                        <div class="config-item" id="num-models-container">
+                            <label for="num-models-input">Max Models (0 = no limit)</label>
                             <input type="number" id="num-models-input" class="select" value="0" min="0" max="100">
                         </div>
 
