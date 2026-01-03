@@ -727,7 +727,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         color: nodeColor,
                         title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
                         font: {
-                            color: isDark ? '#f1f5f9' : '#1e293b'
+                            color: '#f1f5f9'  // Always white for contrast with purple background
                         },
                         assumptions: el.data.id.split(',').filter(a => a !== '∅') // Store assumptions for filtering
                     };
@@ -822,7 +822,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b'
+                        color: '#f1f5f9'  // Always white for contrast with purple background
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
@@ -968,7 +968,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        color: '#f1f5f9',  // Always white for contrast
                         size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
@@ -1096,7 +1096,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b'
+                        color: '#f1f5f9'  // Always white for contrast with purple background
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
@@ -1217,7 +1217,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     },
                                     title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
                                     font: {
-                                        color: isDark ? '#f1f5f9' : '#1e293b',
+                                        color: '#f1f5f9',  // Always white for contrast
                                         size: 25  // Increased for labels inside nodes
                                     },
                                     isJunction: true,
@@ -1305,7 +1305,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        color: '#f1f5f9',  // Always white for contrast
                         size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
