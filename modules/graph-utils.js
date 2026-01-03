@@ -179,21 +179,21 @@ export class GraphUtils {
     static getLayoutOptions(quickMode = false) {
         return {
             enabled: true,
-            timestep: 0.5,
+            timestep: 0.6,  // Increased for faster convergence
             maxVelocity: quickMode ? 100 : 50,
-            minVelocity: 0.75,
+            minVelocity: 1.0,  // Increased to stop earlier
             solver: 'barnesHut',
             barnesHut: {
                 gravitationalConstant: -2000,  // Reduced for less movement
                 centralGravity: 0.1,  // Reduced central pull
                 springLength: 250,  // Longer springs for better spread
                 springConstant: 0.04,  // Weaker springs
-                damping: 0.7,  // Higher damping to stop movement faster
+                damping: 0.85,  // Increased damping for faster stabilization
                 avoidOverlap: 0.5  // Stronger overlap avoidance
             },
             stabilization: {
                 enabled: true,
-                iterations: quickMode ? 150 : 500,  // More iterations for better layout
+                iterations: quickMode ? 100 : 250,  // Reduced iterations for faster convergence
                 updateInterval: 25,
                 onlyDynamicEdges: false,
                 fit: true
@@ -234,7 +234,7 @@ export class GraphUtils {
                 },
                 font: {
                     size: 12,
-                    align: 'top',  // Position labels above edge for better visibility with curves
+                    align: 'middle',  // Position labels on the edge
                     ...GraphUtils.getEdgeFontColor()
                 },
                 smooth: {
