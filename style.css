@@ -2990,7 +2990,7 @@ button:focus-visible,
 }
 
 [data-theme="light"] .atom-name {
-    color: #5568d3;
+    color: white;
 }
 
 [data-theme="light"] .metric-num {
