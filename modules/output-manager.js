@@ -5,12 +5,13 @@ import { PopupManager } from './popup-manager.js?v=20260101-1';
 import { MetricsManager } from './metrics-manager.js?v=20260102-1';
 
 export class OutputManager {
-    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {
+    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect, polaritySelect) {
         this.output = output;
         this.stats = stats;
         this.semiringSelect = semiringSelect;
         this.monoidSelect = monoidSelect;
         this.optimizeSelect = optimizeSelect;
+        this.polaritySelect = polaritySelect;
         this.activeExtensionId = null;  // Track currently highlighted extension
     }
 
@@ -237,8 +238,14 @@ export class OutputManager {
             return;
         }
 
-        // Compute metrics
-        const metricsData = MetricsManager.computeMetrics(this.storedWitnesses);
+        // Build config for metrics computation
+        const config = {
+            polarity: this.polaritySelect ? this.polaritySelect.value : 'cost',
+            monoid: this.monoidSelect ? this.monoidSelect.value : 'max'
+        };
+
+        // Compute metrics with config
+        const metricsData = MetricsManager.computeMetrics(this.storedWitnesses, config);
 
         if (!metricsData) {
             this.log('⚠️ Could not compute metrics', 'warning');

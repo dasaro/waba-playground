@@ -8,14 +8,43 @@
 
 export class MetricsManager {
     /**
+     * Get analysis context based on configuration
+     * @param {Object} config - {polarity: 'strength'|'cost', monoid: string}
+     * @returns {Object} Analysis context with polarity-specific settings
+     */
+    static getAnalysisContext(config) {
+        const polarity = config.polarity || 'cost';
+        const isReward = polarity === 'strength';
+
+        return {
+            polarity: isReward ? 'reward' : 'cost',
+            betterDirection: isReward ? 'higher' : 'lower',
+            comparatorText: isReward ? '≥' : '≤',
+            sortAscending: !isReward,  // cost: ascending (low to high), reward: descending (high to low)
+            metricLabels: {
+                score: isReward ? 'Reward/Strength' : 'Cost/Penalty',
+                optimal: isReward ? 'Best Reward' : 'Optimal Cost',
+                slack: isReward ? 'Δ (reward slack)' : 'ε (cost slack)',
+                gap: isReward ? 'Gap from Best' : 'Regret from Optimal',
+                better: isReward ? 'Higher' : 'Lower',
+                worse: isReward ? 'Lower' : 'Higher'
+            }
+        };
+    }
+
+    /**
      * Compute all metrics from stored witnesses
      * @param {Array} witnesses - Array of {cost, parsed: {in, weights, contraries}}
-     * @returns {Object} {global, atoms, hasSupport}
+     * @param {Object} config - {polarity: 'strength'|'cost', monoid: string}
+     * @returns {Object} {global, atoms, hasSupport, context}
      */
-    static computeMetrics(witnesses) {
+    static computeMetrics(witnesses, config = {}) {
         if (!witnesses || witnesses.length === 0) {
             return null;
         }
+
+        // Get analysis context based on config
+        const context = this.getAnalysisContext(config);
 
         // Extract and normalize data
         const models = witnesses.map(w => ({
@@ -26,7 +55,7 @@ export class MetricsManager {
         }));
 
         // Compute global metrics and near-optimal set S
-        const { global, S } = this.computeGlobalMetrics(models);
+        const { global, S } = this.computeGlobalMetrics(models, context);
 
         // Collect all atoms (union of inAtoms and support keys)
         const allAtoms = this.collectAllAtoms(models);
@@ -40,24 +69,31 @@ export class MetricsManager {
         // Compute per-atom metrics
         const atoms = {};
         allAtoms.forEach(atom => {
-            atoms[atom] = this.computeAtomMetrics(atom, models, S, global.optCost, hasSupport, contraries);
+            atoms[atom] = this.computeAtomMetrics(atom, models, S, global.optCost, hasSupport, contraries, context);
         });
 
-        return { global, atoms, hasSupport };
+        return { global, atoms, hasSupport, context };
     }
 
     /**
      * Compute global metrics and select near-optimal set S
      * Uses level-based selection: K=2 initial levels, extend to m=3 models minimum
+     * @param {Array} models - Array of model objects
+     * @param {Object} context - Analysis context with polarity info
+     * @param {number} K - Number of initial cost levels to include
+     * @param {number} m - Minimum number of models in S
      */
-    static computeGlobalMetrics(models, K = 2, m = 3) {
-        // Get sorted distinct cost levels
+    static computeGlobalMetrics(models, context, K = 2, m = 3) {
+        // Get sorted distinct cost levels (ascending for cost, descending for reward)
         const costs = models.map(model => model.cost);
-        const levels = [...new Set(costs)].sort((a, b) => a - b);
+        const levels = [...new Set(costs)].sort((a, b) =>
+            context.sortAscending ? a - b : b - a
+        );
 
-        const optCost = levels[0];
+        const optCost = levels[0];  // Best score (lowest for cost, highest for reward)
         const secondBestCost = levels.length > 1 ? levels[1] : null;
-        const gap = secondBestCost !== null ? secondBestCost - optCost : null;
+        // Gap is always positive (absolute difference)
+        const gap = secondBestCost !== null ? Math.abs(secondBestCost - optCost) : null;
 
         // Start with K cost levels
         let allowedLevels = levels.slice(0, Math.min(K, levels.length));
@@ -71,8 +107,14 @@ export class MetricsManager {
             levelIndex++;
         }
 
-        // Derive epsilon implicitly (for display only)
-        const epsilon = allowedLevels.length > 0 ? Math.max(...allowedLevels) - optCost : 0;
+        // Derive epsilon/delta implicitly (for display only)
+        // Cost mode: ε = max(allowedLevels) - optCost (how far above optimal)
+        // Reward mode: Δ = optCost - min(allowedLevels) (how far below best)
+        const epsilon = allowedLevels.length > 0
+            ? (context.sortAscending
+                ? Math.max(...allowedLevels) - optCost  // cost mode
+                : optCost - Math.min(...allowedLevels)) // reward mode
+            : 0;
 
         // Compute diversity (average pairwise Jaccard distance)
         const diversity = this.computeDiversity(S);
@@ -142,28 +184,50 @@ export class MetricsManager {
 
     /**
      * Compute per-atom metrics
-     * Boolean entailment over S; cost sensitivity over ALL models
+     * Boolean entailment over S; score sensitivity over ALL models
+     * @param {string} atom - Atom to compute metrics for
+     * @param {Array} models - All models
+     * @param {Array} S - Near-optimal set
+     * @param {number} optCost - Optimal score (best score regardless of polarity)
+     * @param {boolean} hasSupport - Whether support data is available
+     * @param {Map} contraries - Contraries map
+     * @param {Object} context - Analysis context with polarity info
      */
-    static computeAtomMetrics(atom, models, S, optCost, hasSupport, contraries) {
+    static computeAtomMetrics(atom, models, S, optCost, hasSupport, contraries, context) {
         const metrics = {};
 
         // Boolean entailment (S-bounded)
         metrics.brave_S = S.some(m => m.inAtoms.has(atom));
         metrics.cautious_S = S.length > 0 && S.every(m => m.inAtoms.has(atom));
 
-        // Cost sensitivity (computed over ALL models, not just S)
-        const costsWithAtom = models
+        // Score sensitivity (computed over ALL models, not just S)
+        const scoresWithAtom = models
             .filter(m => m.inAtoms.has(atom))
             .map(m => m.cost);
-        const costsWithoutAtom = models
+        const scoresWithoutAtom = models
             .filter(m => !m.inAtoms.has(atom))
             .map(m => m.cost);
 
-        metrics.bestWith = costsWithAtom.length > 0 ? Math.min(...costsWithAtom) : Infinity;
-        metrics.bestWithout = costsWithoutAtom.length > 0 ? Math.min(...costsWithoutAtom) : Infinity;
+        // Best score depends on polarity
+        // Cost mode: lower is better (Math.min)
+        // Reward mode: higher is better (Math.max)
+        const bestFunc = context.sortAscending ? Math.min : Math.max;
+        const worstValue = context.sortAscending ? Infinity : -Infinity;
 
-        metrics.regret = metrics.bestWith !== Infinity ? metrics.bestWith - optCost : null;
-        metrics.penalty = (metrics.bestWith !== Infinity && metrics.bestWithout !== Infinity)
+        metrics.bestWith = scoresWithAtom.length > 0 ? bestFunc(...scoresWithAtom) : worstValue;
+        metrics.bestWithout = scoresWithoutAtom.length > 0 ? bestFunc(...scoresWithoutAtom) : worstValue;
+
+        // Regret/Gap is always >= 0
+        // Cost mode: regret = bestWith - optCost (how much worse)
+        // Reward mode: gap = optCost - bestWith (how much worse)
+        metrics.regret = metrics.bestWith !== worstValue
+            ? Math.abs(metrics.bestWith - optCost)
+            : null;
+
+        // Penalty/Advantage: difference between with and without
+        // Cost mode: penalty = bestWith - bestWithout (positive = atom makes it worse)
+        // Reward mode: advantage = bestWith - bestWithout (positive = atom makes it better)
+        metrics.penalty = (metrics.bestWith !== worstValue && metrics.bestWithout !== worstValue)
             ? metrics.bestWith - metrics.bestWithout
             : null;
 
@@ -213,7 +277,8 @@ export class MetricsManager {
             return '<div class="info-message">No metrics available. Run WABA first.</div>';
         }
 
-        const { global, atoms, hasSupport } = metricsData;
+        const { global, atoms, hasSupport, context } = metricsData;
+        const labels = context.metricLabels;
 
         let html = '<div class="metrics-container">';
 
@@ -222,15 +287,15 @@ export class MetricsManager {
         html += '<button id="export-metrics-csv-btn" class="export-metrics-btn">📥 Download Metrics (CSV)</button>';
         html += '</div>';
 
-        // Global metrics section
+        // Global metrics section with polarity-aware labels
         html += '<div class="metrics-section">';
         html += '<h3 class="metrics-header">Global Metrics (Near-Optimal Set S)</h3>';
         html += '<div class="metrics-grid">';
-        html += `<div class="metric-item"><span class="metric-label">Optimal Cost:</span> <span class="metric-value">${global.optCost.toFixed(2)}</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Second-Best Cost:</span> <span class="metric-value">${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Gap (Δ):</span> <span class="metric-value">${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Cost Levels in S:</span> <span class="metric-value">[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]</span></div>`;
-        html += `<div class="metric-item"><span class="metric-label">Derived ε (max-opt):</span> <span class="metric-value">${global.epsilon.toFixed(2)}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">${labels.optimal}:</span> <span class="metric-value">${global.optCost.toFixed(2)}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Second-Best ${labels.score}:</span> <span class="metric-value">${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Gap:</span> <span class="metric-value">${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Score Levels in S:</span> <span class="metric-value">[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]</span></div>`;
+        html += `<div class="metric-item"><span class="metric-label">Derived ${labels.slack}:</span> <span class="metric-value">${global.epsilon.toFixed(2)}</span></div>`;
         html += `<div class="metric-item"><span class="metric-label">Models in S:</span> <span class="metric-value">${global.numInS} / ${global.totalModels}</span></div>`;
         html += `<div class="metric-item"><span class="metric-label">Diversity:</span> <span class="metric-value">${global.diversity.toFixed(3)}</span></div>`;
         html += '</div></div>';
@@ -241,13 +306,24 @@ export class MetricsManager {
         html += '<div class="metrics-table-container">';
         html += '<table class="metrics-table">';
 
-        // Table header with info icons
+        // Table header with info icons (polarity-aware)
         html += '<thead><tr>';
         html += '<th>Atom</th>';
         html += '<th>Brave<sub>S</sub> <span class="info-icon" title="Exists in at least one model in S (credulous reasoning)">ⓘ</span></th>';
         html += '<th>Cautious<sub>S</sub> <span class="info-icon" title="Exists in all models in S (skeptical reasoning)">ⓘ</span></th>';
-        html += '<th>Regret <span class="info-icon" title="Cost increase for accepting atom: bestWith(p) - optCost (computed over all models)">ⓘ</span></th>';
-        html += '<th>Penalty <span class="info-icon" title="Cost difference with/without atom: bestWith(p) - bestWithout(p) (computed over all models). Negative = accepting atom reduces cost">ⓘ</span></th>';
+
+        // Regret column (polarity-aware tooltip)
+        const regretTooltip = context.polarity === 'reward'
+            ? 'Gap from best: |bestWith(p) - bestScore| (computed over all models)'
+            : 'Regret for accepting atom: |bestWith(p) - optCost| (computed over all models)';
+        html += `<th>${labels.gap} <span class="info-icon" title="${regretTooltip}">ⓘ</span></th>`;
+
+        // Penalty/Advantage column (polarity-aware tooltip)
+        const penaltyLabel = context.polarity === 'reward' ? 'Advantage' : 'Penalty';
+        const penaltyTooltip = context.polarity === 'reward'
+            ? 'Score difference with/without atom: bestWith(p) - bestWithout(p). Positive = accepting atom increases reward'
+            : 'Cost difference with/without atom: bestWith(p) - bestWithout(p). Negative = accepting atom reduces cost';
+        html += `<th>${penaltyLabel} <span class="info-icon" title="${penaltyTooltip}">ⓘ</span></th>`;
 
         if (hasSupport) {
             html += '<th>Π<sub>S</sub> <span class="info-icon" title="Possibilistic plausibility: maximum support value in S (higher = stronger in best scenarios)">ⓘ</span></th>';
