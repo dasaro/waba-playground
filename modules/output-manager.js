@@ -105,17 +105,26 @@ export class OutputManager {
             return;
         }
 
-        // Create download button
+        // Create download button with unified styling
         const button = document.createElement('button');
         button.id = 'download-all-extensions-btn';
-        button.className = 'download-all-btn';
+        button.className = 'analysis-action-btn';
         button.innerHTML = '💾 Download All Extensions';
         button.addEventListener('click', () => this.downloadAllExtensions());
 
-        // Insert into export section (Analysis panel)
+        // Get or create button group container
+        let buttonGroup = document.getElementById('analysis-button-group');
         const exportSection = document.getElementById('export-section');
-        if (exportSection) {
-            exportSection.appendChild(button);
+
+        if (!buttonGroup && exportSection) {
+            buttonGroup = document.createElement('div');
+            buttonGroup.id = 'analysis-button-group';
+            buttonGroup.className = 'analysis-button-group';
+            exportSection.appendChild(buttonGroup);
+        }
+
+        if (buttonGroup) {
+            buttonGroup.appendChild(button);
         } else {
             // Fallback: insert at top of output if export section not found
             this.output.insertBefore(button, this.output.firstChild);
@@ -194,19 +203,28 @@ export class OutputManager {
             return;
         }
 
-        // Create metrics toggle button
+        // Create metrics toggle button with unified styling
         const button = document.createElement('button');
         button.id = 'metrics-toggle-btn';
-        button.className = 'metrics-toggle-btn';
+        button.className = 'analysis-action-btn';
         button.innerHTML = '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
         button.addEventListener('click', () => this.toggleMetrics(button));
 
-        // Insert into metrics section (Analysis panel)
-        const metricsSection = document.getElementById('metrics-section');
-        if (metricsSection) {
-            metricsSection.appendChild(button);
+        // Add to the same button group as download button
+        let buttonGroup = document.getElementById('analysis-button-group');
+        const exportSection = document.getElementById('export-section');
+
+        if (!buttonGroup && exportSection) {
+            buttonGroup = document.createElement('div');
+            buttonGroup.id = 'analysis-button-group';
+            buttonGroup.className = 'analysis-button-group';
+            exportSection.appendChild(buttonGroup);
+        }
+
+        if (buttonGroup) {
+            buttonGroup.appendChild(button);
         } else {
-            // Fallback: insert after download button if metrics section not found
+            // Fallback: insert after download button if button group not found
             const downloadBtn = document.getElementById('download-all-extensions-btn');
             if (downloadBtn && downloadBtn.nextSibling) {
                 this.output.insertBefore(button, downloadBtn.nextSibling);
@@ -262,10 +280,17 @@ export class OutputManager {
             metricsDiv.id = 'metrics-display';
             metricsDiv.style.display = 'block';
 
-            // Insert into metrics section (Analysis panel)
-            const metricsSection = document.getElementById('metrics-section');
-            if (metricsSection && button.parentNode === metricsSection) {
-                metricsSection.appendChild(metricsDiv);
+            // Insert into export section after button group
+            const exportSection = document.getElementById('export-section');
+            const buttonGroup = document.getElementById('analysis-button-group');
+
+            if (exportSection && buttonGroup && buttonGroup.parentNode === exportSection) {
+                // Insert after button group
+                if (buttonGroup.nextSibling) {
+                    exportSection.insertBefore(metricsDiv, buttonGroup.nextSibling);
+                } else {
+                    exportSection.appendChild(metricsDiv);
+                }
             } else {
                 // Fallback: insert after button
                 if (button.nextSibling) {
@@ -827,11 +852,9 @@ export class OutputManager {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
 
-        // Clear analysis panel sections
+        // Clear analysis panel section
         const exportSection = document.getElementById('export-section');
-        const metricsSection = document.getElementById('metrics-section');
         if (exportSection) exportSection.innerHTML = '';
-        if (metricsSection) metricsSection.innerHTML = '';
 
         // Show output empty state after clearing
         if (window.showOutputEmptyState) {

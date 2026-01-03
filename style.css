@@ -3030,25 +3030,54 @@ button:focus-visible,
     gap: var(--space-md);
 }
 
-/* Export section styling */
-#export-section {
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: var(--space-lg);
-}
-
+/* Export section styling - now unified with metrics */
 #export-section:empty {
     display: none;
 }
 
-/* Metrics section styling */
-#metrics-section:empty {
-    display: none;
+/* Analysis button group - unified container for all action buttons */
+.analysis-button-group {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-lg);
 }
 
-/* Button row for download/metrics */
-.analysis-section > .download-all-btn,
-.analysis-section > .metrics-toggle-btn {
-    align-self: flex-start;
+/* Unified button styling for analysis panel actions */
+.analysis-action-btn {
+    padding: var(--space-xs) var(--space-md);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.analysis-action-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.analysis-action-btn:active {
+    transform: translateY(0);
+}
+
+/* Toggle icon animation for expandable buttons */
+.analysis-action-btn .toggle-icon {
+    transition: transform var(--transition-fast);
+}
+
+.analysis-action-btn.expanded .toggle-icon {
+    transform: rotate(90deg);
 }
 
 /* Improve metrics table spacing in full-width layout */
@@ -3062,7 +3091,7 @@ button:focus-visible,
 }
 
 /* Hide analysis panel when empty */
-.analysis-panel:has(#export-section:empty):has(#metrics-section:empty) {
+.analysis-panel:has(#export-section:empty) {
     display: none;
 }
 
@@ -3070,6 +3099,15 @@ button:focus-visible,
 @media (max-width: 768px) {
     .analysis-content {
         gap: var(--space-lg);
+    }
+
+    .analysis-button-group {
+        flex-direction: column;
+    }
+
+    .analysis-action-btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 
@@ -3080,6 +3118,18 @@ button:focus-visible,
 
 [data-theme="light"] .analysis-section {
     border-color: #e2e8f0;
+}
+
+[data-theme="light"] .analysis-action-btn {
+    background: #ffffff;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+[data-theme="light"] .analysis-action-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 /* Better visual separation for Analysis panel */
@@ -3098,12 +3148,6 @@ button:focus-visible,
 
 .analysis-panel .panel-toggle:hover {
     background: rgba(255, 255, 255, 0.2);
-}
-
-/* Improve button spacing in analysis sections */
-.analysis-section .download-all-btn,
-.analysis-section .metrics-toggle-btn {
-    margin-bottom: var(--space-md);
 }
 
 /* Add subtle background to analysis content */
