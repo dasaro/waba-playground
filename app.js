@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260103-3 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260103-4 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -818,29 +818,102 @@ class WABAPlayground {
     }
 
     populateSimpleModeFromClingo(clingoCode) {
-        // Parse clingo code and populate simple mode fields
-        const assumptions = ParserUtils.parseAssumptions(clingoCode);
-        const contraries = ParserUtils.parseContraries(clingoCode);
-        const rules = ParserUtils.parseRules(clingoCode);
-        const weights = ParserUtils.parseWeights(clingoCode);
+        // Parse clingo code and populate simple mode fields (with comments preserved)
+        const lines = clingoCode.split('\n').map(l => l.trim());
 
-        // Populate assumptions
-        this.assumptionsInput.value = assumptions.join('\n');
+        // Extract description and section-specific content with comments
+        const descriptionLines = [];
+        const assumptionLines = [];
+        const ruleLines = [];
+        const contraryLines = [];
+        const weightLines = [];
 
-        // Populate rules
-        const rulesFormatted = rules.map(r => {
-            const bodyStr = r.body.length > 0 ? r.body.join(', ') : '';
-            return `${r.head} <- ${bodyStr}`;
-        });
-        this.rulesInput.value = rulesFormatted.join('\n');
+        let currentSection = null;
 
-        // Populate contraries
-        const contrariesFormatted = contraries.map(c => `(${c.assumption}, ${c.contrary})`);
-        this.contrariesInput.value = contrariesFormatted.join('\n');
+        for (const line of lines) {
+            // Skip empty lines
+            if (!line) continue;
 
-        // Populate weights
-        const weightsFormatted = Object.entries(weights).map(([atom, weight]) => `${atom}: ${weight}`);
-        this.weightsInput.value = weightsFormatted.join('\n');
+            // Extract description lines (% //)
+            if (line.startsWith('% //')) {
+                const descLine = line.substring(4).trim();
+                descriptionLines.push(descLine);
+                continue;
+            }
+
+            // Detect section headers
+            if (line.match(/%+\s*Assumptions/i)) {
+                currentSection = 'assumptions';
+                continue;
+            } else if (line.match(/%+\s*Rules/i)) {
+                currentSection = 'rules';
+                continue;
+            } else if (line.match(/%+\s*Contraries/i)) {
+                currentSection = 'contraries';
+                continue;
+            } else if (line.match(/%+\s*Weights/i)) {
+                currentSection = 'weights';
+                continue;
+            }
+
+            // Preserve inline comments in appropriate section
+            if (line.startsWith('%')) {
+                if (currentSection === 'assumptions') assumptionLines.push(line);
+                else if (currentSection === 'rules') ruleLines.push(line);
+                else if (currentSection === 'contraries') contraryLines.push(line);
+                else if (currentSection === 'weights') weightLines.push(line);
+                continue;
+            }
+
+            // Parse content based on current section
+            if (currentSection === 'assumptions') {
+                const match = line.match(/^assumption\(([^)]+)\)\.$/);
+                if (match) assumptionLines.push(match[1]);
+            } else if (currentSection === 'rules') {
+                // Check for head(...) declarations
+                const headMatch = line.match(/^head\(([^,]+),\s*([^)]+)\)\./);
+                if (headMatch) {
+                    // Extract rule comment if present
+                    const commentMatch = clingoCode.match(new RegExp(`%\\s*${headMatch[1]}:\\s*([^\\n]+)`, 'i'));
+                    if (commentMatch) {
+                        ruleLines.push(`% ${commentMatch[1]}`);
+                    }
+
+                    // Build rule from head/body predicates
+                    const ruleId = headMatch[1];
+                    const head = headMatch[2];
+                    const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
+                    const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
+                    const bodyAtoms = bodyMatches.map(m => m[1]);
+
+                    const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
+                    ruleLines.push(`${head} <- ${bodyStr}`);
+                }
+            } else if (currentSection === 'contraries') {
+                const match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+                if (match) contraryLines.push(`(${match[1]}, ${match[2]})`);
+            } else if (currentSection === 'weights') {
+                const match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+                if (match) weightLines.push(`${match[1]}: ${match[2]}`);
+            }
+        }
+
+        // Populate description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent && descriptionLines.length > 0) {
+            descriptionContent.value = descriptionLines.join('\n');
+        } else if (descriptionContent) {
+            descriptionContent.value = '';
+        }
+
+        // Populate simple mode fields (with comments)
+        this.assumptionsInput.value = assumptionLines.join('\n');
+        this.rulesInput.value = ruleLines.join('\n');
+        this.contrariesInput.value = contraryLines.join('\n');
+        this.weightsInput.value = weightLines.join('\n');
+
+        // Update description box visibility
+        this.updateSimpleDescription();
     }
 
     // ===================================

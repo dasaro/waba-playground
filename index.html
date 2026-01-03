@@ -246,6 +246,8 @@
 
                     <!-- Advanced Mode: Code Editor -->
                     <textarea id="code-editor" class="code-editor code-editor-textarea" placeholder="Enter your WABA framework here...
+% Lines starting with % are comments
+
 Example:
 assumption(a).
 assumption(b).
@@ -278,6 +280,7 @@ contrary(b, c_b)."></textarea>
                         <div class="simple-grid">
                             <div class="simple-field">
                                 <label for="assumptions-input">Assumptions (one per line)</label>
+                                <span class="comment-hint">Lines starting with % are comments</span>
                                 <textarea id="assumptions-input" class="simple-textarea" placeholder="a
 b
 c"></textarea>
@@ -285,17 +288,20 @@ c"></textarea>
 
                             <div class="simple-field">
                                 <label for="rules-input">Rules (format: head <- body1, body2)</label>
+                                <span class="comment-hint">Lines starting with % are comments</span>
                                 <textarea id="rules-input" class="simple-textarea" placeholder="c_a <- b"></textarea>
                             </div>
 
                             <div class="simple-field">
                                 <label for="contraries-input">Contraries (format: (assumption, contrary))</label>
+                                <span class="comment-hint">Lines starting with % are comments</span>
                                 <textarea id="contraries-input" class="simple-textarea" placeholder="(a, c_a)
 (b, c_b)"></textarea>
                             </div>
 
                             <div class="simple-field">
                                 <label for="weights-input">Weights (format: atom: weight)</label>
+                                <span class="comment-hint">Lines starting with % are comments</span>
                                 <textarea id="weights-input" class="simple-textarea" placeholder="a: 80
 b: 60
 c_a: 70"></textarea>

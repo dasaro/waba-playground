@@ -304,6 +304,7 @@ export class FileManager {
         const contraries = [];
         const weights = [];
         const description = [];
+        let currentSection = null;
 
         for (const line of lines) {
             // Skip empty lines
@@ -316,8 +317,30 @@ export class FileManager {
                 continue;
             }
 
-            // Skip other comments (%)
-            if (line.startsWith('%')) continue;
+            // Preserve inline comments (not section headers) - add to appropriate section
+            if (line.startsWith('%')) {
+                // Detect section headers to determine current context
+                if (line.match(/%\s*Assumptions:/i)) {
+                    currentSection = 'assumptions';
+                    continue;
+                } else if (line.match(/%\s*Rules:/i)) {
+                    currentSection = 'rules';
+                    continue;
+                } else if (line.match(/%\s*Contraries:/i)) {
+                    currentSection = 'contraries';
+                    continue;
+                } else if (line.match(/%\s*Weights:/i)) {
+                    currentSection = 'weights';
+                    continue;
+                }
+
+                // Add inline comment to current section
+                if (currentSection === 'assumptions') assumptions.push(line);
+                else if (currentSection === 'rules') rules.push(line);
+                else if (currentSection === 'contraries') contraries.push(line);
+                else if (currentSection === 'weights') weights.push(line);
+                continue;
+            }
 
             // Check for rule: "a <- b,d" or "d <- c"
             const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
