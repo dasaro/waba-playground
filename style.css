@@ -645,12 +645,36 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 .description-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-weight: 700;
     font-size: var(--text-base);
     color: var(--primary-color);
     margin-bottom: var(--space-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.remove-description-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: var(--text-lg);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.remove-description-btn:hover {
+    color: var(--error-color);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.remove-description-btn:active {
+    transform: scale(0.95);
 }
 
 .description-content {

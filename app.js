@@ -610,6 +610,12 @@ class WABAPlayground {
             addCommentBtn.addEventListener('click', () => this.addDescriptionTemplate());
         }
 
+        // Remove Description button
+        const removeDescriptionBtn = document.getElementById('simple-remove-description-btn');
+        if (removeDescriptionBtn) {
+            removeDescriptionBtn.addEventListener('click', () => this.removeDescription());
+        }
+
         // Sync description textarea changes back to % COMMENT block
         const descriptionContent = document.getElementById('simple-description-content');
         if (descriptionContent) {
@@ -669,8 +675,8 @@ class WABAPlayground {
     }
 
     addDescriptionTemplate() {
-        // Add // description template to the first textarea (assumptions)
-        const template = '// Enter your description here\n\n';
+        // Add % // description template to the first textarea (assumptions)
+        const template = '% // Enter your description here\n\n';
         const currentValue = this.assumptionsInput.value;
 
         // If there's already content, prepend the template
@@ -686,6 +692,39 @@ class WABAPlayground {
 
         // Update the description box
         this.updateSimpleDescription();
+    }
+
+    removeDescription() {
+        // Remove all % // description lines from all input fields
+        const inputs = [
+            this.assumptionsInput,
+            this.rulesInput,
+            this.contrariesInput,
+            this.weightsInput
+        ];
+
+        inputs.forEach(input => {
+            const lines = input.value.split('\n');
+            const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('% //'));
+            input.value = nonDescriptionLines.join('\n').trim();
+
+            // Add back a newline at the end if there's content
+            if (input.value) {
+                input.value += '\n';
+            }
+        });
+
+        // Clear the description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.value = '';
+        }
+
+        // Update the description box visibility
+        this.updateSimpleDescription();
+
+        // Regenerate graph
+        this.regenerateGraph();
     }
 
     syncDescriptionToComment() {

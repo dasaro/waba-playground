@@ -277,7 +277,12 @@ contrary(b, c_b)."></textarea>
                     <div id="simple-mode" class="simple-mode">
                         <!-- Description Box (shown only if description exists) -->
                         <div id="simple-description-box" class="simple-description-box" hidden>
-                            <div class="description-header">Description</div>
+                            <div class="description-header">
+                                <span>Description</span>
+                                <button id="simple-remove-description-btn" class="remove-description-btn" title="Remove description">
+                                    ✕
+                                </button>
+                            </div>
                             <textarea id="simple-description-content" class="description-content" placeholder="Enter description here..." rows="3"></textarea>
                         </div>
 
