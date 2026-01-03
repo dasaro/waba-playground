@@ -282,9 +282,9 @@ export class MetricsManager {
 
         let html = '<div class="metrics-container">';
 
-        // CSV Export button
+        // CSV Export button (downloads 2 separate files)
         html += '<div class="metrics-actions">';
-        html += '<button id="export-metrics-csv-btn" class="export-metrics-btn">📥 Download Metrics (CSV)</button>';
+        html += '<button id="export-metrics-csv-btn" class="export-metrics-btn" title="Downloads 2 CSV files: global metrics and per-atom metrics">📥 Download Metrics (2 CSV files)</button>';
         html += '</div>';
 
         // Global metrics section with polarity-aware labels
@@ -378,34 +378,48 @@ export class MetricsManager {
     }
 
     /**
-     * Export metrics to CSV format
+     * Export global metrics to CSV format (single header, clean format)
      */
-    static exportMetricsCSV(metricsData) {
+    static exportGlobalMetricsCSV(metricsData) {
         if (!metricsData) {
             return null;
         }
 
-        const { global, atoms, hasSupport } = metricsData;
+        const { global, context } = metricsData;
+        const labels = context.metricLabels;
         let csv = '';
 
-        // Global Metrics Section
-        csv += 'GLOBAL METRICS (Near-Optimal Set S)\n';
+        // Single header row
         csv += 'Metric,Value\n';
-        csv += `Optimal Cost,${global.optCost.toFixed(2)}\n`;
-        csv += `Second-Best Cost,${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}\n`;
-        csv += `Gap (Δ),${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}\n`;
-        csv += `Cost Levels in S,"[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]"\n`;
-        csv += `Derived ε (max-opt),${global.epsilon.toFixed(2)}\n`;
+
+        // Data rows (polarity-aware labels)
+        csv += `${labels.optimal},${global.optCost.toFixed(2)}\n`;
+        csv += `Second-Best ${labels.score},${global.secondBestCost !== null ? global.secondBestCost.toFixed(2) : 'N/A'}\n`;
+        csv += `Gap,${global.gap !== null ? global.gap.toFixed(2) : 'N/A'}\n`;
+        csv += `Score Levels in S,"[${global.allowedLevels.map(x => x.toFixed(2)).join(', ')}]"\n`;
+        csv += `${labels.slack},${global.epsilon.toFixed(2)}\n`;
         csv += `Models in S,${global.numInS}\n`;
         csv += `Total Models,${global.totalModels}\n`;
         csv += `Diversity,${global.diversity.toFixed(3)}\n`;
-        csv += '\n';
 
-        // Per-Atom Metrics Section
-        csv += 'PER-ATOM METRICS\n';
+        return csv;
+    }
 
-        // CSV Header
-        let headers = ['Atom', 'Brave_S', 'Cautious_S', 'Regret', 'Penalty'];
+    /**
+     * Export per-atom metrics to CSV format (single header, clean format)
+     */
+    static exportAtomMetricsCSV(metricsData) {
+        if (!metricsData) {
+            return null;
+        }
+
+        const { atoms, hasSupport, context } = metricsData;
+        const labels = context.metricLabels;
+        let csv = '';
+
+        // Single header row (polarity-aware column names)
+        const penaltyLabel = context.polarity === 'reward' ? 'Advantage' : 'Penalty';
+        let headers = ['Atom', 'Brave_S', 'Cautious_S', labels.gap, penaltyLabel];
         if (hasSupport) {
             headers.push('Pi_S', 'N_S', 'Net_S', 'Contrary');
         }
@@ -414,7 +428,7 @@ export class MetricsManager {
         // Sort atoms alphabetically
         const sortedAtoms = Object.keys(atoms).sort();
 
-        // CSV Data Rows
+        // Data rows
         sortedAtoms.forEach(atom => {
             const m = atoms[atom];
             let row = [
@@ -441,28 +455,46 @@ export class MetricsManager {
     }
 
     /**
-     * Download metrics as CSV file
+     * Download metrics as two separate CSV files (global + per-atom)
      */
     static downloadMetricsCSV(metricsData) {
-        const csv = this.exportMetricsCSV(metricsData);
-        if (!csv) {
+        if (!metricsData) {
             console.error('No metrics data to export');
             return;
         }
 
-        // Create blob and download
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        link.download = `waba-metrics-${timestamp}.csv`;
 
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Download global metrics CSV
+        const globalCSV = this.exportGlobalMetricsCSV(metricsData);
+        if (globalCSV) {
+            const blob1 = new Blob([globalCSV], { type: 'text/csv;charset=utf-8;' });
+            const url1 = URL.createObjectURL(blob1);
+            const link1 = document.createElement('a');
+            link1.href = url1;
+            link1.download = `waba-global-metrics-${timestamp}.csv`;
+            document.body.appendChild(link1);
+            link1.click();
+            document.body.removeChild(link1);
+            URL.revokeObjectURL(url1);
+        }
+
+        // Small delay to ensure separate downloads
+        setTimeout(() => {
+            // Download per-atom metrics CSV
+            const atomCSV = this.exportAtomMetricsCSV(metricsData);
+            if (atomCSV) {
+                const blob2 = new Blob([atomCSV], { type: 'text/csv;charset=utf-8;' });
+                const url2 = URL.createObjectURL(blob2);
+                const link2 = document.createElement('a');
+                link2.href = url2;
+                link2.download = `waba-atom-metrics-${timestamp}.csv`;
+                document.body.appendChild(link2);
+                link2.click();
+                document.body.removeChild(link2);
+                URL.revokeObjectURL(url2);
+            }
+        }, 100);
     }
 
     /**
