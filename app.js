@@ -616,12 +616,11 @@ class WABAPlayground {
             removeDescriptionBtn.addEventListener('click', () => this.removeDescription());
         }
 
-        // Sync description textarea changes back to % COMMENT block
+        // Regenerate graph when description changes
         const descriptionContent = document.getElementById('simple-description-content');
         if (descriptionContent) {
             descriptionContent.addEventListener('input', () => {
                 if (this.inputMode.value === 'simple') {
-                    this.syncDescriptionToComment();
                     this.regenerateGraph();
                 }
             });
@@ -639,33 +638,14 @@ class WABAPlayground {
     }
 
     updateSimpleDescription() {
-        // Extract description from all inputs (look for // lines)
-        const allInputs = [
-            ...this.assumptionsInput.value.split('\n'),
-            ...this.rulesInput.value.split('\n'),
-            ...this.contrariesInput.value.split('\n'),
-            ...this.weightsInput.value.split('\n')
-        ];
-
-        let description = [];
-
-        for (let line of allInputs) {
-            const trimmed = line.trim();
-
-            // Check for description lines starting with % //
-            if (trimmed.startsWith('% //')) {
-                const content = trimmed.substring(4).trim();
-                description.push(content);
-            }
-        }
-
-        // Update description box and add comment button
+        // Check if description textarea has content
         const descriptionBox = document.getElementById('simple-description-box');
         const descriptionContent = document.getElementById('simple-description-content');
         const addCommentContainer = document.getElementById('simple-add-comment-container');
 
-        if (description.length > 0) {
-            descriptionContent.value = description.join('\n');
+        const hasDescription = descriptionContent && descriptionContent.value.trim().length > 0;
+
+        if (hasDescription) {
             descriptionBox.removeAttribute('hidden');
             addCommentContainer.setAttribute('hidden', '');
         } else {
@@ -675,45 +655,21 @@ class WABAPlayground {
     }
 
     addDescriptionTemplate() {
-        // Add % // description template to the first textarea (assumptions)
-        const template = '% // Enter your description here\n\n';
-        const currentValue = this.assumptionsInput.value;
+        // Add description template directly to description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.value = 'Enter your description here';
 
-        // If there's already content, prepend the template
-        if (currentValue.trim()) {
-            this.assumptionsInput.value = template + currentValue;
-        } else {
-            this.assumptionsInput.value = template;
+            // Focus the description textarea and select the placeholder text
+            descriptionContent.focus();
+            descriptionContent.select();
         }
 
-        // Focus the assumptions textarea and position cursor after the template
-        this.assumptionsInput.focus();
-        this.assumptionsInput.setSelectionRange(template.length - 1, template.length - 1);
-
-        // Update the description box
+        // Update the description box visibility
         this.updateSimpleDescription();
     }
 
     removeDescription() {
-        // Remove all % // description lines from all input fields
-        const inputs = [
-            this.assumptionsInput,
-            this.rulesInput,
-            this.contrariesInput,
-            this.weightsInput
-        ];
-
-        inputs.forEach(input => {
-            const lines = input.value.split('\n');
-            const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('% //'));
-            input.value = nonDescriptionLines.join('\n').trim();
-
-            // Add back a newline at the end if there's content
-            if (input.value) {
-                input.value += '\n';
-            }
-        });
-
         // Clear the description textarea
         const descriptionContent = document.getElementById('simple-description-content');
         if (descriptionContent) {
@@ -751,22 +707,14 @@ class WABAPlayground {
     }
 
     parseSimpleABA() {
-        // Helper function to extract description and filter description lines
-        const extractDescriptionAndFilter = (lines) => {
-            let description = [];
+        // Helper function to filter comment lines (no description extraction)
+        const filterComments = (lines) => {
             const filtered = [];
 
             for (let line of lines) {
                 const trimmed = line.trim();
 
-                // Check for description lines starting with % //
-                if (trimmed.startsWith('% //')) {
-                    const content = trimmed.substring(4).trim();
-                    description.push(content);
-                    continue;
-                }
-
-                // Skip inline comments (%)
+                // Skip all comment lines (including description lines)
                 if (trimmed.startsWith('%')) {
                     continue;
                 }
@@ -777,32 +725,23 @@ class WABAPlayground {
                 }
             }
 
-            return { description, filtered };
+            return filtered;
         };
 
-        // Process all inputs and extract description
-        const allInputs = [
-            ...this.assumptionsInput.value.split('\n'),
-            ...this.rulesInput.value.split('\n'),
-            ...this.contrariesInput.value.split('\n'),
-            ...this.weightsInput.value.split('\n')
-        ];
-
-        const { description, filtered: allFiltered } = extractDescriptionAndFilter(allInputs);
+        // Get description directly from description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        const description = descriptionContent && descriptionContent.value
+            ? descriptionContent.value.split('\n').filter(line => line.trim())
+            : [];
 
         // Update description box and button visibility
         this.updateSimpleDescription();
 
         // Now process each input separately, filtering out comments
-        const assumptionsResult = extractDescriptionAndFilter(this.assumptionsInput.value.split('\n'));
-        const rulesResult = extractDescriptionAndFilter(this.rulesInput.value.split('\n'));
-        const contrariesResult = extractDescriptionAndFilter(this.contrariesInput.value.split('\n'));
-        const weightsResult = extractDescriptionAndFilter(this.weightsInput.value.split('\n'));
-
-        const rulesText = rulesResult.filtered;
-        const assumptions = assumptionsResult.filtered;
-        const contrariesText = contrariesResult.filtered;
-        const weightsText = weightsResult.filtered;
+        const assumptions = filterComments(this.assumptionsInput.value.split('\n'));
+        const rulesText = filterComments(this.rulesInput.value.split('\n'));
+        const contrariesText = filterComments(this.contrariesInput.value.split('\n'));
+        const weightsText = filterComments(this.weightsInput.value.split('\n'));
 
         let clingoCode = '%% Auto-generated from Simple Editor\n';
 

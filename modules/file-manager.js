@@ -264,18 +264,17 @@ export class FileManager {
                 this.simpleMode.style.display = 'block';
                 this.editor.style.display = 'none';
 
-                // Populate description and fields
-                // Description goes in assumptions field with % // prefix
-                let assumptionsWithDescription = '';
-                if (parsed.description && parsed.description.length > 0) {
-                    assumptionsWithDescription = parsed.description.map(line => `% // ${line}`).join('\n') + '\n';
-                }
-                assumptionsWithDescription += parsed.assumptions.join('\n');
-
-                this.assumptionsInput.value = assumptionsWithDescription;
+                // Populate fields WITHOUT description (description goes in description box only)
+                this.assumptionsInput.value = parsed.assumptions.join('\n');
                 this.rulesInput.value = parsed.rules.join('\n');
                 this.contrariesInput.value = parsed.contraries.join('\n');
                 this.weightsInput.value = parsed.weights.join('\n');
+
+                // Set description directly in description textarea
+                const descriptionContent = document.getElementById('simple-description-content');
+                if (descriptionContent && parsed.description && parsed.description.length > 0) {
+                    descriptionContent.value = parsed.description.join('\n');
+                }
 
                 // Generate ASP code and update graph (this will also update description display)
                 const aspCode = parseSimpleABA();
