@@ -844,13 +844,15 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Find rules that derive this contrary
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
-                // Check if contrary has any rules with non-empty bodies (derived attacks)
-                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
+                // Check if contrary has any rules with assumption-based bodies
+                const hasAssumptionBasedRules = derivingRules.some(rule =>
+                    rule.body && rule.body.length > 0 && rule.body.some(atom => assumptions.includes(atom))
+                );
 
-                if (!hasNonFactRules) {
-                    // Contrary is a fact (no rules, or only empty-body/fact rules)
+                if (!hasAssumptionBasedRules) {
+                    // Contrary is not derived from assumptions (fact or derived from non-assumptions)
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another (treat as derived)
+                        // Direct attack from one assumption to another
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
                         const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
@@ -871,13 +873,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalDashes: false
                         });
                     } else {
-                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
+                        // Fact-based attack (contrary is not an assumption and not derived from assumptions) - attack via ⊤
                         const weight = weights[contrary] || 1;
                         console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
-                    // Contrary is derived by rule(s)
+                    // Contrary is derived by rule(s) involving assumptions
                     derivingRules.forEach(rule => {
                         const attackers = rule.body;
 
@@ -1117,13 +1119,15 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Find rules that derive this contrary
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
-                // Check if contrary has any rules with non-empty bodies (derived attacks)
-                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
+                // Check if contrary has any rules with assumption-based bodies
+                const hasAssumptionBasedRules = derivingRules.some(rule =>
+                    rule.body && rule.body.length > 0 && rule.body.some(atom => assumptions.includes(atom))
+                );
 
-                if (!hasNonFactRules) {
-                    // Contrary is a fact (no rules, or only empty-body/fact rules)
+                if (!hasAssumptionBasedRules) {
+                    // Contrary is not derived from assumptions (fact or derived from non-assumptions)
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another (treat as derived)
+                        // Direct attack from one assumption to another
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
                         const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
@@ -1143,13 +1147,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalDashes: false
                         });
                     } else {
-                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
+                        // Fact-based attack (contrary is not an assumption and not derived from assumptions) - attack via ⊤
                         const weight = weights[contrary] || 1;
                         console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
-                    // Contrary is derived by rule(s)
+                    // Contrary is derived by rule(s) involving assumptions
                     derivingRules.forEach(rule => {
                         const attackers = rule.body; // Array of atoms in the rule body
 
