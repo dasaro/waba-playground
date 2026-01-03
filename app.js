@@ -790,16 +790,8 @@ class WABAPlayground {
 
         const { description, filtered: allFiltered } = extractDescriptionAndFilter(allInputs);
 
-        // Update description box
-        const descriptionBox = document.getElementById('simple-description-box');
-        const descriptionContent = document.getElementById('simple-description-content');
-
-        if (description.length > 0) {
-            descriptionContent.value = description.join('\n');
-            descriptionBox.removeAttribute('hidden');
-        } else {
-            descriptionBox.setAttribute('hidden', '');
-        }
+        // Update description box and button visibility
+        this.updateSimpleDescription();
 
         // Now process each input separately, filtering out comments
         const assumptionsResult = extractDescriptionAndFilter(this.assumptionsInput.value.split('\n'));
