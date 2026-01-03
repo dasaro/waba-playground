@@ -21,45 +21,6 @@ export class GraphManager {
     }
 
     /**
-     * Calculate optimal node size and font size based on label length
-     * Strategy: Shrink nodes for longer labels to keep graph compact
-     * @param {string} label - Node label text
-     * @param {number} baseSize - Base node size (default 25)
-     * @returns {object} { nodeSize, fontSize }
-     */
-    calculateAdaptiveSize(label, baseSize = 25) {
-        const length = label.length;
-
-        // Special case: single character (like ⊤) - slightly larger
-        if (length === 1) {
-            return { nodeSize: baseSize + 5, fontSize: 26 };
-        }
-
-        // Short labels (2-4 chars): standard size
-        if (length <= 4) {
-            return { nodeSize: baseSize, fontSize: 14 };
-        }
-
-        // Medium labels (5-8 chars): slightly smaller
-        if (length <= 8) {
-            return { nodeSize: Math.max(20, baseSize - 3), fontSize: 13 };
-        }
-
-        // Long labels (9-12 chars): smaller node and font
-        if (length <= 12) {
-            return { nodeSize: Math.max(18, baseSize - 5), fontSize: 11 };
-        }
-
-        // Very long labels (13-16 chars): compact size
-        if (length <= 16) {
-            return { nodeSize: Math.max(16, baseSize - 7), fontSize: 10 };
-        }
-
-        // Extremely long labels (17+ chars): minimal size
-        return { nodeSize: Math.max(15, baseSize - 9), fontSize: 9 };
-    }
-
-    /**
      * Convert color to RGBA with specified opacity
      * @param {string|object} color - Color in hex, rgb, or vis.js object format
      * @param {number} opacity - Opacity value (0-1)
@@ -759,18 +720,24 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         }
                     };
 
-                    // Adaptive sizing based on label length
-                    const sizing = this.calculateAdaptiveSize(el.data.label);
-
                     const nodeData = {
                         id: el.data.id,
                         label: el.data.label,
-                        size: sizing.nodeSize,
+                        size: 18,
                         color: nodeColor,
                         title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
                         font: {
-                            color: '#f1f5f9',  // Always white for contrast with purple background
-                            size: sizing.fontSize
+                            color: '#f1f5f9',
+                            size: 11,
+                            multi: 'html',
+                            bold: { size: 11 }
+                        },
+                        scaling: {
+                            label: {
+                                enabled: true,
+                                min: 9,
+                                max: 11
+                            }
                         },
                         assumptions: el.data.id.split(',').filter(a => a !== '∅') // Store assumptions for filtering
                     };
@@ -858,18 +825,24 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     }
                 };
 
-                // Adaptive sizing based on label length
-                const sizing = this.calculateAdaptiveSize(assumption);
-
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: sizing.nodeSize,
+                    size: 18,
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9',  // Always white for contrast with purple background
-                        size: sizing.fontSize
+                        color: '#f1f5f9',
+                        size: 11,
+                        multi: 'html',
+                        bold: { size: 11 }
+                    },
+                    scaling: {
+                        label: {
+                            enabled: true,
+                            min: 9,
+                            max: 11
+                        }
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
@@ -1010,13 +983,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 25,  // Increased for labels inside nodes
+                    size: 20,
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: '#f1f5f9',  // Always white for contrast
-                        size: 26  // Increased for labels inside nodes
+                        color: '#f1f5f9',
+                        size: 16
                     },
                     isTop: true
                 });
@@ -1136,18 +1109,24 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     }
                 };
 
-                // Adaptive sizing based on label length
-                const sizing = this.calculateAdaptiveSize(assumption);
-
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: sizing.nodeSize,
+                    size: 18,
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9',  // Always white for contrast with purple background
-                        size: sizing.fontSize
+                        color: '#f1f5f9',
+                        size: 11,
+                        multi: 'html',
+                        bold: { size: 11 }
+                    },
+                    scaling: {
+                        label: {
+                            enabled: true,
+                            min: 9,
+                            max: 11
+                        }
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
@@ -1256,7 +1235,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 const junctionNode = {
                                     id: junctionId,
                                     label: '',
-                                    size: 25,  // Increased for labels inside nodes
+                                    size: 15,
                                     shape: 'diamond',
                                     color: {
                                         border: '#10b981',
@@ -1268,8 +1247,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     },
                                     title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
                                     font: {
-                                        color: '#f1f5f9',  // Always white for contrast
-                                        size: 25  // Increased for labels inside nodes
+                                        color: '#f1f5f9',
+                                        size: 10
                                     },
                                     isJunction: true,
                                     attackers: assumptionAttackers,
@@ -1351,13 +1330,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 25,  // Increased for labels inside nodes
+                    size: 20,
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: '#f1f5f9',  // Always white for contrast
-                        size: 26  // Increased for labels inside nodes
+                        color: '#f1f5f9',
+                        size: 16
                     },
                     isTop: true
                 });
