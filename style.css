@@ -3090,3 +3090,36 @@ button:focus-visible,
 [data-theme="light"] .analysis-panel .panel-content {
     background: rgba(102, 126, 234, 0.02);
 }
+
+/* ================================================================
+   Polarity/Comparator Inference Styles
+   ================================================================ */
+
+/* Info hint icon in labels */
+.info-hint {
+    cursor: help;
+    color: var(--primary-color);
+    font-size: 0.85em;
+    margin-left: 4px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.info-hint:hover {
+    opacity: 1;
+}
+
+/* Disabled/inferred selects have grayed-out appearance */
+.select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+/* Label text adjustment for inferred fields */
+label:has(> .info-hint) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

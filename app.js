@@ -34,6 +34,9 @@ class WABAPlayground {
         this.optimizeSelect = document.getElementById('optimize-select');
         this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
+        this.advancedModeToggle = document.getElementById('advanced-mode-toggle');
+        this.polaritySelect = document.getElementById('polarity-select');
+        this.comparatorSelect = document.getElementById('comparator-select');
         this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
 
         // Simple ABA mode elements
@@ -199,6 +202,9 @@ class WABAPlayground {
         // Initialize empty states
         UIManager.initializeEmptyStates();
 
+        // Initialize polarity/comparator inference
+        this.initPolarityInference();
+
         // Preload selected example on startup
         setTimeout(() => {
             const selectedExample = this.exampleSelect.value;
@@ -235,7 +241,10 @@ class WABAPlayground {
         this.initDragAndDrop();
 
         // Graph mode changes
-        this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
+        this.semiringSelect.addEventListener('change', () => {
+            this.updatePolarityFromSemiring();
+            this.regenerateGraph();
+        });
         this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
         this.graphModeRadios.forEach(radio => {
             radio.addEventListener('change', () => {
@@ -244,6 +253,16 @@ class WABAPlayground {
                 this.graphManager.resetGraphColors();
                 this.regenerateGraph();
             });
+        });
+
+        // Polarity/Comparator inference event listeners
+        this.advancedModeToggle.addEventListener('change', () => this.handleAdvancedModeToggle());
+        this.polaritySelect.addEventListener('change', () => this.handlePolarityChange());
+        this.comparatorSelect.addEventListener('change', () => {
+            if (!this.polaritySelect.disabled) {
+                // User manually changed comparator in advanced mode
+                this.userOverrodeComparator = true;
+            }
         });
 
         // Disable budget when optimization is enabled
@@ -936,6 +955,142 @@ class WABAPlayground {
     handleEdgeClick(edge, x, y) {
         // Show edge popup with attack details
         PopupManager.showEdgePopup(edge, x, y);
+    }
+
+    // ===================================
+    // Polarity/Comparator Inference
+    // ===================================
+
+    /**
+     * Infer polarity from semiring selection
+     * @param {string} semiring - Semiring name
+     * @returns {string} 'strength' or 'cost'
+     */
+    inferPolarity(semiring) {
+        const polarityMap = {
+            'godel': 'strength',
+            'lukasiewicz': 'strength',
+            'arctic': 'strength',
+            'tropical': 'cost',
+            'bottleneck_cost': 'cost'
+        };
+        return polarityMap[semiring] || 'strength';
+    }
+
+    /**
+     * Infer comparator from polarity
+     * @param {string} polarity - 'strength' or 'cost'
+     * @returns {string} '<=' or '>='
+     */
+    inferComparator(polarity) {
+        return polarity === 'strength' ? '<=' : '>=';
+    }
+
+    /**
+     * Initialize polarity inference system
+     */
+    initPolarityInference() {
+        // Load saved state from localStorage
+        const savedAdvancedMode = localStorage.getItem('waba_advancedMode') === 'true';
+        const savedPolarity = localStorage.getItem('waba_polarity');
+        const savedComparator = localStorage.getItem('waba_comparator');
+
+        this.advancedModeToggle.checked = savedAdvancedMode;
+        this.userOverrodeComparator = false;
+
+        // Set initial values based on current semiring
+        this.updatePolarityFromSemiring();
+
+        // If advanced mode was saved, restore custom values
+        if (savedAdvancedMode && savedPolarity && savedComparator) {
+            this.polaritySelect.value = savedPolarity;
+            this.comparatorSelect.value = savedComparator;
+            this.polaritySelect.disabled = false;
+            this.comparatorSelect.disabled = false;
+        }
+    }
+
+    /**
+     * Update polarity and comparator based on current semiring
+     */
+    updatePolarityFromSemiring() {
+        const isAdvanced = this.advancedModeToggle.checked;
+
+        if (!isAdvanced) {
+            // Auto-infer from semiring
+            const semiring = this.semiringSelect.value;
+            const polarity = this.inferPolarity(semiring);
+            const comparator = this.inferComparator(polarity);
+
+            this.polaritySelect.value = polarity;
+            this.comparatorSelect.value = comparator;
+
+            // Save to localStorage
+            localStorage.setItem('waba_polarity', polarity);
+            localStorage.setItem('waba_comparator', comparator);
+        }
+    }
+
+    /**
+     * Handle advanced mode toggle
+     */
+    handleAdvancedModeToggle() {
+        const isAdvanced = this.advancedModeToggle.checked;
+
+        this.polaritySelect.disabled = !isAdvanced;
+        this.comparatorSelect.disabled = !isAdvanced;
+
+        // Update label text
+        const polarityLabel = document.querySelector('label[for="polarity-select"]');
+        const comparatorLabel = document.querySelector('label[for="comparator-select"]');
+
+        if (polarityLabel) {
+            const labelText = polarityLabel.childNodes[0];
+            if (labelText && labelText.nodeType === Node.TEXT_NODE) {
+                labelText.textContent = isAdvanced ? 'Polarity (Manual)' : 'Polarity (Inferred)';
+            }
+        }
+
+        if (comparatorLabel) {
+            const labelText = comparatorLabel.childNodes[0];
+            if (labelText && labelText.nodeType === Node.TEXT_NODE) {
+                labelText.textContent = isAdvanced ? 'Comparator (Manual)' : 'Comparator (Inferred)';
+            }
+        }
+
+        if (!isAdvanced) {
+            // Revert to inferred values
+            this.userOverrodeComparator = false;
+            this.updatePolarityFromSemiring();
+        } else {
+            // Save current values when entering advanced mode
+            localStorage.setItem('waba_polarity', this.polaritySelect.value);
+            localStorage.setItem('waba_comparator', this.comparatorSelect.value);
+        }
+
+        // Save advanced mode state
+        localStorage.setItem('waba_advancedMode', isAdvanced);
+    }
+
+    /**
+     * Handle polarity change in advanced mode
+     */
+    handlePolarityChange() {
+        const isAdvanced = this.advancedModeToggle.checked;
+
+        if (isAdvanced && !this.userOverrodeComparator) {
+            // Auto-update comparator to match polarity (unless user manually changed it)
+            const polarity = this.polaritySelect.value;
+            const comparator = this.inferComparator(polarity);
+            this.comparatorSelect.value = comparator;
+
+            // Save to localStorage
+            localStorage.setItem('waba_polarity', polarity);
+            localStorage.setItem('waba_comparator', comparator);
+        } else if (isAdvanced) {
+            // Just save the polarity
+            localStorage.setItem('waba_polarity', this.polaritySelect.value);
+        }
     }
 }
 

@@ -105,6 +105,34 @@
                             </select>
                         </div>
 
+                        <div class="config-item checkbox-container">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="advanced-mode-toggle" class="checkbox-input"> Advanced Mode (Manual Polarity/Comparator)
+                            </label>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="polarity-select" title="Weight interpretation: Strength (higher is better) vs Cost (lower is better)">
+                                Polarity (Inferred)
+                                <span class="info-hint" title="Automatically inferred from semiring. Enable Advanced Mode to override.">ⓘ</span>
+                            </label>
+                            <select id="polarity-select" class="select" disabled>
+                                <option value="strength">Strength/Reward (↑ stronger)</option>
+                                <option value="cost">Cost/Weakness (↓ better)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="comparator-select" title="Threshold comparator for per-attack filtering">
+                                Comparator (Inferred)
+                                <span class="info-hint" title="Automatically inferred from polarity. Enable Advanced Mode to override.">ⓘ</span>
+                            </label>
+                            <select id="comparator-select" class="select" disabled>
+                                <option value="<=">≤ (discard if score ≤ β)</option>
+                                <option value=">=">≥ (discard if score ≥ β)</option>
+                            </select>
+                        </div>
+
                         <div class="config-item">
                             <label for="semantics-select">Semantics</label>
                             <select id="semantics-select" class="select">
