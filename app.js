@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260103-4 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260103-5 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -708,25 +708,26 @@ class WABAPlayground {
     }
 
     parseSimpleABA() {
-        // Helper function to filter comment lines (no description extraction)
-        const filterComments = (lines) => {
-            const filtered = [];
+        // Helper function to process lines, preserving comments (except % // description)
+        const processLines = (lines) => {
+            const result = [];
 
             for (let line of lines) {
                 const trimmed = line.trim();
 
-                // Skip all comment lines (including description lines)
-                if (trimmed.startsWith('%')) {
+                // Skip empty lines
+                if (!trimmed) continue;
+
+                // Skip description lines (% //) - those go in description box
+                if (trimmed.startsWith('% //')) {
                     continue;
                 }
 
-                // Add non-comment, non-empty lines to filtered
-                if (trimmed) {
-                    filtered.push(trimmed);
-                }
+                // Preserve all other lines (including % comments)
+                result.push(trimmed);
             }
 
-            return filtered;
+            return result;
         };
 
         // Get description directly from description textarea
@@ -738,11 +739,11 @@ class WABAPlayground {
         // Update description box and button visibility
         this.updateSimpleDescription();
 
-        // Now process each input separately, filtering out comments
-        const assumptions = filterComments(this.assumptionsInput.value.split('\n'));
-        const rulesText = filterComments(this.rulesInput.value.split('\n'));
-        const contrariesText = filterComments(this.contrariesInput.value.split('\n'));
-        const weightsText = filterComments(this.weightsInput.value.split('\n'));
+        // Process each input, preserving comments
+        const assumptionsLines = processLines(this.assumptionsInput.value.split('\n'));
+        const rulesLines = processLines(this.rulesInput.value.split('\n'));
+        const contrariesLines = processLines(this.contrariesInput.value.split('\n'));
+        const weightsLines = processLines(this.weightsInput.value.split('\n'));
 
         let clingoCode = '%% Auto-generated from Simple Editor\n';
 
@@ -757,44 +758,62 @@ class WABAPlayground {
         clingoCode += '\n';
 
         // Parse assumptions
-        if (assumptions.length > 0) {
+        if (assumptionsLines.length > 0) {
             clingoCode += '%% Assumptions\n';
-            assumptions.forEach(a => {
-                clingoCode += `assumption(${a}).\n`;
+            assumptionsLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise treat as assumption
+                    clingoCode += `assumption(${line}).\n`;
+                }
             });
             clingoCode += '\n';
         }
 
         // Parse weights
-        if (weightsText.length > 0) {
+        if (weightsLines.length > 0) {
             clingoCode += '%% Weights\n';
-            weightsText.forEach(line => {
-                const match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
-                if (match) {
-                    const [, atom, weight] = match;
-                    clingoCode += `weight(${atom}, ${weight}).\n`;
+            weightsLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as weight
+                    const match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
+                    if (match) {
+                        const [, atom, weight] = match;
+                        clingoCode += `weight(${atom}, ${weight}).\n`;
+                    }
                 }
             });
             clingoCode += '\n';
         }
 
         // Parse rules
-        if (rulesText.length > 0) {
+        if (rulesLines.length > 0) {
             clingoCode += '%% Rules\n';
             let ruleCounter = 1;
-            rulesText.forEach((rule) => {
-                const match = rule.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
-                if (match) {
-                    const [, head, bodyStr] = match;
-                    const ruleId = `r${ruleCounter++}`;
+            rulesLines.forEach((line) => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as rule
+                    const match = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
+                    if (match) {
+                        const [, head, bodyStr] = match;
+                        const ruleId = `r${ruleCounter++}`;
 
-                    if (bodyStr.trim() === '') {
-                        clingoCode += `% ${ruleId}: ${head} <- (fact)\n`;
-                        clingoCode += `head(${ruleId}, ${head}).\n`;
-                    } else {
-                        const bodyAtoms = bodyStr.split(',').map(s => s.trim()).filter(s => s);
-                        clingoCode += `% ${ruleId}: ${head} <- ${bodyAtoms.join(', ')}\n`;
-                        clingoCode += `head(${ruleId}, ${head}). body(${ruleId}, ${bodyAtoms.join(`; ${ruleId}, `)}).\n`;
+                        if (bodyStr.trim() === '') {
+                            clingoCode += `% ${ruleId}: ${head} <- (fact)\n`;
+                            clingoCode += `head(${ruleId}, ${head}).\n`;
+                        } else {
+                            const bodyAtoms = bodyStr.split(',').map(s => s.trim()).filter(s => s);
+                            clingoCode += `% ${ruleId}: ${head} <- ${bodyAtoms.join(', ')}\n`;
+                            clingoCode += `head(${ruleId}, ${head}). body(${ruleId}, ${bodyAtoms.join(`; ${ruleId}, `)}).\n`;
+                        }
                     }
                 }
             });
@@ -802,14 +821,20 @@ class WABAPlayground {
         }
 
         // Parse contraries
-        if (contrariesText.length > 0) {
+        if (contrariesLines.length > 0) {
             clingoCode += '%% Contraries\n';
-            contrariesText.forEach(line => {
-                // Format: (assumption, contrary)
-                const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
-                if (match) {
-                    const [, assumption, contrary] = match;
-                    clingoCode += `contrary(${assumption}, ${contrary}).\n`;
+            contrariesLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as contrary
+                    // Format: (assumption, contrary)
+                    const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+                    if (match) {
+                        const [, assumption, contrary] = match;
+                        clingoCode += `contrary(${assumption}, ${contrary}).\n`;
+                    }
                 }
             });
         }
