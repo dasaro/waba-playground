@@ -170,7 +170,7 @@ export class GraphManager {
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
+            smooth: edge.originalSmooth || { enabled: true, type: 'dynamic', roundness: 0.5 }
         }));
         this.networkData.edges.update(edgeUpdates);
 
@@ -287,8 +287,7 @@ export class GraphManager {
                         id: edge.id,
                         color: { color: '#9ca3af', highlight: '#6b7280' },
                         width: 3,  // Slightly thicker for visibility
-                        dashes: [8, 4],  // Longer dashes for better visibility
-                        smooth: { enabled: false }  // Disable smooth curves for dashed lines to make pattern clearer
+                        dashes: [8, 4]  // Longer dashes for better visibility
                     });
                     discardedCount++;
                     matched = true;

@@ -239,7 +239,7 @@ export class GraphUtils {
                 },
                 smooth: {
                     enabled: true,
-                    type: 'cubicBezier',
+                    type: 'dynamic',  // Dynamic curves handle parallel/mutual edges better
                     roundness: 0.5
                 },
                 shadow: {
