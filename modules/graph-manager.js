@@ -21,6 +21,45 @@ export class GraphManager {
     }
 
     /**
+     * Calculate optimal node size and font size based on label length
+     * Strategy: Shrink nodes for longer labels to keep graph compact
+     * @param {string} label - Node label text
+     * @param {number} baseSize - Base node size (default 25)
+     * @returns {object} { nodeSize, fontSize }
+     */
+    calculateAdaptiveSize(label, baseSize = 25) {
+        const length = label.length;
+
+        // Special case: single character (like ⊤) - slightly larger
+        if (length === 1) {
+            return { nodeSize: baseSize + 5, fontSize: 26 };
+        }
+
+        // Short labels (2-4 chars): standard size
+        if (length <= 4) {
+            return { nodeSize: baseSize, fontSize: 14 };
+        }
+
+        // Medium labels (5-8 chars): slightly smaller
+        if (length <= 8) {
+            return { nodeSize: Math.max(20, baseSize - 3), fontSize: 13 };
+        }
+
+        // Long labels (9-12 chars): smaller node and font
+        if (length <= 12) {
+            return { nodeSize: Math.max(18, baseSize - 5), fontSize: 11 };
+        }
+
+        // Very long labels (13-16 chars): compact size
+        if (length <= 16) {
+            return { nodeSize: Math.max(16, baseSize - 7), fontSize: 10 };
+        }
+
+        // Extremely long labels (17+ chars): minimal size
+        return { nodeSize: Math.max(15, baseSize - 9), fontSize: 9 };
+    }
+
+    /**
      * Convert color to RGBA with specified opacity
      * @param {string|object} color - Color in hex, rgb, or vis.js object format
      * @param {number} opacity - Opacity value (0-1)
@@ -720,14 +759,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         }
                     };
 
+                    // Adaptive sizing based on label length
+                    const sizing = this.calculateAdaptiveSize(el.data.label);
+
                     const nodeData = {
                         id: el.data.id,
                         label: el.data.label,
-                        size: Math.max(25, 15 + (el.data.size * 3)),  // Min size 25 for labels to fit inside
+                        size: sizing.nodeSize,
                         color: nodeColor,
                         title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
                         font: {
-                            color: '#f1f5f9'  // Always white for contrast with purple background
+                            color: '#f1f5f9',  // Always white for contrast with purple background
+                            size: sizing.fontSize
                         },
                         assumptions: el.data.id.split(',').filter(a => a !== '∅') // Store assumptions for filtering
                     };
@@ -815,14 +858,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     }
                 };
 
+                // Adaptive sizing based on label length
+                const sizing = this.calculateAdaptiveSize(assumption);
+
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 25,  // Increased for labels inside nodes
+                    size: sizing.nodeSize,
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9'  // Always white for contrast with purple background
+                        color: '#f1f5f9',  // Always white for contrast with purple background
+                        size: sizing.fontSize
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
@@ -1089,14 +1136,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     }
                 };
 
+                // Adaptive sizing based on label length
+                const sizing = this.calculateAdaptiveSize(assumption);
+
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 25,  // Increased for labels inside nodes
+                    size: sizing.nodeSize,
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9'  // Always white for contrast with purple background
+                        color: '#f1f5f9',  // Always white for contrast with purple background
+                        size: sizing.fontSize
                     },
                     isAssumption: true,
                     assumptions: [assumption]  // Store for extension highlighting
