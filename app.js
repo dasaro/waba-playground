@@ -698,6 +698,12 @@ class WABAPlayground {
         this.rulesInput = this.rulesEditor;
         this.contrariesInput = this.contrariesEditor;
         this.weightsInput = this.weightsEditor;
+
+        // Update FileManager references to use PrismEditor instances
+        this.fileManager.assumptionsInput = this.assumptionsEditor;
+        this.fileManager.rulesInput = this.rulesEditor;
+        this.fileManager.contrariesInput = this.contrariesEditor;
+        this.fileManager.weightsInput = this.weightsEditor;
     }
 
     updateSimpleDescription() {
