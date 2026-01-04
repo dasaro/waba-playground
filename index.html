@@ -102,44 +102,44 @@
 
                         <div class="config-item">
                             <label for="monoid-select">
-                                Monoid (Attack Aggregation)
-                                <span class="info-hint" title="Aggregates attack strength/weakness depending on polarity">ⓘ</span>
+                                Monoid (Discard-Cost Aggregation)
+                                <span class="info-hint" title="Aggregates discarded attack scores into beta_cost (repair cost). Higher attack scores cost more to discard.">ⓘ</span>
                             </label>
                             <select id="monoid-select" class="select">
-                                <option value="max">MAX - Minimize/Maximize Worst Attack</option>
-                                <option value="sum">SUM - Minimize/Maximize Total Cost</option>
-                                <option value="min">MIN - Minimize/Maximize Best Attack</option>
-                                <option value="count">COUNT - Minimize/Maximize Attack Count</option>
+                                <option value="max">MAX - Worst discarded attack</option>
+                                <option value="sum">SUM - Total discard cost</option>
+                                <option value="min">MIN - Best discarded attack</option>
+                                <option value="count">COUNT - Number of discards</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label title="Weight interpretation automatically inferred from semiring">
-                                Polarity (Auto-Inferred)
-                                <span class="info-hint" title="Automatically determined based on semiring choice">ⓘ</span>
+                            <label title="Attack score meaning (weight W)">
+                                Attack Score Meaning (W)
+                                <span class="info-hint" title="What attack weight W represents. Either way, discarding costs more for higher W (beta_cost is always a COST).">ⓘ</span>
                             </label>
                             <div id="polarity-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-tertiary); font-size: var(--text-sm); opacity: 0.7; font-style: italic;">
-                                Strength/Reward (↑ stronger)
+                                Strength/Reward (↑ stronger → costlier to discard)
                             </div>
                             <!-- Hidden select for programmatic access -->
                             <select id="polarity-select" class="select" style="display: none;">
-                                <option value="strength">Strength/Reward (↑ stronger)</option>
-                                <option value="cost">Cost/Weakness (↓ better)</option>
+                                <option value="strength">Strength/Reward (↑ stronger → costlier to discard)</option>
+                                <option value="cost">Cost/Weakness (↑ weaker → costlier to discard)</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label title="Threshold comparator automatically inferred from polarity">
-                                Comparator (Auto-Inferred)
-                                <span class="info-hint" title="Automatically determined based on polarity">ⓘ</span>
+                            <label title="Budget constraint applies to beta_cost (repair cost)">
+                                Budget Constraint Type
+                                <span class="info-hint" title="Upper Bound: allow discards only if beta_cost ≤ β (standard). Lower Bound: force discards so beta_cost ≥ β (advanced).">ⓘ</span>
                             </label>
                             <div id="comparator-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-tertiary); font-size: var(--text-sm); opacity: 0.7; font-style: italic;">
-                                ≤ (discard if score ≤ β)
+                                Upper Bound (beta_cost ≤ β)
                             </div>
                             <!-- Hidden select for programmatic access -->
                             <select id="comparator-select" class="select" style="display: none;">
-                                <option value="<=">≤ (discard if score ≤ β)</option>
-                                <option value=">=">≥ (discard if score ≥ β)</option>
+                                <option value="ub">Upper Bound (beta_cost ≤ β)</option>
+                                <option value="lb">Lower Bound (beta_cost ≥ β)</option>
                             </select>
                         </div>
 
@@ -163,14 +163,16 @@
 
                         <div class="config-item">
                             <label for="optimize-select">
-                                Optimization Direction
-                                <span class="info-hint" id="opt-dir-hint" title="Automatically inferred from polarity in normal mode">ⓘ</span>
+                                Optimization Objective
+                                <span class="info-hint" id="opt-dir-hint" title="What to optimize: repair cost (beta_cost) is standard. Advanced: can add reward objectives.">ⓘ</span>
                             </label>
                             <select id="optimize-select" class="select">
-                                <option value="minimize" selected>Minimize (Cost Semantics)</option>
-                                <option value="maximize">Maximize (Reward Semantics)</option>
+                                <option value="minimize" selected>Minimize Repair Cost (beta_cost)</option>
+                                <option value="maximize">Maximize Reward (kept attacks)</option>
                             </select>
-                            <div id="opt-dir-warning" class="warning-message" style="display: none; margin-top: 4px; font-size: 0.85em; color: var(--warning-color);"></div>
+                            <div id="opt-dir-warning" class="warning-message" style="display: none; margin-top: 4px; font-size: 0.85em; color: var(--warning-color);">
+                                ⚠️ Maximizing reward is a separate objective from minimizing beta_cost
+                            </div>
                         </div>
 
                         <div class="config-item">
@@ -182,16 +184,22 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="constraint-select">Budget Constraint</label>
+                            <label for="constraint-select">
+                                Budget Constraint
+                                <span class="info-hint" title="Constrains beta_cost (repair cost). UB: only allow low-cost repairs. LB: force higher-cost repairs (advanced).">ⓘ</span>
+                            </label>
                             <select id="constraint-select" class="select">
                                 <option value="none" selected>None (Enumerate All)</option>
-                                <option value="ub">Upper Bound (cost ≤ β)</option>
-                                <option value="lb">Lower Bound (quality ≥ β)</option>
+                                <option value="ub">Upper Bound (beta_cost ≤ β)</option>
+                                <option value="lb">Lower Bound (beta_cost ≥ β)</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="budget-input" id="budget-input-label">Budget (β)</label>
+                            <label for="budget-input" id="budget-input-label">
+                                Budget Threshold (β)
+                                <span class="info-hint" title="Threshold for beta_cost. With UB: only extensions with repair cost ≤ β are allowed.">ⓘ</span>
+                            </label>
                             <input type="number" id="budget-input" class="select" value="100" min="0" max="1000">
                         </div>
 

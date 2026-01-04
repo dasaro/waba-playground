@@ -272,8 +272,11 @@ class WABAPlayground {
 
         // Polarity/Comparator are always auto-inferred (no advanced mode)
 
-        // Handle constraint changes (enable/disable budget input)
-        this.constraintSelect.addEventListener('change', () => this.updateBudgetInputState());
+        // Handle constraint changes (enable/disable budget input + update comparator display)
+        this.constraintSelect.addEventListener('change', () => {
+            this.updateBudgetInputState();
+            this.updatePolarityFromSemiring(); // Update comparator display
+        });
 
         // Handle opt mode changes (show/hide num models input)
         this.optModeSelect.addEventListener('change', () => this.updateNumModelsVisibility());
@@ -1162,21 +1165,27 @@ class WABAPlayground {
     }
 
     /**
-     * Infer comparator from polarity
-     * @param {string} polarity - 'strength' or 'cost'
-     * @returns {string} '<=' or '>='
+     * Get budget constraint type (UB or LB)
+     * NOTE: Comparator now applies to beta_cost (repair cost), not attack scores.
+     * Beta_cost is ALWAYS a cost (regardless of semiring polarity).
+     * - Upper Bound (UB): allow discards only if beta_cost ≤ β
+     * - Lower Bound (LB): force discards so beta_cost ≥ β
+     * @returns {string} 'ub' or 'lb'
      */
-    inferComparator(polarity) {
-        return polarity === 'strength' ? '<=' : '>=';
+    getBudgetConstraintType() {
+        const constraint = this.constraintSelect.value;
+        return constraint === 'lb' ? 'lb' : 'ub'; // Default to UB
     }
 
     /**
-     * Infer optimization direction from polarity
-     * @param {string} polarity - 'strength' or 'cost'
-     * @returns {string} 'minimize' or 'maximize'
+     * Infer optimization direction (ALWAYS minimize beta_cost by default)
+     * NOTE: beta_cost is the repair cost (always a COST to minimize)
+     * @returns {string} 'minimize' (default) or 'maximize' (explicit user choice)
      */
-    inferOptDirection(polarity) {
-        return polarity === 'strength' ? 'maximize' : 'minimize';
+    inferOptDirection() {
+        // Always default to minimize (beta_cost is a COST)
+        // User can explicitly override to maximize reward (separate objective)
+        return 'minimize';
     }
 
     /**
@@ -1194,37 +1203,42 @@ class WABAPlayground {
         // Auto-infer from semiring
         const semiring = this.semiringSelect.value;
         const polarity = this.inferPolarity(semiring);
-        const comparator = this.inferComparator(polarity);
-        const optDirection = this.inferOptDirection(polarity);
+        const constraintType = this.getBudgetConstraintType();
+        const optDirection = this.inferOptDirection();
 
         // Update hidden selects for programmatic access
         this.polaritySelect.value = polarity;
-        this.comparatorSelect.value = comparator;
+        this.comparatorSelect.value = constraintType;
         this.optimizeSelect.value = optDirection;
 
         // Update display elements
         const polarityText = polarity === 'strength'
-            ? 'Strength/Reward (↑ stronger)'
-            : 'Cost/Weakness (↓ better)';
-        const comparatorText = comparator === '<='
-            ? '≤ (discard if score ≤ β)'
-            : '≥ (discard if score ≥ β)';
+            ? 'Strength/Reward (↑ stronger → costlier to discard)'
+            : 'Cost/Weakness (↑ weaker → costlier to discard)';
+        const comparatorText = constraintType === 'ub'
+            ? 'Upper Bound (beta_cost ≤ β)'
+            : 'Lower Bound (beta_cost ≥ β)';
 
         this.polarityDisplay.textContent = polarityText;
         this.comparatorDisplay.textContent = comparatorText;
 
-        // Clear any warnings
+        // Update warnings based on user's optimization choice
         this.updateOptDirectionWarning();
     }
 
     /**
-     * Update optimization direction warning (disabled - always auto-inferred)
+     * Update optimization direction warning
+     * Show warning when user selects maximize (separate objective from beta_cost)
      */
     updateOptDirectionWarning() {
-        // No warnings needed - polarity and direction are always auto-inferred
         const warningDiv = document.getElementById('opt-dir-warning');
         if (warningDiv) {
-            warningDiv.style.display = 'none';
+            const optDir = this.optimizeSelect.value;
+            if (optDir === 'maximize') {
+                warningDiv.style.display = 'block';
+            } else {
+                warningDiv.style.display = 'none';
+            }
         }
     }
 
