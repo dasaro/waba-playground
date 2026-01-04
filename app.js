@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-7 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-8 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -1053,21 +1053,17 @@ class WABAPlayground {
     /**
      * Infer polarity from semiring selection
      * @param {string} semiring - Semiring name
-     * @returns {string} 'strength' (reward) or 'cost'
-     *
-     * Polarity interpretation:
-     * - 'cost': lower is better, reject if W > B (exceeds budget)
-     * - 'strength': higher is better (reward), reject if W < B (below threshold)
+     * @returns {string} 'strength' or 'cost'
      */
     inferPolarity(semiring) {
         const polarityMap = {
-            'godel': 'cost',           // Min/Max: lower costs better, reject if exceeds
-            'lukasiewicz': 'cost',     // Truth degrees as costs, reject if exceeds
-            'arctic': 'strength',      // Max/+: higher rewards better, reject if below
-            'tropical': 'cost',        // +/Min: accumulates costs, reject if exceeds
-            'bottleneck_cost': 'cost'  // Max/Min: min path better, reject if exceeds
+            'godel': 'strength',
+            'lukasiewicz': 'strength',
+            'arctic': 'strength',
+            'tropical': 'cost',
+            'bottleneck_cost': 'cost'
         };
-        return polarityMap[semiring] || 'cost';
+        return polarityMap[semiring] || 'strength';
     }
 
     /**
