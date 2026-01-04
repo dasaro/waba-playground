@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-9 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-10 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -14,6 +14,7 @@ import { ClingoManager } from './modules/clingo-manager.js?v=20260101-1';
 import { OutputManager } from './modules/output-manager.js?v=20260101-1';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
 import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
+import { PrismEditor } from './modules/prism-editor.js?v=20260104-1';
 import { examples } from './examples.js?v=20260101-1';
 
 class WABAPlayground {
@@ -172,6 +173,9 @@ class WABAPlayground {
 
         // Initialize font size
         this.fontManager.initFontSize();
+
+        // Initialize Prism editors for Simple Mode (syntax highlighting)
+        this.initPrismEditors();
 
         // Run metrics unit tests (silent in production)
         MetricsManager.runUnitTest();
@@ -670,6 +674,30 @@ class WABAPlayground {
             this.simpleMode.style.display = 'none';
             this.editor.style.display = 'block';
         }
+    }
+
+    initPrismEditors() {
+        // Initialize Prism syntax highlighting for Simple Mode textareas
+        // Replace textareas with contenteditable elements that support syntax highlighting
+
+        // Store original textarea references
+        const originalAssumptions = this.assumptionsInput;
+        const originalRules = this.rulesInput;
+        const originalContraries = this.contrariesInput;
+        const originalWeights = this.weightsInput;
+
+        // Create PrismEditor instances
+        this.assumptionsEditor = new PrismEditor(originalAssumptions, 'waba');
+        this.rulesEditor = new PrismEditor(originalRules, 'waba');
+        this.contrariesEditor = new PrismEditor(originalContraries, 'waba');
+        this.weightsEditor = new PrismEditor(originalWeights, 'waba');
+
+        // Update references to use editor API (transparent textarea-like interface)
+        // The original textareas are still accessible but hidden
+        this.assumptionsInput = this.assumptionsEditor;
+        this.rulesInput = this.rulesEditor;
+        this.contrariesInput = this.contrariesEditor;
+        this.weightsInput = this.weightsEditor;
     }
 
     updateSimpleDescription() {
