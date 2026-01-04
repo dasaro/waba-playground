@@ -244,21 +244,37 @@ export class FileManager {
             }
 
             if (fileExtension === 'lp') {
-                // .lp file: switch to Advanced Mode and load directly
-                this.inputMode.value = 'advanced';
-                this.simpleMode.style.display = 'none';
-                this.editor.style.display = 'block';
-                this.editor.value = content;
+                // .lp file: convert to .waba format and load into Simple Mode
+                const wabaContent = this.convertLpToWaba(content);
+                const parsed = this.parseWabaFile(wabaContent);
 
-                // Clear stored .waba content (this is a .lp file)
-                if (onStoreWabaContent) {
-                    onStoreWabaContent(null);
+                // Switch to Simple Mode
+                this.inputMode.value = 'simple';
+                this.simpleMode.style.display = 'block';
+                this.editor.style.display = 'none';
+
+                // Populate Simple mode fields
+                this.assumptionsInput.value = parsed.assumptions.join('\n');
+                this.rulesInput.value = parsed.rules.join('\n');
+                this.contrariesInput.value = parsed.contraries.join('\n');
+                this.weightsInput.value = parsed.weights.join('\n');
+
+                // Update description if present
+                const descriptionContent = document.getElementById('simple-description-content');
+                if (descriptionContent && parsed.description && parsed.description.length > 0) {
+                    descriptionContent.value = parsed.description.join('\n');
                 }
 
-                // Update graph visualization
-                await onGraphUpdate(content);
+                // Store original .lp content for Advanced mode (preserve original formatting)
+                if (onStoreWabaContent) {
+                    onStoreWabaContent(content);
+                }
 
-                onLog(`📁 Loaded .lp file: ${fileName}`, 'info');
+                // Generate ASP code and update graph
+                const aspCode = parseSimpleABA();
+                await onGraphUpdate(aspCode);
+
+                onLog(`📁 Loaded .lp file: ${fileName} (converted to Simple Mode)`, 'info');
 
             } else if (fileExtension === 'waba') {
                 // .waba file: parse and load into Simple Mode

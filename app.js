@@ -584,8 +584,30 @@ class WABAPlayground {
         // Toggle between simple and advanced mode
         this.inputMode.addEventListener('change', (e) => {
             if (e.target.value === 'simple') {
+                // Switching to Simple mode
                 this.simpleMode.style.display = 'block';
                 this.editor.style.display = 'none';
+
+                // Parse Advanced editor content and populate Simple mode fields
+                const advancedCode = this.editor.value.trim();
+                if (advancedCode) {
+                    // Convert .lp format to .waba and populate Simple mode
+                    const wabaContent = this.fileManager.convertLpToWaba(advancedCode);
+                    const parsed = this.fileManager.parseWabaFile(wabaContent);
+
+                    // Populate Simple mode fields
+                    this.assumptionsInput.value = parsed.assumptions.join('\n');
+                    this.rulesInput.value = parsed.rules.join('\n');
+                    this.contrariesInput.value = parsed.contraries.join('\n');
+                    this.weightsInput.value = parsed.weights.join('\n');
+
+                    // Update description if present
+                    const descriptionContent = document.getElementById('simple-description-content');
+                    if (descriptionContent && parsed.description && parsed.description.length > 0) {
+                        descriptionContent.value = parsed.description.join('\n');
+                    }
+                }
+
                 this.updateSimpleDescription();
             } else {
                 // Switching to Advanced mode
