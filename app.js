@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-3 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-4 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -877,21 +877,23 @@ class WABAPlayground {
             // 1. Check for assumption
             let match = line.match(/^assumption\(([^)]+)\)\.$/);
             if (match) {
-                assumptionLines.push(match[1]);
+                assumptionLines.push(match[1].trim());
                 continue;
             }
 
             // 2. Check for weight
             match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
             if (match) {
-                weightLines.push(`${match[1]}: ${match[2]}`);
+                weightLines.push(`${match[1].trim()}: ${match[2]}`);
                 continue;
             }
 
             // 3. Check for contrary
             match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
             if (match) {
-                contraryLines.push(`(${match[1]}, ${match[2]})`);
+                const arg1 = match[1].trim();
+                const arg2 = match[2].trim();
+                contraryLines.push(`(${arg1}, ${arg2})`);
                 continue;
             }
 
