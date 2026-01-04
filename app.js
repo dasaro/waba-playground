@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-4 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-5 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -872,24 +872,35 @@ class WABAPlayground {
                 continue;
             }
 
+            // Strip inline comments (everything after % on the same line)
+            // but only if the line doesn't START with %
+            let cleanLine = line;
+            if (!line.startsWith('%')) {
+                const commentIndex = line.indexOf('%');
+                if (commentIndex !== -1) {
+                    cleanLine = line.substring(0, commentIndex).trim();
+                }
+            }
+
             // Try to match specific patterns (order matters!)
+            // Use cleanLine (with inline comments stripped) for all pattern matching
 
             // 1. Check for assumption
-            let match = line.match(/^assumption\(([^)]+)\)\.$/);
+            let match = cleanLine.match(/^assumption\(([^)]+)\)\.$/);
             if (match) {
                 assumptionLines.push(match[1].trim());
                 continue;
             }
 
             // 2. Check for weight
-            match = line.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+            match = cleanLine.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
             if (match) {
                 weightLines.push(`${match[1].trim()}: ${match[2]}`);
                 continue;
             }
 
             // 3. Check for contrary
-            match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+            match = cleanLine.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
             if (match) {
                 const arg1 = match[1].trim();
                 const arg2 = match[2].trim();
@@ -898,7 +909,7 @@ class WABAPlayground {
             }
 
             // 4. Check for head (rule)
-            match = line.match(/^head\(([^,]+),\s*([^)]+)\)\./);
+            match = cleanLine.match(/^head\(([^,]+),\s*([^)]+)\)\./);
             if (match) {
                 const ruleId = match[1];
                 const head = match[2];
