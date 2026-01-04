@@ -48,6 +48,9 @@ class WABAPlayground {
         this.contrariesInput = document.getElementById('contraries-input');
         this.weightsInput = document.getElementById('weights-input');
 
+        // Store original .waba file content (with all comments)
+        this.originalWabaContent = null;
+
         // File upload elements
         this.fileUploadBtn = document.getElementById('file-upload-btn');
         this.fileUploadInput = document.getElementById('file-upload-input');
@@ -239,7 +242,8 @@ class WABAPlayground {
                 (code) => this.updateGraph(code),
                 () => this.parseSimpleABA(),
                 (msg, type) => this.outputManager.log(msg, type),
-                () => this.clearPreviousRun()
+                () => this.clearPreviousRun(),
+                (content) => this.originalWabaContent = content
             );
         });
 
@@ -364,7 +368,8 @@ class WABAPlayground {
                     (code) => this.updateGraph(code),
                     () => this.parseSimpleABA(),
                     (msg, type) => this.outputManager.log(msg, type),
-                    () => this.clearPreviousRun()
+                    () => this.clearPreviousRun(),
+                    (content) => this.originalWabaContent = content
                 );
             }
         });
@@ -583,8 +588,19 @@ class WABAPlayground {
                 this.editor.style.display = 'none';
                 this.updateSimpleDescription();
             } else {
+                // Switching to Advanced mode
                 this.simpleMode.style.display = 'none';
                 this.editor.style.display = 'block';
+
+                // Populate editor with original .waba content (if available) or generate from Simple Mode
+                if (this.originalWabaContent) {
+                    // Use original .waba content with all comments preserved
+                    this.editor.value = this.originalWabaContent;
+                } else {
+                    // Generate ASP code from Simple Mode fields
+                    const aspCode = this.parseSimpleABA();
+                    this.editor.value = aspCode;
+                }
             }
         });
 
@@ -592,6 +608,9 @@ class WABAPlayground {
         [this.assumptionsInput, this.rulesInput, this.contrariesInput, this.weightsInput].forEach(input => {
             input.addEventListener('input', () => {
                 if (this.inputMode.value === 'simple') {
+                    // Clear original .waba content when user edits Simple Mode fields
+                    // (their edits should be used when switching to Advanced mode)
+                    this.originalWabaContent = null;
                     this.updateSimpleDescription();
                     this.regenerateGraph();
                 }

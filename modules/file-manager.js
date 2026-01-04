@@ -216,7 +216,7 @@ export class FileManager {
     // ===================================
     // File Upload
     // ===================================
-    async handleFileUpload(event, onGraphUpdate, parseSimpleABA, onLog, onClearPreviousRun) {
+    async handleFileUpload(event, onGraphUpdate, parseSimpleABA, onLog, onClearPreviousRun, onStoreWabaContent) {
         const file = event.target.files[0];
         if (!file) return;
 
@@ -250,6 +250,11 @@ export class FileManager {
                 this.editor.style.display = 'block';
                 this.editor.value = content;
 
+                // Clear stored .waba content (this is a .lp file)
+                if (onStoreWabaContent) {
+                    onStoreWabaContent(null);
+                }
+
                 // Update graph visualization
                 await onGraphUpdate(content);
 
@@ -258,6 +263,11 @@ export class FileManager {
             } else if (fileExtension === 'waba') {
                 // .waba file: parse and load into Simple Mode
                 const parsed = this.parseWabaFile(content);
+
+                // Store original .waba content (with all comments) for Advanced mode
+                if (onStoreWabaContent) {
+                    onStoreWabaContent(content);
+                }
 
                 // Switch to Simple Mode
                 this.inputMode.value = 'simple';

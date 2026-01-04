@@ -575,7 +575,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border-radius: var(--radius-md);
     padding: var(--space-md);
     resize: vertical;
-    height: 400px; /* Fixed height with manual resize capability */
+    min-height: 500px; /* Larger minimum height to span more area */
+    width: 100%; /* Full width */
+    box-sizing: border-box; /* Include padding in width calculation */
     tab-size: 4;
 }
 
@@ -1796,7 +1798,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     }
 
     .code-editor {
-        height: 300px; /* Smaller on mobile */
+        min-height: 300px; /* Smaller minimum on mobile */
         font-size: var(--text-xs);
     }
 
