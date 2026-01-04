@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-1 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-2 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';

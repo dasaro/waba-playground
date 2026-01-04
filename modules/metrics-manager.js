@@ -238,7 +238,7 @@ export class MetricsManager {
                     return m.support.get(atom) || 0;
                 }
                 return 0;
-            });
+            }).filter(s => s > 0); // Only consider models where atom actually has support
 
             metrics.Pi_S = supportsInS.length > 0 ? Math.max(...supportsInS) : 0;
             metrics.N_S = supportsInS.length > 0 ? Math.min(...supportsInS) : 0;
