@@ -1140,11 +1140,22 @@ supported_with_weight(X,W) :-
 
 :- in(X), defeated(X).
 `,
+        admissible: `%% ADMISSIBLE SEMANTICS (from WABA/semantics/admissible.lp)
+%% Builds upon: Conflict-free
+%% Inline cf.lp since #include not supported in WASM
+
+%% conflict freeness (from cf.lp)
+:- in(X), defeated(X).
+
+%% The argument x is not defended by S
+not_defended(X) :- attacks_successfully(Y,X), not defeated(Y).
+
+%% All arguments x \in S need to be defended by S
+:- in(X), not_defended(X).
+`,
 
         // ❌ Not Implemented (removed from WABA repository due to flaws)
         // These can be resurrected from git history (commit 48902f1) if needed
-        admissible: `%% NOT IMPLEMENTED
-%% Removed due to implementation flaws. See WABA/semantics/README.md`,
         complete: `%% NOT IMPLEMENTED
 %% Removed due to implementation flaws. See WABA/semantics/README.md`,
         grounded: `%% NOT IMPLEMENTED
