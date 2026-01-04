@@ -304,7 +304,6 @@ export class FileManager {
         const contraries = [];
         const weights = [];
         const description = [];
-        let currentSection = null;
 
         for (const line of lines) {
             // Skip empty lines
@@ -317,56 +316,47 @@ export class FileManager {
                 continue;
             }
 
-            // Preserve inline comments (not section headers) - add to appropriate section
+            // Skip comment-only lines (including section headers)
             if (line.startsWith('%')) {
-                // Detect section headers to determine current context
-                if (line.match(/%\s*Assumptions:/i)) {
-                    currentSection = 'assumptions';
-                    continue;
-                } else if (line.match(/%\s*Rules:/i)) {
-                    currentSection = 'rules';
-                    continue;
-                } else if (line.match(/%\s*Contraries:/i)) {
-                    currentSection = 'contraries';
-                    continue;
-                } else if (line.match(/%\s*Weights:/i)) {
-                    currentSection = 'weights';
-                    continue;
-                }
-
-                // Add inline comment to current section
-                if (currentSection === 'assumptions') assumptions.push(line);
-                else if (currentSection === 'rules') rules.push(line);
-                else if (currentSection === 'contraries') contraries.push(line);
-                else if (currentSection === 'weights') weights.push(line);
                 continue;
             }
 
-            // Check for rule: "a <- b,d" or "d <- c"
-            const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
+            // Strip inline comments from the line before pattern matching
+            // Find the first % that's not inside quotes (simple approach: just find %)
+            let cleanLine = line;
+            const commentIndex = line.indexOf('%');
+            if (commentIndex !== -1) {
+                cleanLine = line.substring(0, commentIndex).trim();
+            }
+
+            // Skip if line becomes empty after stripping comment
+            if (!cleanLine) continue;
+
+            // Check for rule: "a <- b,d" or "d <- c" or "a <-" (fact)
+            const ruleMatch = cleanLine.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
             if (ruleMatch) {
-                rules.push(line);
+                rules.push(cleanLine);
                 continue;
             }
 
             // Check for contrary first (has parentheses): "(a, c_a)" format
-            const contraryMatch = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+            const contraryMatch = cleanLine.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
             if (contraryMatch) {
-                contraries.push(line);
+                contraries.push(cleanLine);
                 continue;
             }
 
             // Check for weight (has colon + number): "d : 10" or "a: 80"
-            const weightMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
+            const weightMatch = cleanLine.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
             if (weightMatch) {
-                weights.push(line);
+                weights.push(cleanLine);
                 continue;
             }
 
             // Otherwise treat as assumption (single atom)
-            const assumptionMatch = line.match(/^[a-z_][a-z0-9_]*$/i);
+            const assumptionMatch = cleanLine.match(/^[a-z_][a-z0-9_]*$/i);
             if (assumptionMatch) {
-                assumptions.push(line);
+                assumptions.push(cleanLine);
                 continue;
             }
 
