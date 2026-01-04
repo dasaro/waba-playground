@@ -247,7 +247,8 @@ class WABAPlayground {
                 () => this.parseSimpleABA(),
                 (msg, type) => this.outputManager.log(msg, type),
                 () => this.clearPreviousRun(),
-                (content) => this.originalWabaContent = content
+                (content) => this.originalWabaContent = content,
+                (filename) => this.updateExampleSelectWithFilename(filename)
             );
         });
 
@@ -373,7 +374,8 @@ class WABAPlayground {
                     () => this.parseSimpleABA(),
                     (msg, type) => this.outputManager.log(msg, type),
                     () => this.clearPreviousRun(),
-                    (content) => this.originalWabaContent = content
+                    (content) => this.originalWabaContent = content,
+                    (filename) => this.updateExampleSelectWithFilename(filename)
                 );
             }
         });
@@ -1038,6 +1040,9 @@ class WABAPlayground {
                 const clingoCode = examples[exampleName];
                 this.editor.value = clingoCode;
 
+                // Clear original .waba content (this is an example, not a user file)
+                this.originalWabaContent = null;
+
                 // Also parse and populate simple mode fields
                 this.populateSimpleModeFromClingo(clingoCode);
 
@@ -1052,6 +1057,28 @@ class WABAPlayground {
         } else if (exampleName) {
             console.error(`Example not found: ${exampleName}`);
             this.outputManager.log(`❌ Example "${exampleName}" not found`, 'error');
+        }
+    }
+
+    updateExampleSelectWithFilename(filename) {
+        // Remove existing "Uploaded File" option if present
+        const existingOption = this.exampleSelect.querySelector('option[value="__uploaded__"]');
+        if (existingOption) {
+            existingOption.remove();
+        }
+
+        // Add new option with uploaded filename (without extension)
+        const filenameWithoutExt = filename.replace(/\.(lp|waba)$/i, '');
+        const option = document.createElement('option');
+        option.value = '__uploaded__';
+        option.textContent = `📁 ${filenameWithoutExt}`;
+        option.selected = true;
+
+        // Insert at the top (after "-- Select Example --")
+        if (this.exampleSelect.options.length > 0) {
+            this.exampleSelect.insertBefore(option, this.exampleSelect.options[1]);
+        } else {
+            this.exampleSelect.appendChild(option);
         }
     }
 

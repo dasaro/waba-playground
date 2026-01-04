@@ -216,7 +216,7 @@ export class FileManager {
     // ===================================
     // File Upload
     // ===================================
-    async handleFileUpload(event, onGraphUpdate, parseSimpleABA, onLog, onClearPreviousRun, onStoreWabaContent) {
+    async handleFileUpload(event, onGraphUpdate, parseSimpleABA, onLog, onClearPreviousRun, onStoreWabaContent, onFilenameUpdate) {
         const file = event.target.files[0];
         if (!file) return;
 
@@ -274,6 +274,11 @@ export class FileManager {
                 const aspCode = parseSimpleABA();
                 await onGraphUpdate(aspCode);
 
+                // Update example select dropdown with filename
+                if (onFilenameUpdate) {
+                    onFilenameUpdate(fileName);
+                }
+
                 onLog(`📁 Loaded .lp file: ${fileName} (converted to Simple Mode)`, 'info');
 
             } else if (fileExtension === 'waba') {
@@ -305,6 +310,11 @@ export class FileManager {
                 // Generate ASP code and update graph (this will also update description display)
                 const aspCode = parseSimpleABA();
                 await onGraphUpdate(aspCode);
+
+                // Update example select dropdown with filename
+                if (onFilenameUpdate) {
+                    onFilenameUpdate(fileName);
+                }
 
                 onLog(`📁 Loaded .waba file: ${fileName}`, 'info');
 
