@@ -108,29 +108,31 @@
                             </select>
                         </div>
 
-                        <div class="config-item checkbox-container">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="advanced-mode-toggle" class="checkbox-input"> Advanced Mode (Manual Polarity/Comparator)
-                            </label>
-                        </div>
-
                         <div class="config-item">
-                            <label for="polarity-select" title="Weight interpretation: Strength (higher is better) vs Cost (lower is better)">
-                                Polarity (Inferred)
-                                <span class="info-hint" title="Automatically inferred from semiring. Enable Advanced Mode to override.">ⓘ</span>
+                            <label title="Weight interpretation automatically inferred from semiring">
+                                Polarity (Auto-Inferred)
+                                <span class="info-hint" title="Automatically determined based on semiring choice">ⓘ</span>
                             </label>
-                            <select id="polarity-select" class="select" disabled>
+                            <div id="polarity-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: var(--text-sm);">
+                                Strength/Reward (↑ stronger)
+                            </div>
+                            <!-- Hidden select for programmatic access -->
+                            <select id="polarity-select" class="select" style="display: none;">
                                 <option value="strength">Strength/Reward (↑ stronger)</option>
                                 <option value="cost">Cost/Weakness (↓ better)</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="comparator-select" title="Threshold comparator for per-attack filtering">
-                                Comparator (Inferred)
-                                <span class="info-hint" title="Automatically inferred from polarity. Enable Advanced Mode to override.">ⓘ</span>
+                            <label title="Threshold comparator automatically inferred from polarity">
+                                Comparator (Auto-Inferred)
+                                <span class="info-hint" title="Automatically determined based on polarity">ⓘ</span>
                             </label>
-                            <select id="comparator-select" class="select" disabled>
+                            <div id="comparator-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: var(--text-sm);">
+                                ≤ (discard if score ≤ β)
+                            </div>
+                            <!-- Hidden select for programmatic access -->
+                            <select id="comparator-select" class="select" style="display: none;">
                                 <option value="<=">≤ (discard if score ≤ β)</option>
                                 <option value=">=">≥ (discard if score ≥ β)</option>
                             </select>

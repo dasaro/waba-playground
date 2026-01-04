@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-8 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260104-9 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -34,9 +34,10 @@ class WABAPlayground {
         this.optimizeSelect = document.getElementById('optimize-select');
         this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
-        this.advancedModeToggle = document.getElementById('advanced-mode-toggle');
         this.polaritySelect = document.getElementById('polarity-select');
+        this.polarityDisplay = document.getElementById('polarity-display');
         this.comparatorSelect = document.getElementById('comparator-select');
+        this.comparatorDisplay = document.getElementById('comparator-display');
         this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
 
         // Simple ABA mode elements
@@ -260,15 +261,7 @@ class WABAPlayground {
             });
         });
 
-        // Polarity/Comparator inference event listeners
-        this.advancedModeToggle.addEventListener('change', () => this.handleAdvancedModeToggle());
-        this.polaritySelect.addEventListener('change', () => this.handlePolarityChange());
-        this.comparatorSelect.addEventListener('change', () => {
-            if (!this.polaritySelect.disabled) {
-                // User manually changed comparator in advanced mode
-                this.userOverrodeComparator = true;
-            }
-        });
+        // Polarity/Comparator are always auto-inferred (no advanced mode)
 
         // Handle constraint changes (enable/disable budget input)
         this.constraintSelect.addEventListener('change', () => this.updateBudgetInputState());
@@ -1085,145 +1078,50 @@ class WABAPlayground {
     }
 
     /**
-     * Initialize polarity inference system
+     * Initialize polarity inference system (always auto-inferred)
      */
     initPolarityInference() {
-        // Load saved state from localStorage
-        const savedAdvancedMode = localStorage.getItem('waba_advancedMode') === 'true';
-        const savedPolarity = localStorage.getItem('waba_polarity');
-        const savedComparator = localStorage.getItem('waba_comparator');
-
-        this.advancedModeToggle.checked = savedAdvancedMode;
-        this.userOverrodeComparator = false;
-
-        // Set initial values based on current semiring
+        // Set initial values based on current semiring (always auto-inferred)
         this.updatePolarityFromSemiring();
-
-        // If advanced mode was saved, restore custom values
-        if (savedAdvancedMode && savedPolarity && savedComparator) {
-            this.polaritySelect.value = savedPolarity;
-            this.comparatorSelect.value = savedComparator;
-            this.polaritySelect.disabled = false;
-            this.comparatorSelect.disabled = false;
-        }
     }
 
     /**
-     * Update polarity and comparator based on current semiring
+     * Update polarity and comparator based on current semiring (always auto-inferred)
      */
     updatePolarityFromSemiring() {
-        const isAdvanced = this.advancedModeToggle.checked;
+        // Auto-infer from semiring
+        const semiring = this.semiringSelect.value;
+        const polarity = this.inferPolarity(semiring);
+        const comparator = this.inferComparator(polarity);
+        const optDirection = this.inferOptDirection(polarity);
 
-        if (!isAdvanced) {
-            // Auto-infer from semiring
-            const semiring = this.semiringSelect.value;
-            const polarity = this.inferPolarity(semiring);
-            const comparator = this.inferComparator(polarity);
-            const optDirection = this.inferOptDirection(polarity);
+        // Update hidden selects for programmatic access
+        this.polaritySelect.value = polarity;
+        this.comparatorSelect.value = comparator;
+        this.optimizeSelect.value = optDirection;
 
-            this.polaritySelect.value = polarity;
-            this.comparatorSelect.value = comparator;
-            this.optimizeSelect.value = optDirection;
+        // Update display elements
+        const polarityText = polarity === 'strength'
+            ? 'Strength/Reward (↑ stronger)'
+            : 'Cost/Weakness (↓ better)';
+        const comparatorText = comparator === '<='
+            ? '≤ (discard if score ≤ β)'
+            : '≥ (discard if score ≥ β)';
 
-            // Save to localStorage
-            localStorage.setItem('waba_polarity', polarity);
-            localStorage.setItem('waba_comparator', comparator);
+        this.polarityDisplay.textContent = polarityText;
+        this.comparatorDisplay.textContent = comparatorText;
 
-            // Clear any warnings
-            this.updateOptDirectionWarning();
-        }
-    }
-
-    /**
-     * Handle advanced mode toggle
-     */
-    handleAdvancedModeToggle() {
-        const isAdvanced = this.advancedModeToggle.checked;
-
-        this.polaritySelect.disabled = !isAdvanced;
-        this.comparatorSelect.disabled = !isAdvanced;
-
-        // Update label text
-        const polarityLabel = document.querySelector('label[for="polarity-select"]');
-        const comparatorLabel = document.querySelector('label[for="comparator-select"]');
-
-        if (polarityLabel) {
-            const labelText = polarityLabel.childNodes[0];
-            if (labelText && labelText.nodeType === Node.TEXT_NODE) {
-                labelText.textContent = isAdvanced ? 'Polarity (Manual)' : 'Polarity (Inferred)';
-            }
-        }
-
-        if (comparatorLabel) {
-            const labelText = comparatorLabel.childNodes[0];
-            if (labelText && labelText.nodeType === Node.TEXT_NODE) {
-                labelText.textContent = isAdvanced ? 'Comparator (Manual)' : 'Comparator (Inferred)';
-            }
-        }
-
-        if (!isAdvanced) {
-            // Revert to inferred values
-            this.userOverrodeComparator = false;
-            this.updatePolarityFromSemiring();
-        } else {
-            // Save current values when entering advanced mode
-            localStorage.setItem('waba_polarity', this.polaritySelect.value);
-            localStorage.setItem('waba_comparator', this.comparatorSelect.value);
-        }
-
-        // Save advanced mode state
-        localStorage.setItem('waba_advancedMode', isAdvanced);
-    }
-
-    /**
-     * Handle polarity change in advanced mode
-     */
-    handlePolarityChange() {
-        const isAdvanced = this.advancedModeToggle.checked;
-
-        if (isAdvanced && !this.userOverrodeComparator) {
-            // Auto-update comparator to match polarity (unless user manually changed it)
-            const polarity = this.polaritySelect.value;
-            const comparator = this.inferComparator(polarity);
-            this.comparatorSelect.value = comparator;
-
-            // Save to localStorage
-            localStorage.setItem('waba_polarity', polarity);
-            localStorage.setItem('waba_comparator', comparator);
-        } else if (isAdvanced) {
-            // Just save the polarity
-            localStorage.setItem('waba_polarity', this.polaritySelect.value);
-        }
-
-        if (!isAdvanced) {
-            // Also update optimization direction
-            const polarity = this.polaritySelect.value;
-            const optDirection = this.inferOptDirection(polarity);
-            this.optimizeSelect.value = optDirection;
-        }
-
-        // Update warning
+        // Clear any warnings
         this.updateOptDirectionWarning();
     }
 
     /**
-     * Update optimization direction warning if direction contradicts polarity
+     * Update optimization direction warning (disabled - always auto-inferred)
      */
     updateOptDirectionWarning() {
+        // No warnings needed - polarity and direction are always auto-inferred
         const warningDiv = document.getElementById('opt-dir-warning');
-        if (!warningDiv) return;
-
-        const isAdvanced = this.advancedModeToggle.checked;
-        const polarity = this.polaritySelect.value;
-        const direction = this.optimizeSelect.value;
-        const expectedDirection = this.inferOptDirection(polarity);
-
-        if (isAdvanced && direction !== expectedDirection) {
-            const polarityLabel = polarity === 'strength' ? 'Strength/Reward' : 'Cost/Weakness';
-            const directionLabel = direction === 'minimize' ? 'Minimize' : 'Maximize';
-            warningDiv.textContent = `⚠️ Warning: ${polarityLabel} polarity typically uses ${expectedDirection === 'minimize' ? 'Minimize' : 'Maximize'}, not ${directionLabel}`;
-            warningDiv.style.display = 'block';
-        } else {
+        if (warningDiv) {
             warningDiv.style.display = 'none';
         }
     }
