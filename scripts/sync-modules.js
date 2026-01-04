@@ -107,16 +107,15 @@ const monoid = {
 // ============================================================================
 console.log('📦 Semantics Modules (21)...');
 const semantics = {
-    // Core semantics (10)
+    // Core semantics (9)
     stable: readModule(path.join(WABA_ROOT, 'semantics', 'stable.lp')),
     cf: readModule(path.join(WABA_ROOT, 'semantics', 'cf.lp')),
     admissible: readModule(path.join(WABA_ROOT, 'semantics', 'admissible.lp')),
     complete: readModule(path.join(WABA_ROOT, 'semantics', 'complete.lp')),
     grounded: readModule(path.join(WABA_ROOT, 'semantics', 'grounded.lp')),
     ideal: readModule(path.join(WABA_ROOT, 'semantics', 'ideal.lp')),
-    naive: readModule(path.join(WABA_ROOT, 'semantics', 'naive.lp')),
     preferred: readModule(path.join(WABA_ROOT, 'semantics', 'preferred.lp')),
-    'semi-stable': readModule(path.join(WABA_ROOT, 'semantics', 'semi-stable.lp')),
+    semistable: readModule(path.join(WABA_ROOT, 'semantics', 'semistable.lp')),
     staged: readModule(path.join(WABA_ROOT, 'semantics', 'staged.lp')),
 
     // Heuristic variants (5)
@@ -203,9 +202,8 @@ export const wabaModules = {
         complete: \`${escapeContent(semantics.complete)}\`,
         grounded: \`${escapeContent(semantics.grounded)}\`,
         ideal: \`${escapeContent(semantics.ideal)}\`,
-        naive: \`${escapeContent(semantics.naive)}\`,
         preferred: \`${escapeContent(semantics.preferred)}\`,
-        'semi-stable': \`${escapeContent(semantics['semi-stable'])}\`,
+        semistable: \`${escapeContent(semantics.semistable)}\`,
         staged: \`${escapeContent(semantics.staged)}\`,
         'heuristic-naive': \`${escapeContent(semantics['heuristic-naive'])}\`,
         'heuristic-preferred': \`${escapeContent(semantics['heuristic-preferred'])}\`,
