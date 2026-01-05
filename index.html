@@ -421,20 +421,20 @@ c_a: 70"></textarea>
                         </div>
                     </div>
 
-                    <div id="cy" class="graph-canvas" role="img" aria-label="Argumentation graph visualization"></div>
+                    <div id="cy" class="graph-canvas" role="img" aria-label="Argumentation graph visualization">
+                        <!-- Empty State -->
+                        <div id="graph-empty-state" class="graph-empty-state" role="status" hidden>
+                            <div class="empty-state-icon" aria-hidden="true">📊</div>
+                            <h3>No Graph to Display</h3>
+                            <p>Run a WABA framework to visualize the argumentation graph.</p>
+                            <p class="empty-state-hint">Click "▶️ Run WABA" above to get started.</p>
+                        </div>
+                    </div>
 
                     <!-- Isolated Assumptions Banner -->
                     <div id="isolated-assumptions-banner" class="isolated-assumptions-banner" hidden>
                         <strong>⚠️ Isolated Assumptions:</strong>
                         <span id="isolated-assumptions-list"></span>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div id="graph-empty-state" class="graph-empty-state" role="status" hidden>
-                        <div class="empty-state-icon" aria-hidden="true">📊</div>
-                        <h3>No Graph to Display</h3>
-                        <p>Run a WABA framework to visualize the argumentation graph.</p>
-                        <p class="empty-state-hint">Click "▶️ Run WABA" above to get started.</p>
                     </div>
                     </div>
                 </section>
