@@ -15,7 +15,7 @@ import { OutputManager } from './modules/output-manager.js?v=20260101-1';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
 import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
 import { PrismEditor } from './modules/prism-editor.js?v=20260104-1';
-import { examples } from './examples.js?v=20260101-1';
+import { examples } from './examples.js?v=20260105-1';
 
 class WABAPlayground {
     constructor() {
