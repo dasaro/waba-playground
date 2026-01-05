@@ -175,6 +175,9 @@ export class ClingoManager {
 %% Framework
 ${framework}
 
+%% Budget (required for admissible semantics and unaffordable_attack)
+budget(${budget}).
+
 %% Core module
 ${coreModule}
 
@@ -190,7 +193,6 @@ ${semiringModule}
             const constraintModule = this.getConstraintModule(monoid, constraint);
             program += `
 %% Budget constraint (${constraint} ${monoid}) - enumeration mode only
-#const beta = ${budget}.
 ${constraintModule}
 `;
         }
