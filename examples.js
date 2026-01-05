@@ -32,6 +32,31 @@ contrary(c, c_c).   % c_c is the contrary of c (non-derived)
 budget(100).
 `,
 
+    minimal: `%% Minimal Example - Derived Attack Through Intermediate
+%% Demonstrates: multi-step derivation (a supports p, p supports c_b, c_b attacks b)
+%% Shows: partial weights (only 'a' is weighted)
+
+assumption(a).
+assumption(b).
+
+% Weights: only 'a' has explicit weight
+weight(a, 10).
+
+% Rule 1: p <- a (a supports intermediate element p)
+head(r1, p).
+body(r1, a).
+
+% Rule 2: c_b <- p (p supports c_b which attacks b)
+head(r2, c_b).
+body(r2, p).
+
+% Contraries: each assumption has exactly ONE contrary
+contrary(a, c_a).   % c_a attacks a (no derivation shown)
+contrary(b, c_b).   % c_b attacks b (derived from a via p)
+
+budget(50).
+`,
+
     linear: `%% Linear Topology Example
 %% Structure: a -> b -> c -> d (chain of attacks)
 %% Shows: sequential attack propagation
