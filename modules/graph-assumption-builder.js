@@ -1,4 +1,10 @@
-import { GraphUtils } from './graph-utils.js?v=20260312-8';
+import { GraphUtils } from './graph-utils.js?v=20260312-9';
+import {
+    buildAssumptionNodeTooltip,
+    buildAttackEdgeTooltip,
+    buildJunctionTooltip,
+    buildTopNodeTooltip
+} from './graph-tooltip-builder.js?v=20260312-9';
 
 function assumptionNodeColor() {
     return GraphUtils.createNodeColor('assumption');
@@ -8,27 +14,36 @@ function assumptionFont() {
     return { color: GraphUtils.getFontColor() };
 }
 
-function createAssumptionNode(assumption, weights) {
-    const weight = weights[assumption] ?? '?';
+function createAssumptionNode(assumption, weights, summary) {
+    const explicitWeight = Object.prototype.hasOwnProperty.call(weights, assumption) ? weights[assumption] : null;
     return {
         id: assumption,
         label: assumption,
         size: 25,
         color: assumptionNodeColor(),
-        title: `Assumption: ${assumption}\nWeight: ${weight}`,
+        title: buildAssumptionNodeTooltip({
+            assumption,
+            explicitWeight,
+            contrary: summary.contrary,
+            incomingSources: summary.incomingSources,
+            outgoingTargets: summary.outgoingTargets,
+            outgoingContraries: summary.outgoingContraries
+        }),
         font: assumptionFont(),
-        isAssumption: true
+        isAssumption: true,
+        explicitWeight,
+        contrary: summary.contrary
     };
 }
 
-function createTopNode() {
+function createTopNode(factBasedAttacks) {
     return {
         id: '⊤',
         label: '⊤',
         size: 25,
         shape: 'ellipse',
         color: assumptionNodeColor(),
-        title: 'Top element (⊤): represents fact-based attacks',
+        title: buildTopNodeTooltip(factBasedAttacks),
         font: {
             color: GraphUtils.getFontColor(),
             size: 26
@@ -71,7 +86,7 @@ function addFactBasedAttacks(visNodes, visEdges, factBasedAttacks) {
         return;
     }
 
-    visNodes.push(createTopNode());
+    visNodes.push(createTopNode(factBasedAttacks));
     factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
         const displayWeight = weight === '?' ? '' : weight;
         const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
@@ -80,13 +95,22 @@ function addFactBasedAttacks(visNodes, visEdges, factBasedAttacks) {
             from: '⊤',
             to: assumption,
             label: displayWeight,
+            weight,
             width: 2,
             color: edgeColor,
             arrows: 'to',
-            title: `Fact ${contrary} attacks ${assumption}\nType: Fact-based\nWeight: ${weight}`,
+            title: buildAttackEdgeTooltip({
+                typeLabel: 'Fact-based attack',
+                attacker: contrary,
+                target: assumption,
+                contrary,
+                weight,
+                note: 'The contrary is supported by a fact or empty-body rule, so no assumption is needed to launch this attack.'
+            }),
             attackType: 'fact',
             attackingElement: contrary,
-            targetAssumption: assumption
+            targetAssumption: assumption,
+            contrary
         }));
     });
 }
@@ -95,8 +119,40 @@ function getContraryWeight(weights, contrary) {
     return weights[contrary] ?? 1;
 }
 
+function createAssumptionNodes(assumptions, contraries, visEdges, weights) {
+    const contraryMap = new Map(contraries.map(({ assumption, contrary }) => [assumption, contrary]));
+    const summaries = new Map(assumptions.map((assumption) => [assumption, {
+        contrary: contraryMap.get(assumption) ?? null,
+        incomingSources: [],
+        outgoingTargets: [],
+        outgoingContraries: []
+    }]));
+
+    visEdges.forEach((edge) => {
+        const attacker = edge.attackingElement;
+        const target = edge.targetAssumption;
+        if (attacker && summaries.has(attacker)) {
+            const summary = summaries.get(attacker);
+            summary.outgoingTargets.push(target);
+            if (edge.contrary) {
+                summary.outgoingContraries.push(edge.contrary);
+            }
+        }
+        if (target && summaries.has(target)) {
+            const summary = summaries.get(target);
+            if (edge.attackType === 'fact') {
+                summary.incomingSources.push(`facts via ${edge.contrary}`);
+            } else if (attacker) {
+                summary.incomingSources.push(attacker);
+            }
+        }
+    });
+
+    return assumptions.map((assumption) => createAssumptionNode(assumption, weights, summaries.get(assumption)));
+}
+
 export function buildDirectAssumptionGraph(assumptions, contraries, rules, weights) {
-    const visNodes = assumptions.map((assumption) => createAssumptionNode(assumption, weights));
+    const visNodes = [];
     const visEdges = [];
     const factBasedAttacks = [];
 
@@ -113,13 +169,22 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
                     from: contrary,
                     to: assumption,
                     label: weight === '?' ? '' : weight,
+                    weight,
                     width: 2,
                     color: edgeColor,
                     arrows: 'to',
-                    title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
+                    title: buildAttackEdgeTooltip({
+                        typeLabel: 'Direct attack',
+                        attacker: contrary,
+                        target: assumption,
+                        contrary,
+                        weight,
+                        note: 'The attacker itself is the contrary of the target assumption.'
+                    }),
                     attackType: 'direct',
                     attackingElement: contrary,
-                    targetAssumption: assumption
+                    targetAssumption: assumption,
+                    derivationBody: [contrary]
                 }));
             } else {
                 factBasedAttacks.push({
@@ -145,15 +210,27 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
                     from: attacker,
                     to: assumption,
                     label: weight === '?' ? '' : weight,
+                    weight,
                     width: 2,
                     color: edgeColor,
                     arrows: 'to',
                     dashes: false,
-                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
+                    title: buildAttackEdgeTooltip({
+                        typeLabel: 'Derived attack',
+                        attacker,
+                        target: assumption,
+                        contrary,
+                        weight,
+                        ruleId: rule.id,
+                        derivationBody: attackers,
+                        note: 'This attack exists because the source assumption supports a rule body that derives the contrary.'
+                    }),
                     attackType: 'derived',
                     attackingElement: attacker,
                     targetAssumption: assumption,
-                    contrary
+                    contrary,
+                    ruleId: rule.id,
+                    derivationBody: attackers
                 }));
                 return;
             }
@@ -166,29 +243,42 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
                 const weight = getContraryWeight(weights, contrary);
                 const displayWeight = weight === '?' ? '' : weight;
                 assumptionAttackers.forEach((attacker) => {
-                    const otherAttackers = assumptionAttackers.filter((name) => name !== attacker).join(', ');
                     const edgeColor = { color: '#10b981', highlight: '#059669' };
                     visEdges.push(createAttackEdge({
                         id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
                         from: attacker,
                         to: assumption,
                         label: displayWeight,
+                        weight,
                         width: 2,
                         color: edgeColor,
                         arrows: 'to',
                         dashes: false,
-                        title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
+                        title: buildAttackEdgeTooltip({
+                            typeLabel: 'Joint attack contribution',
+                            attacker,
+                            target: assumption,
+                            contrary,
+                            weight,
+                            ruleId: rule.id,
+                            derivationBody: attackers,
+                            jointWith: assumptionAttackers,
+                            note: 'This edge represents one premise feeding a joint attack; all contributors must be supported.'
+                        }),
                         attackType: 'joint',
                         attackingElement: attacker,
                         targetAssumption: assumption,
                         contrary,
-                        jointWith: assumptionAttackers
+                        jointWith: assumptionAttackers,
+                        ruleId: rule.id,
+                        derivationBody: attackers
                     }));
                 });
             }
         });
     });
 
+    visNodes.push(...createAssumptionNodes(assumptions, contraries, visEdges, weights));
     addFactBasedAttacks(visNodes, visEdges, factBasedAttacks);
 
     return {
@@ -199,7 +289,7 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
 }
 
 export function buildBranchingAssumptionGraph(assumptions, contraries, rules, weights) {
-    const visNodes = assumptions.map((assumption) => createAssumptionNode(assumption, weights));
+    const visNodes = [];
     const visEdges = [];
     const factBasedAttacks = [];
 
@@ -216,12 +306,23 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                     from: contrary,
                     to: assumption,
                     label: weight === '?' ? '' : weight,
+                    weight,
                     width: 2,
                     color: edgeColor,
                     arrows: 'to',
-                    title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
+                    title: buildAttackEdgeTooltip({
+                        typeLabel: 'Direct attack',
+                        attacker: contrary,
+                        target: assumption,
+                        contrary,
+                        weight,
+                        note: 'The attacker itself is the contrary of the target assumption.'
+                    }),
                     attackingElement: contrary,
-                    targetAssumption: assumption
+                    targetAssumption: assumption,
+                    contrary,
+                    attackType: 'direct',
+                    derivationBody: [contrary]
                 }));
             } else {
                 factBasedAttacks.push({
@@ -247,14 +348,27 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                     from: attacker,
                     to: assumption,
                     label: weight === '?' ? '' : weight,
+                    weight,
                     width: 2,
                     color: edgeColor,
                     arrows: 'to',
                     dashes: false,
-                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
+                    title: buildAttackEdgeTooltip({
+                        typeLabel: 'Derived attack',
+                        attacker,
+                        target: assumption,
+                        contrary,
+                        weight,
+                        ruleId: rule.id,
+                        derivationBody: attackers,
+                        note: 'A single supported assumption is enough to derive the contrary in this rule.'
+                    }),
                     attackingElement: attacker,
                     targetAssumption: assumption,
-                    contrary
+                    contrary,
+                    attackType: 'derived',
+                    ruleId: rule.id,
+                    derivationBody: attackers
                 }));
                 return;
             }
@@ -279,7 +393,13 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                             background: '#059669'
                         }
                     },
-                    title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
+                    title: buildJunctionTooltip({
+                        target: assumption,
+                        contrary,
+                        ruleId: rule.id,
+                        derivationBody: assumptionAttackers,
+                        weight: getContraryWeight(weights, contrary)
+                    }),
                     font: {
                         color: GraphUtils.getFontColor(),
                         size: 25
@@ -287,7 +407,10 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                     isJunction: true,
                     attackers: assumptionAttackers,
                     target: assumption,
-                    contrary
+                    contrary,
+                    ruleId: rule.id,
+                    derivationBody: assumptionAttackers,
+                    weight: getContraryWeight(weights, contrary)
                 });
 
                 assumptionAttackers.forEach((attacker) => {
@@ -300,10 +423,25 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                         color: edgeColor,
                         arrows: 'to',
                         dashes: false,
-                        title: `${attacker} contributes to joint attack`,
+                        title: buildAttackEdgeTooltip({
+                            typeLabel: 'Joint attack contribution',
+                            attacker,
+                            target: assumption,
+                            contrary,
+                            weight: getContraryWeight(weights, contrary),
+                            ruleId: rule.id,
+                            derivationBody: assumptionAttackers,
+                            jointWith: assumptionAttackers,
+                            note: 'This is a prerequisite edge into the junction; by itself it does not defeat the target.'
+                        }),
                         attackingElement: attacker,
                         targetAssumption: assumption,
-                        contrary
+                        contrary,
+                        attackType: 'joint-contribution',
+                        ruleId: rule.id,
+                        derivationBody: assumptionAttackers,
+                        jointWith: assumptionAttackers,
+                        weight: getContraryWeight(weights, contrary)
                     }));
                 });
 
@@ -314,18 +452,34 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                     from: junctionId,
                     to: assumption,
                     label: weight === '?' ? '' : weight,
+                    weight,
                     width: 2,
                     color: edgeColor,
                     arrows: 'to',
                     dashes: false,
-                    title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
+                    title: buildAttackEdgeTooltip({
+                        typeLabel: 'Joint attack',
+                        attacker: 'junction',
+                        target: assumption,
+                        contrary,
+                        weight,
+                        ruleId: rule.id,
+                        derivationBody: assumptionAttackers,
+                        jointWith: assumptionAttackers,
+                        note: 'The junction fires once all listed contributors are simultaneously supported.'
+                    }),
                     targetAssumption: assumption,
-                    contrary
+                    contrary,
+                    attackType: 'joint',
+                    ruleId: rule.id,
+                    derivationBody: assumptionAttackers,
+                    jointWith: assumptionAttackers
                 }));
             }
         });
     });
 
+    visNodes.push(...createAssumptionNodes(assumptions, contraries, visEdges, weights));
     addFactBasedAttacks(visNodes, visEdges, factBasedAttacks);
 
     return {

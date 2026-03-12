@@ -2510,7 +2510,8 @@ button:focus-visible,
 
 .graph-tooltip,
 .node-popup,
-.derivation-tooltip {
+.derivation-tooltip,
+.vis-tooltip {
     position: fixed;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -2527,16 +2528,28 @@ button:focus-visible,
 
 .graph-tooltip strong,
 .node-popup strong,
-.derivation-tooltip strong {
+.derivation-tooltip strong,
+.vis-tooltip strong {
     color: var(--primary-color);
     display: block;
     margin-bottom: 4px;
 }
 
+.graph-hover-panel {
+    display: grid;
+    gap: 4px;
+    min-width: 220px;
+}
+
+.graph-hover-panel div {
+    margin: 0;
+}
+
 /* Light theme adjustments */
 [data-theme="light"] .graph-tooltip,
 [data-theme="light"] .node-popup,
-[data-theme="light"] .derivation-tooltip {
+[data-theme="light"] .derivation-tooltip,
+[data-theme="light"] .vis-tooltip {
     background: #ffffff;
     border-color: #e2e8f0;
     color: #1e293b;
@@ -2545,7 +2558,7 @@ button:focus-visible,
 
 [data-theme="light"] .graph-tooltip strong,
 [data-theme="light"] .node-popup strong,
-[data-theme="light"] .derivation-tooltip strong {
+[data-theme="light"] .derivation-tooltip strong,
+[data-theme="light"] .vis-tooltip strong {
     color: #5568d3;
-}
 }

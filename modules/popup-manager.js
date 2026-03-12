@@ -2,6 +2,16 @@
  * PopupManager - Handles popup displays for nodes, edges, and derivation chains
  */
 export class PopupManager {
+    static renderTooltipContent(content) {
+        if (!content) {
+            return '';
+        }
+        if (/<[a-z][\s\S]*>/i.test(content)) {
+            return content;
+        }
+        return content.replace(/\n/g, '<br>');
+    }
+
     /**
      * Show derivation chain popup for a derived atom
      * @param {string} atom - The derived atom
@@ -167,51 +177,47 @@ export class PopupManager {
         const popup = document.createElement('div');
         popup.className = 'node-popup graph-tooltip';
 
-        // Build content with badges and special characters
-        let content = '<div class="popup-content">';
+        let content = PopupManager.renderTooltipContent(node.title);
+        if (!content) {
+            content = '<div class="popup-content">';
 
-        // Header with node type badge
-        const nodeType = node.isAssumption ? '🔷 Assumption' :
-                        node.isJunction ? '⋈ Junction' :
-                        node.isTop ? '⊤ Top' : '⚪ Node';
-        content += `<div class="popup-header">
-            <span class="node-type-badge">${nodeType}</span>
-            <strong>${node.label || node.id}</strong>
-        </div>`;
+            const nodeType = node.isAssumption ? '🔷 Assumption' :
+                node.isJunction ? '⋈ Junction' :
+                    node.isTop ? '⊤ Top' : '⚪ Node';
+            content += `<div class="popup-header">
+                <span class="node-type-badge">${nodeType}</span>
+                <strong>${node.label || node.id}</strong>
+            </div>`;
 
-        // Assumptions list with chips
-        if (node.assumptions && node.assumptions.length > 0) {
-            content += '<div class="popup-section">';
-            content += '<div class="popup-label">📋 Contains:</div>';
-            content += '<div class="popup-chips">';
-            node.assumptions.forEach(a => {
-                content += `<span class="assumption-chip">${a}</span>`;
-            });
-            content += '</div></div>';
-        }
-
-        // Status badges
-        if (node.isIn !== undefined || node.isSupported !== undefined) {
-            content += '<div class="popup-section">';
-            content += '<div class="popup-label">Status:</div>';
-            content += '<div class="status-badges">';
-            if (node.isIn === true) {
-                content += '<span class="status-badge in">✓ In</span>';
-            } else if (node.isIn === false) {
-                content += '<span class="status-badge out">✗ Out</span>';
+            if (node.assumptions && node.assumptions.length > 0) {
+                content += '<div class="popup-section">';
+                content += '<div class="popup-label">📋 Contains:</div>';
+                content += '<div class="popup-chips">';
+                node.assumptions.forEach((assumption) => {
+                    content += `<span class="assumption-chip">${assumption}</span>`;
+                });
+                content += '</div></div>';
             }
-            if (node.isSupported) {
-                content += '<span class="status-badge supported">⬆ Supported</span>';
+
+            if (node.isIn !== undefined || node.isSupported !== undefined) {
+                content += '<div class="popup-section">';
+                content += '<div class="popup-label">Status:</div>';
+                content += '<div class="status-badges">';
+                if (node.isIn === true) {
+                    content += '<span class="status-badge in">✓ In</span>';
+                } else if (node.isIn === false) {
+                    content += '<span class="status-badge out">✗ Out</span>';
+                }
+                if (node.isSupported) {
+                    content += '<span class="status-badge supported">⬆ Supported</span>';
+                }
+                content += '</div></div>';
             }
-            content += '</div></div>';
-        }
 
-        // Additional info
-        if (node.title && !node.isJunction) {
-            content += `<div class="popup-section"><div class="popup-info">ℹ️ ${node.title}</div></div>`;
+            content += '</div>';
+        } else {
+            content = `<div class="popup-content">${content}</div>`;
         }
-
-        content += '</div>';
         popup.innerHTML = content;
         document.body.appendChild(popup);
 
@@ -281,80 +287,76 @@ export class PopupManager {
         const popup = document.createElement('div');
         popup.className = 'node-popup graph-tooltip';
 
-        // Build content with badges and special characters
-        let content = '<div class="popup-content">';
+        let content = PopupManager.renderTooltipContent(edge.title);
 
-        // Header with attack type badge
-        const attackType = edge.attackType === 'direct' ? '⚡ Direct' :
-                          edge.attackType === 'derived' ? '🔗 Derived' :
-                          edge.attackType === 'joint' ? '🤝 Joint' :
-                          edge.attackType === 'fact' ? '📌 Fact-based' :
-                          '⚔️ Attack';
-        content += `<div class="popup-header">
-            <span class="attack-type-badge">${attackType}</span>
-            <strong>Attack Details</strong>
-        </div>`;
+        if (!content) {
+            content = '<div class="popup-content">';
 
-        // Weight badge
-        let displayWeight = 'N/A';
-        if (edge.weight !== undefined) {
-            if (edge.weight === Infinity || edge.weight === '#sup') {
-                displayWeight = '#sup';
-            } else if (edge.weight === -Infinity || edge.weight === '#inf') {
-                displayWeight = '#inf';
-            } else {
-                displayWeight = edge.weight;
+            const attackType = edge.attackType === 'direct' ? '⚡ Direct' :
+                edge.attackType === 'derived' ? '🔗 Derived' :
+                    edge.attackType === 'joint' ? '🤝 Joint' :
+                        edge.attackType === 'fact' ? '📌 Fact-based' :
+                            '⚔️ Attack';
+            content += `<div class="popup-header">
+                <span class="attack-type-badge">${attackType}</span>
+                <strong>Attack Details</strong>
+            </div>`;
+
+            let displayWeight = 'N/A';
+            if (edge.weight !== undefined) {
+                if (edge.weight === Infinity || edge.weight === '#sup') {
+                    displayWeight = '#sup';
+                } else if (edge.weight === -Infinity || edge.weight === '#inf') {
+                    displayWeight = '#inf';
+                } else {
+                    displayWeight = edge.weight;
+                }
+            } else if (edge.label) {
+                displayWeight = edge.label;
             }
-        } else if (edge.label) {
-            displayWeight = edge.label;
-        }
 
-        content += '<div class="popup-section">';
-        content += '<div class="popup-label">⚖️ Weight:</div>';
-        content += `<span class="weight-badge">${displayWeight}</span>`;
-        content += '</div>';
-
-        // Attack relationship
-        content += '<div class="popup-section">';
-        content += '<div class="popup-label">🎯 Attack:</div>';
-        if (edge.attackingElement && edge.attackedAssumption) {
-            content += `<div class="attack-relationship">
-                <span class="element-chip source">${edge.attackingElement}</span>
-                <span class="arrow">→</span>
-                <span class="element-chip target">${edge.attackedAssumption}</span>
-            </div>`;
-        } else if (edge.contrary && edge.targetAssumption) {
-            content += `<div class="attack-relationship">
-                <span class="element-chip source">${edge.contrary}</span>
-                <span class="arrow">→</span>
-                <span class="element-chip target">${edge.targetAssumption}</span>
-            </div>`;
-        } else if (edge.from && edge.to) {
-            content += `<div class="attack-relationship">
-                <span class="element-chip source">${edge.from}</span>
-                <span class="arrow">→</span>
-                <span class="element-chip target">${edge.to}</span>
-            </div>`;
-        }
-        content += '</div>';
-
-        // Joint attack participants
-        if (edge.jointWith && edge.jointWith.length > 1) {
             content += '<div class="popup-section">';
-            content += '<div class="popup-label">🤝 Joint with:</div>';
-            content += '<div class="popup-chips">';
-            edge.jointWith.filter(a => a !== edge.attackingElement).forEach(a => {
-                content += `<span class="participant-chip">${a}</span>`;
-            });
-            content += '</div></div>';
-        }
+            content += '<div class="popup-label">⚖️ Weight:</div>';
+            content += `<span class="weight-badge">${displayWeight}</span>`;
+            content += '</div>';
 
-        // Additional info
-        if (edge.title) {
-            content += `<div class="popup-section"><div class="popup-info">ℹ️ ${edge.title}</div></div>`;
-        }
+            content += '<div class="popup-section">';
+            content += '<div class="popup-label">🎯 Attack:</div>';
+            if (edge.attackingElement && edge.attackedAssumption) {
+                content += `<div class="attack-relationship">
+                    <span class="element-chip source">${edge.attackingElement}</span>
+                    <span class="arrow">→</span>
+                    <span class="element-chip target">${edge.attackedAssumption}</span>
+                </div>`;
+            } else if (edge.contrary && edge.targetAssumption) {
+                content += `<div class="attack-relationship">
+                    <span class="element-chip source">${edge.contrary}</span>
+                    <span class="arrow">→</span>
+                    <span class="element-chip target">${edge.targetAssumption}</span>
+                </div>`;
+            } else if (edge.from && edge.to) {
+                content += `<div class="attack-relationship">
+                    <span class="element-chip source">${edge.from}</span>
+                    <span class="arrow">→</span>
+                    <span class="element-chip target">${edge.to}</span>
+                </div>`;
+            }
+            content += '</div>';
 
-        content += '</div>';
+            if (edge.jointWith && edge.jointWith.length > 1) {
+                content += '<div class="popup-section">';
+                content += '<div class="popup-label">🤝 Joint with:</div>';
+                content += '<div class="popup-chips">';
+                edge.jointWith.filter((participant) => participant !== edge.attackingElement).forEach((participant) => {
+                    content += `<span class="participant-chip">${participant}</span>`;
+                });
+                content += '</div></div>';
+            }
+
+            content += '</div>';
+        } else {
+            content = `<div class="popup-content">${content}</div>`;
+        }
         popup.innerHTML = content;
         document.body.appendChild(popup);
 
