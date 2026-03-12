@@ -11,6 +11,8 @@ async function waitForClingoReady(page) {
 
 test('collapsible panels toggle cleanly', async ({ page }) => {
     await waitForClingoReady(page);
+    await expect(page.locator('#analysis-export-png-proxy')).toBeVisible();
+    await expect(page.locator('[data-panel="analysis"]')).toContainText('Decision Analysis');
 
     for (const panelId of ['config', 'output', 'analysis']) {
         const panel = page.locator(`.panel[data-panel="${panelId}"]`);

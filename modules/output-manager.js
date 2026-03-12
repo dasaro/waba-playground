@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260312-9';
-import { MetricsManager } from './metrics-manager.js?v=20260312-9';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260312-9';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260312-9';
+import { PopupManager } from './popup-manager.js?v=20260312-10';
+import { MetricsManager } from './metrics-manager.js?v=20260312-10';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260312-10';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260312-10';
 
 export class OutputManager {
     constructor(dom, getConfig = null) {
@@ -17,6 +17,41 @@ export class OutputManager {
         this.polaritySelect = dom.polaritySelect;
         this.getConfig = getConfig;
         this.activeExtensionId = null;  // Track currently highlighted extension
+        this.renderAnalysisHome();
+    }
+
+    renderAnalysisHome() {
+        const exportSection = this.dom.exportSection;
+        if (!exportSection) {
+            return;
+        }
+
+        exportSection.innerHTML = `
+            <div class="analysis-empty-state">
+                <div class="analysis-empty-card">
+                    <h4>Decision Analysis</h4>
+                    <p>Run a framework to populate ranked extensions, best-assumption summaries, and CSV export.</p>
+                </div>
+                <div class="analysis-empty-card">
+                    <h4>Graph Export</h4>
+                    <p>The current graph view can always be exported from here, even before a solver run.</p>
+                    <div class="analysis-button-group">
+                        <button type="button" id="analysis-export-png-proxy" class="analysis-action-btn analysis-action-btn-secondary">💾 Export PNG</button>
+                        <button type="button" id="analysis-export-pdf-proxy" class="analysis-action-btn analysis-action-btn-secondary">📄 Export PDF</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const pngProxy = this.dom.document.getElementById('analysis-export-png-proxy');
+        if (pngProxy && this.dom.exportPngBtn) {
+            pngProxy.addEventListener('click', () => this.dom.exportPngBtn.click());
+        }
+
+        const pdfProxy = this.dom.document.getElementById('analysis-export-pdf-proxy');
+        if (pdfProxy && this.dom.exportPdfBtn) {
+            pdfProxy.addEventListener('click', () => this.dom.exportPdfBtn.click());
+        }
     }
 
     // ===================================
@@ -740,8 +775,7 @@ export class OutputManager {
         this.stats.innerHTML = '';
 
         // Clear analysis panel section
-        const exportSection = this.dom.exportSection;
-        if (exportSection) exportSection.innerHTML = '';
+        this.renderAnalysisHome();
 
         // Show output empty state after clearing
         if (window.showOutputEmptyState) {

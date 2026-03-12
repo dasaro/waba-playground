@@ -1275,6 +1275,42 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     background: linear-gradient(135deg, var(--secondary-color), var(--primary-dark));
 }
 
+.analysis-action-btn-secondary {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+}
+
+.analysis-action-btn-secondary:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-color);
+}
+
+.analysis-empty-state {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.analysis-empty-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.analysis-empty-card h4 {
+    margin: 0 0 var(--space-xs);
+    color: var(--text-primary);
+}
+
+.analysis-empty-card p {
+    margin: 0 0 var(--space-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
 .metrics-container {
     display: flex;
     flex-direction: column;
