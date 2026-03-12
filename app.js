@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260312-4 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260312-5 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -8,14 +8,14 @@ import { PanelManager } from './modules/panel-manager.js?v=20260312-4';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
-import { GraphManager } from './modules/graph-manager.js?v=20260312-2';
+import { GraphManager } from './modules/graph-manager.js?v=20260312-5';
 import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
 import { ClingoManager } from './modules/clingo-manager.js?v=20260312-2';
-import { OutputManager } from './modules/output-manager.js?v=20260312-4';
+import { OutputManager } from './modules/output-manager.js?v=20260312-5';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
-import { MetricsManager } from './modules/metrics-manager.js?v=20260312-4';
+import { MetricsManager } from './modules/metrics-manager.js?v=20260312-5';
 import { PrismEditor } from './modules/prism-editor.js?v=20260312-4';
-import { examples } from './examples.js?v=20260312-4';
+import { examples } from './examples.js?v=20260312-5';
 import { wabaModules } from './waba-modules.js?v=20260312-2';
 
 class WABAPlayground {

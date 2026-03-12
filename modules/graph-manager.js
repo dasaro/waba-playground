@@ -7,7 +7,7 @@ import { ParserUtils } from './parser-utils.js?v=20260101-1';
 import { UIManager } from './ui-manager.js?v=20260101-1';
 
 export class GraphManager {
-    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn) {
+    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null) {
         this.graphCanvas = graphCanvas;
         this.resetLayoutBtn = resetLayoutBtn;
         this.fullscreenBtn = fullscreenBtn;
@@ -16,8 +16,8 @@ export class GraphManager {
         this.isolatedNodes = [];
         this.currentFrameworkCode = '';
         this.currentGraphMode = 'standard';
+        this.graphPanel = null;
         this.isFullscreen = false;
-        this.graphPanel = null; // Will be set to the graph panel container
     }
 
     /**
@@ -41,9 +41,9 @@ export class GraphManager {
         // Handle hex color
         if (color.startsWith('#')) {
             const hex = color.replace('#', '');
-            const r = parseInt(hex.substring(0, 2), 16);
-            const g = parseInt(hex.substring(2, 4), 16);
-            const b = parseInt(hex.substring(4, 6), 16);
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
             return `rgba(${r}, ${g}, ${b}, ${opacity})`;
         }
 
@@ -135,6 +135,87 @@ export class GraphManager {
         this.runGraphLayout(false);
     }
 
+    initFullscreen(graphPanel) {
+        this.graphPanel = graphPanel;
+
+        if (this.fullscreenBtn) {
+            this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        }
+
+        document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('mozfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('MSFullscreenChange', () => this.handleFullscreenChange());
+    }
+
+    async toggleFullscreen() {
+        if (!this.graphPanel) {
+            console.error('Graph panel not initialized for fullscreen');
+            return;
+        }
+
+        try {
+            if (!this.isFullscreen) {
+                if (this.graphPanel.requestFullscreen) {
+                    await this.graphPanel.requestFullscreen();
+                } else if (this.graphPanel.webkitRequestFullscreen) {
+                    await this.graphPanel.webkitRequestFullscreen();
+                } else if (this.graphPanel.mozRequestFullScreen) {
+                    await this.graphPanel.mozRequestFullScreen();
+                } else if (this.graphPanel.msRequestFullscreen) {
+                    await this.graphPanel.msRequestFullscreen();
+                }
+            } else if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                await document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                await document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                await document.msExitFullscreen();
+            }
+        } catch (error) {
+            console.error('Fullscreen error:', error);
+        }
+    }
+
+    handleFullscreenChange() {
+        this.isFullscreen = !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement
+        );
+
+        if (this.fullscreenBtn) {
+            if (this.isFullscreen) {
+                this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
+            } else {
+                this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
+            }
+        }
+
+        if (!this.network) {
+            return;
+        }
+
+        setTimeout(() => {
+            try {
+                this.network.redraw();
+                this.network.fit({
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            } catch (error) {
+                console.warn('Graph resize after fullscreen change failed:', error);
+            }
+        }, 150);
+    }
+
     resetGraphColors() {
         if (!this.network) return;
 
@@ -170,7 +251,7 @@ export class GraphManager {
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'continuous', forceDirection: 'none', roundness: 0.5 }
+            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
         }));
         this.networkData.edges.update(edgeUpdates);
 
@@ -287,7 +368,8 @@ export class GraphManager {
                         id: edge.id,
                         color: { color: '#9ca3af', highlight: '#6b7280' },
                         width: 3,  // Slightly thicker for visibility
-                        dashes: [8, 4]  // Longer dashes for better visibility
+                        dashes: [8, 4],  // Longer dashes for better visibility
+                        smooth: { enabled: false }  // Disable smooth curves for dashed lines to make pattern clearer
                     });
                     discardedCount++;
                     matched = true;
@@ -382,12 +464,6 @@ export class GraphManager {
         this.currentFrameworkCode = frameworkCode;
         this.currentGraphMode = graphMode;
 
-        // Show empty state if no framework code
-        if (!frameworkCode || !frameworkCode.trim()) {
-            UIManager.showGraphEmptyState();
-            return;
-        }
-
         if (graphMode === 'assumption-direct') {
             await this.updateGraphAssumptionLevelDirect(frameworkCode, clingoManager);
         } else if (graphMode === 'assumption-branching') {
@@ -395,102 +471,6 @@ export class GraphManager {
         } else {
             await this.updateGraphStandard(frameworkCode, clingoManager);
         }
-    }
-
-    /**
-     * Filter sets to keep only minimal attacking sets AND sets that are attacked
-     * For each attack, keep only the minimal set(s) that can perform it
-     * Also include minimal sets that contain attacked assumptions
-     * @param {Map} setsMap - Map of all sets with their attacks
-     * @returns {Map} - Filtered map containing minimal attacking sets and attacked sets
-     */
-    filterToMinimalAttackingSets(setsMap) {
-        const minimalSets = new Map();
-
-        // Always include the empty set as a baseline
-        const emptySet = setsMap.get('∅');
-        if (emptySet) {
-            minimalSets.set('∅', emptySet);
-        }
-
-        // Group sets by the attacks they perform
-        // attackKey -> [sets that perform this attack]
-        const attackGroups = new Map();
-        const attackedAssumptions = new Set(); // Track which assumptions are attacked
-
-        setsMap.forEach(set => {
-            set.attacks.forEach(attack => {
-                // Create unique key for this attack: "attackingElement -> assumption"
-                const attackKey = `${attack.attackingElement}->${attack.assumption}`;
-
-                // Track attacked assumption
-                attackedAssumptions.add(attack.assumption);
-
-                if (!attackGroups.has(attackKey)) {
-                    attackGroups.set(attackKey, []);
-                }
-                attackGroups.get(attackKey).push(set);
-            });
-        });
-
-        // For each attack, keep only minimal sets that can perform it
-        attackGroups.forEach((sets, attackKey) => {
-            // Sort by set size (smaller sets first)
-            sets.sort((a, b) => a.assumptions.length - b.assumptions.length);
-
-            // Filter to minimal sets: keep a set if no smaller set is a subset
-            const minimalForThisAttack = [];
-            for (const set of sets) {
-                const isMinimal = !minimalForThisAttack.some(minSet =>
-                    this.isSubsetOf(minSet.assumptions, set.assumptions)
-                );
-                if (isMinimal) {
-                    minimalForThisAttack.push(set);
-                }
-            }
-
-            // Add these minimal sets to the result
-            minimalForThisAttack.forEach(set => {
-                if (!minimalSets.has(set.id)) {
-                    minimalSets.set(set.id, set);
-                }
-            });
-        });
-
-        // Also include minimal sets containing attacked assumptions (to show attack targets)
-        attackedAssumptions.forEach(assumption => {
-            // Find all sets containing this assumption
-            const setsWithAssumption = [];
-            setsMap.forEach(set => {
-                if (set.assumptions.includes(assumption)) {
-                    setsWithAssumption.push(set);
-                }
-            });
-
-            // Sort by size and add minimal ones
-            setsWithAssumption.sort((a, b) => a.assumptions.length - b.assumptions.length);
-
-            // Add the minimal set containing this assumption
-            if (setsWithAssumption.length > 0) {
-                const minSet = setsWithAssumption[0]; // Smallest set containing this assumption
-                if (!minimalSets.has(minSet.id)) {
-                    minimalSets.set(minSet.id, minSet);
-                }
-            }
-        });
-
-        return minimalSets;
-    }
-
-    /**
-     * Check if setA is a subset of setB
-     * @param {Array} setA - First set (as sorted array)
-     * @param {Array} setB - Second set (as sorted array)
-     * @returns {boolean} - True if setA ⊆ setB
-     */
-    isSubsetOf(setA, setB) {
-        if (setA.length > setB.length) return false;
-        return setA.every(elem => setB.includes(elem));
     }
 
     /**
@@ -612,15 +592,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 });
             }
 
-            // Filter to keep only minimal attacking sets
-            const minimalSetsMap = this.filterToMinimalAttackingSets(setsMap);
-            console.log(`Filtered from ${setsMap.size} total sets to ${minimalSetsMap.size} minimal attacking sets`);
-
             // Build graph elements
             const elements = [];
 
             // Add nodes for each set
-            minimalSetsMap.forEach(set => {
+            setsMap.forEach(set => {
                 const label = set.id;
                 const isEmptySet = set.assumptions.length === 0;
                 const hasAttacks = set.attacks.length > 0;
@@ -638,7 +614,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             });
 
             // Add attack edges from sets to assumptions
-            minimalSetsMap.forEach(set => {
+            setsMap.forEach(set => {
                 set.attacks.forEach(attack => {
                     const { assumption, attackingElement, weight, derivedBy } = attack;
                     const displayWeight = weight === Infinity ? '#sup' : (weight === -Infinity ? '#inf' : weight);
@@ -648,7 +624,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
                     // Attack edge from set to assumption (shown as attacking any set containing that assumption)
                     // For visualization, we'll create edges to all sets that contain the attacked assumption
-                    minimalSetsMap.forEach(targetSet => {
+                    setsMap.forEach(targetSet => {
                         if (targetSet.assumptions.includes(assumption)) {
                             // Include attacking element in edge ID to ensure uniqueness
                             const edgeId = `${set.id}-attacks-${targetSet.id}-via-${assumption}-from-${attackingElement}`;
@@ -728,21 +704,11 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     const nodeData = {
                         id: el.data.id,
                         label: el.data.label,
-                        size: 18,
+                        size: Math.max(25, 15 + (el.data.size * 3)),  // Min size 25 for labels to fit inside
                         color: nodeColor,
                         title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
                         font: {
-                            color: '#f1f5f9',
-                            size: 11,
-                            multi: 'html',
-                            bold: { size: 11 }
-                        },
-                        scaling: {
-                            label: {
-                                enabled: true,
-                                min: 9,
-                                max: 11
-                            }
+                            color: isDark ? '#f1f5f9' : '#1e293b'
                         },
                         assumptions: el.data.id.split(',').filter(a => a !== '∅') // Store assumptions for filtering
                     };
@@ -769,12 +735,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Show/hide empty state based on graph content
-            if (visNodes.length === 0 && visEdges.length === 0) {
-                UIManager.showGraphEmptyState();
-            } else {
-                UIManager.hideGraphEmptyState();
-            }
+            // Hide graph empty state after successful render
+            UIManager.hideGraphEmptyState();
 
             // Update banner with isolated assumptions
             this.updateIsolatedAssumptionsOverlay();
@@ -794,7 +756,6 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating graph:', error);
-            UIManager.showGraphEmptyState();
         }
     }
 
@@ -833,24 +794,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 18,
+                    size: 25,  // Increased for labels inside nodes
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9',
-                        size: 11,
-                        multi: 'html',
-                        bold: { size: 11 }
+                        color: isDark ? '#f1f5f9' : '#1e293b'
                     },
-                    scaling: {
-                        label: {
-                            enabled: true,
-                            min: 9,
-                            max: 11
-                        }
-                    },
-                    isAssumption: true,
-                    assumptions: [assumption]  // Store for extension highlighting
+                    isAssumption: true
                 });
             });
 
@@ -868,15 +818,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Find rules that derive this contrary
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
-                // Check if contrary has any rules with assumption-based bodies
-                const hasAssumptionBasedRules = derivingRules.some(rule =>
-                    rule.body && rule.body.length > 0 && rule.body.some(atom => assumptions.includes(atom))
-                );
+                // Check if contrary has any rules with non-empty bodies (derived attacks)
+                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
 
-                if (!hasAssumptionBasedRules) {
-                    // Contrary is not derived from assumptions (fact or derived from non-assumptions)
+                if (!hasNonFactRules) {
+                    // Contrary is a fact (no rules, or only empty-body/fact rules)
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another
+                        // Direct attack from one assumption to another (treat as derived)
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
                         const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
@@ -897,13 +845,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalDashes: false
                         });
                     } else {
-                        // Fact-based attack (contrary is not an assumption and not derived from assumptions) - attack via ⊤
+                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
                         const weight = weights[contrary] || 1;
                         console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
-                    // Contrary is derived by rule(s) involving assumptions
+                    // Contrary is derived by rule(s)
                     derivingRules.forEach(rule => {
                         const attackers = rule.body;
 
@@ -988,13 +936,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 20,
+                    size: 25,  // Increased for labels inside nodes
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: '#f1f5f9',
-                        size: 16
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
                 });
@@ -1045,12 +993,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Show/hide empty state based on graph content
-            if (visNodes.length === 0 && visEdges.length === 0) {
-                UIManager.showGraphEmptyState();
-            } else {
-                UIManager.hideGraphEmptyState();
-            }
+            // Hide graph empty state after successful render
+            UIManager.hideGraphEmptyState();
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
@@ -1071,7 +1015,6 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating assumption-level graph (direct):', error);
-            UIManager.showGraphEmptyState();
         }
     }
 
@@ -1117,24 +1060,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: assumption,
                     label: assumption,
-                    size: 18,
+                    size: 25,  // Increased for labels inside nodes
                     color: nodeColor,
                     title: `Assumption: ${assumption}\nWeight: ${weight}`,
                     font: {
-                        color: '#f1f5f9',
-                        size: 11,
-                        multi: 'html',
-                        bold: { size: 11 }
+                        color: isDark ? '#f1f5f9' : '#1e293b'
                     },
-                    scaling: {
-                        label: {
-                            enabled: true,
-                            min: 9,
-                            max: 11
-                        }
-                    },
-                    isAssumption: true,
-                    assumptions: [assumption]  // Store for extension highlighting
+                    isAssumption: true
                 });
             });
 
@@ -1153,15 +1085,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 // Find rules that derive this contrary
                 const derivingRules = rules.filter(rule => rule.head === contrary);
 
-                // Check if contrary has any rules with assumption-based bodies
-                const hasAssumptionBasedRules = derivingRules.some(rule =>
-                    rule.body && rule.body.length > 0 && rule.body.some(atom => assumptions.includes(atom))
-                );
+                // Check if contrary has any rules with non-empty bodies (derived attacks)
+                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
 
-                if (!hasAssumptionBasedRules) {
-                    // Contrary is not derived from assumptions (fact or derived from non-assumptions)
+                if (!hasNonFactRules) {
+                    // Contrary is a fact (no rules, or only empty-body/fact rules)
                     if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another
+                        // Direct attack from one assumption to another (treat as derived)
                         const weight = weights[contrary] || 1;
                         const displayWeight = weight === '?' ? '' : weight;
                         const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
@@ -1181,13 +1111,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             originalDashes: false
                         });
                     } else {
-                        // Fact-based attack (contrary is not an assumption and not derived from assumptions) - attack via ⊤
+                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
                         const weight = weights[contrary] || 1;
                         console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
                         factBasedAttacks.push({ assumption, contrary, weight });
                     }
                 } else {
-                    // Contrary is derived by rule(s) involving assumptions
+                    // Contrary is derived by rule(s)
                     derivingRules.forEach(rule => {
                         const attackers = rule.body; // Array of atoms in the rule body
 
@@ -1240,7 +1170,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                 const junctionNode = {
                                     id: junctionId,
                                     label: '',
-                                    size: 15,
+                                    size: 25,  // Increased for labels inside nodes
                                     shape: 'diamond',
                                     color: {
                                         border: '#10b981',
@@ -1252,8 +1182,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                                     },
                                     title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
                                     font: {
-                                        color: '#f1f5f9',
-                                        size: 10
+                                        color: isDark ? '#f1f5f9' : '#1e293b',
+                                        size: 25  // Increased for labels inside nodes
                                     },
                                     isJunction: true,
                                     attackers: assumptionAttackers,
@@ -1335,13 +1265,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 visNodes.push({
                     id: '⊤',
                     label: '⊤',
-                    size: 20,
+                    size: 25,  // Increased for labels inside nodes
                     shape: 'ellipse',
                     color: topNodeColor,
                     title: 'Top element (⊤): represents fact-based attacks',
                     font: {
-                        color: '#f1f5f9',
-                        size: 16
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        size: 26  // Increased for labels inside nodes
                     },
                     isTop: true
                 });
@@ -1393,12 +1323,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             this.networkData.nodes.add(visNodes);
             this.networkData.edges.add(visEdges);
 
-            // Show/hide empty state based on graph content
-            if (visNodes.length === 0 && visEdges.length === 0) {
-                UIManager.showGraphEmptyState();
-            } else {
-                UIManager.hideGraphEmptyState();
-            }
+            // Hide graph empty state after successful render
+            UIManager.hideGraphEmptyState();
 
             // Store isolated assumptions for display
             this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
@@ -1419,320 +1345,6 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 
         } catch (error) {
             console.error('Error updating assumption-level graph:', error);
-            UIManager.showGraphEmptyState();
         }
-    }
-
-    // ===================================
-    // Fullscreen Mode
-    // ===================================
-
-    /**
-     * Initialize fullscreen functionality
-     * @param {HTMLElement} graphPanel - The graph panel container element
-     */
-    initFullscreen(graphPanel) {
-        this.graphPanel = graphPanel;
-        this.isFullscreen = false;
-        this.fullscreenOverlay = null;
-
-        // Add fullscreen button click handler
-        if (this.fullscreenBtn) {
-            this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
-        }
-    }
-
-    /**
-     * Toggle fullscreen mode for the graph panel
-     */
-    toggleFullscreen() {
-        if (!this.isFullscreen) {
-            this.enterFullscreen();
-        } else {
-            this.exitFullscreen();
-        }
-    }
-
-    /**
-     * Enter custom fullscreen modal mode
-     */
-    enterFullscreen() {
-        if (this.isFullscreen) return;
-
-        // Create fullscreen overlay
-        this.fullscreenOverlay = document.createElement('div');
-        this.fullscreenOverlay.id = 'graph-fullscreen-overlay';
-
-        // Get current graph mode from the regular graph header
-        const currentMode = document.querySelector('input[name="graph-mode"]:checked')?.value || 'standard';
-
-        this.fullscreenOverlay.innerHTML = `
-            <div class="fullscreen-header">
-                <div class="fullscreen-header-left">
-                    <h3>Argumentation Graph</h3>
-                    <div class="fullscreen-mode-selector" role="radiogroup" aria-label="Graph visualization mode">
-                        <label class="mode-option">
-                            <input type="radio" name="fullscreen-graph-mode" value="standard" ${currentMode === 'standard' ? 'checked' : ''} aria-label="Standard graph mode">
-                            <span>Standard</span>
-                        </label>
-                        <!-- TEMPORARILY DISABLED: Assumption-Direct and Assumption-Branching modes (contain bugs) -->
-                        <!--
-                        <label class="mode-option">
-                            <input type="radio" name="fullscreen-graph-mode" value="assumption-direct" ${currentMode === 'assumption-direct' ? 'checked' : ''} aria-label="Assumption-Direct mode">
-                            <span>Assumption-Direct</span>
-                        </label>
-                        <label class="mode-option">
-                            <input type="radio" name="fullscreen-graph-mode" value="assumption-branching" ${currentMode === 'assumption-branching' ? 'checked' : ''} aria-label="Assumption-Branching mode">
-                            <span>Assumption-Branching</span>
-                        </label>
-                        -->
-                    </div>
-                </div>
-                <div class="fullscreen-controls">
-                    <button id="fullscreen-export-png-btn" class="fullscreen-btn" aria-label="Export graph as PNG">💾 PNG</button>
-                    <button id="fullscreen-export-pdf-btn" class="fullscreen-btn" aria-label="Export graph as PDF">📄 PDF</button>
-                    <button id="fullscreen-legend-btn" class="fullscreen-btn" aria-label="Toggle legend">📖 Legend</button>
-                    <button id="fullscreen-reset-btn" class="fullscreen-btn" aria-label="Reset layout">🔄 Reset</button>
-                    <button id="fullscreen-close-btn" class="fullscreen-btn fullscreen-close" aria-label="Exit fullscreen">✕ Close</button>
-                </div>
-            </div>
-            <div id="fullscreen-graph-container" class="fullscreen-graph-container"></div>
-            <div id="fullscreen-extensions-panel" class="fullscreen-extensions-panel" hidden>
-                <div class="extensions-panel-header">
-                    <span>Extensions:</span>
-                </div>
-                <div id="fullscreen-extensions-list" class="fullscreen-extensions-list"></div>
-            </div>
-        `;
-
-        document.body.appendChild(this.fullscreenOverlay);
-
-        // Move graph canvas to fullscreen container
-        const fullscreenContainer = document.getElementById('fullscreen-graph-container');
-        const graphCanvas = document.getElementById('cy');
-        const graphHeader = this.graphPanel.querySelector('.graph-header');
-        const graphLegend = this.graphPanel.querySelector('.graph-legend');
-        const isolatedBanner = this.graphPanel.querySelector('.isolated-assumptions-banner');
-
-        // Store original parent for restoration
-        this.originalParent = graphCanvas.parentNode;
-        this.originalNextSibling = graphCanvas.nextSibling;
-
-        // Move elements to fullscreen
-        fullscreenContainer.appendChild(graphCanvas);
-        if (graphLegend) {
-            fullscreenContainer.appendChild(graphLegend);
-        }
-        if (isolatedBanner && !isolatedBanner.hasAttribute('hidden')) {
-            fullscreenContainer.appendChild(isolatedBanner);
-        }
-
-        // Populate extensions panel
-        this.populateExtensionsPanel();
-
-        // Setup control handlers
-        const closeBtn = document.getElementById('fullscreen-close-btn');
-        const resetBtn = document.getElementById('fullscreen-reset-btn');
-        const legendBtn = document.getElementById('fullscreen-legend-btn');
-        const exportPngBtn = document.getElementById('fullscreen-export-png-btn');
-        const exportPdfBtn = document.getElementById('fullscreen-export-pdf-btn');
-
-        closeBtn.addEventListener('click', () => this.exitFullscreen());
-
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => this.resetLayout());
-        }
-
-        if (legendBtn && graphLegend) {
-            legendBtn.addEventListener('click', () => {
-                graphLegend.toggleAttribute('hidden');
-                legendBtn.setAttribute('aria-expanded', !graphLegend.hasAttribute('hidden'));
-            });
-        }
-
-        // Export buttons - trigger the original export buttons
-        if (exportPngBtn) {
-            exportPngBtn.addEventListener('click', () => {
-                const originalBtn = document.getElementById('export-png-btn');
-                if (originalBtn) originalBtn.click();
-            });
-        }
-
-        if (exportPdfBtn) {
-            exportPdfBtn.addEventListener('click', () => {
-                const originalBtn = document.getElementById('export-pdf-btn');
-                if (originalBtn) originalBtn.click();
-            });
-        }
-
-        // Graph mode selector - sync with original and trigger regeneration
-        const fullscreenModeRadios = document.querySelectorAll('input[name="fullscreen-graph-mode"]');
-        fullscreenModeRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    // Sync with the original graph mode selector
-                    const originalRadio = document.querySelector(`input[name="graph-mode"][value="${e.target.value}"]`);
-                    if (originalRadio) {
-                        originalRadio.checked = true;
-                        // Trigger change event on original to regenerate graph
-                        originalRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-            });
-        });
-
-        // ESC key handler
-        this.escHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.exitFullscreen();
-            }
-        };
-        document.addEventListener('keydown', this.escHandler);
-
-        // Update state
-        this.isFullscreen = true;
-        if (this.fullscreenBtn) {
-            this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
-            this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
-        }
-
-        // Trigger network redraw to adjust to new container size
-        setTimeout(() => {
-            if (this.network) {
-                this.network.fit();
-            }
-        }, 100);
-    }
-
-    /**
-     * Exit custom fullscreen modal mode
-     */
-    exitFullscreen() {
-        if (!this.isFullscreen) return;
-
-        const graphCanvas = document.getElementById('cy');
-        const graphLegend = this.graphPanel.querySelector('.graph-legend');
-        const isolatedBanner = document.getElementById('isolated-assumptions-banner');
-
-        // Restore elements to original positions
-        if (this.originalNextSibling) {
-            this.originalParent.insertBefore(graphCanvas, this.originalNextSibling);
-        } else {
-            this.originalParent.appendChild(graphCanvas);
-        }
-
-        // Restore legend and banner if they exist
-        const panelContent = this.graphPanel.querySelector('.panel-content');
-        if (graphLegend && !panelContent.contains(graphLegend)) {
-            // Insert after graph-header
-            const graphHeader = panelContent.querySelector('.graph-header');
-            graphHeader.insertAdjacentElement('afterend', graphLegend);
-        }
-
-        if (isolatedBanner && !panelContent.contains(isolatedBanner)) {
-            // Insert after graph canvas
-            graphCanvas.insertAdjacentElement('afterend', isolatedBanner);
-        }
-
-        // Remove overlay
-        if (this.fullscreenOverlay) {
-            this.fullscreenOverlay.remove();
-            this.fullscreenOverlay = null;
-        }
-
-        // Remove ESC handler
-        if (this.escHandler) {
-            document.removeEventListener('keydown', this.escHandler);
-            this.escHandler = null;
-        }
-
-        // Update state
-        this.isFullscreen = false;
-        if (this.fullscreenBtn) {
-            this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
-            this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
-        }
-
-        // Trigger network redraw
-        setTimeout(() => {
-            if (this.network) {
-                this.network.fit();
-            }
-        }, 100);
-    }
-
-    /**
-     * Populate the extensions panel with available extensions
-     */
-    populateExtensionsPanel() {
-        const extensionsPanel = document.getElementById('fullscreen-extensions-panel');
-        const extensionsList = document.getElementById('fullscreen-extensions-list');
-
-        if (!extensionsPanel || !extensionsList) return;
-
-        // Find all extension headers in the output panel
-        const answerHeaders = document.querySelectorAll('.answer-header');
-
-        if (answerHeaders.length === 0) {
-            // No extensions, keep panel hidden
-            extensionsPanel.setAttribute('hidden', '');
-            return;
-        }
-
-        // Show panel
-        extensionsPanel.removeAttribute('hidden');
-
-        // Clear existing content
-        extensionsList.innerHTML = '';
-
-        // Create a button for each extension
-        answerHeaders.forEach((header, index) => {
-            const extensionId = header.dataset.extensionId;
-            const answerNumber = parseInt(extensionId);
-            const isActive = header.classList.contains('active-extension');
-
-            // Extract cost/reward from the badge
-            const costBadge = header.querySelector('.extension-cost-badge');
-            const costText = costBadge ? costBadge.textContent.trim() : '';
-
-            // Create extension button
-            const button = document.createElement('button');
-            button.className = 'fullscreen-extension-btn';
-            button.dataset.extensionId = extensionId;
-
-            if (isActive) {
-                button.classList.add('active');
-            }
-
-            button.innerHTML = `
-                <span class="extension-number">Ext ${answerNumber}</span>
-                ${costText ? `<span class="extension-cost">${costText}</span>` : ''}
-            `;
-
-            // Click handler - trigger the original header's click
-            button.addEventListener('click', () => {
-                // Trigger click on the original header to reuse all existing logic
-                header.click();
-
-                // Update active state on all fullscreen buttons
-                document.querySelectorAll('.fullscreen-extension-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-
-                // Check if this extension is now active (could have been toggled off)
-                if (header.classList.contains('active-extension')) {
-                    button.classList.add('active');
-                }
-            });
-
-            extensionsList.appendChild(button);
-        });
-    }
-
-    /**
-     * Handle fullscreen state changes (legacy - no longer used with custom overlay)
-     */
-    handleFullscreenChange() {
-        // Legacy method - kept for compatibility but not used with custom overlay
     }
 }

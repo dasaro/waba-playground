@@ -259,6 +259,88 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Panels (Unified Component)
    =================================== */
 
+.panel {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--space-md);
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.panel-header h3 {
+    margin: 0;
+}
+
+.panel-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    padding: var(--space-xs) var(--space-sm);
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.panel-toggle:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.panel-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.panel-content {
+    padding: var(--space-lg);
+}
+
+.panel[data-collapsed="true"] .panel-content {
+    display: none;
+}
+
+.panel[data-collapsed="true"] .panel-header {
+    border-bottom: none;
+}
+
+.icon-collapse,
+.icon-expand {
+    font-weight: 700;
+    user-select: none;
+}
+
+.analysis-panel .panel-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+}
+
+.analysis-panel .panel-header h3,
+.analysis-panel .panel-toggle {
+    color: white;
+}
+
+.analysis-panel .panel-toggle:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
 .config-panel,
 .editor-container,
 .output-container,

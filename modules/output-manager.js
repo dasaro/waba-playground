@@ -2,7 +2,7 @@
  * OutputManager - Handles result display, parsing, and logging
  */
 import { PopupManager } from './popup-manager.js?v=20260101-1';
-import { MetricsManager } from './metrics-manager.js?v=20260312-4';
+import { MetricsManager } from './metrics-manager.js?v=20260312-5';
 
 export class OutputManager {
     constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect, polaritySelect, getConfig = null) {
