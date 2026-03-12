@@ -2,9 +2,12 @@ backup-cytoscape/
 server.log
 *.backup
 *.bak
+*.log
 node_modules/
 .DS_Store
 clingo-wasm-0.3.2.tgz
 
 # Build artifacts
 synced-modules.txt
+test-results/
+tmp-*.lp

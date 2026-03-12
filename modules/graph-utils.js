@@ -6,11 +6,9 @@ export class GraphUtils {
     /**
      * Create color scheme for a node based on type and state
      * @param {string} type - Node type ('assumption', 'element', 'set', 'empty-set', 'attacking-set')
-     * @param {boolean} isIn - Whether node is "in" (selected)
-     * @param {boolean} isSupported - Whether node is supported
      * @returns {Object} - vis.js color object
      */
-    static createNodeColor(type, isIn = false, isSupported = false) {
+    static createNodeColor(type) {
         if (type === 'assumption' || type === 'set') {
             // Standard assumption/set colors
             return {

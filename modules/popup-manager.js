@@ -9,11 +9,6 @@ export class PopupManager {
      * @param {HTMLElement} element - The element that triggered the popup
      */
     static showDerivationChain(atom, parsed, element) {
-        console.log('📖 [showDerivationChain] CALLED');
-        console.log('Atom:', atom);
-        console.log('Element:', element);
-        console.log('Parsed data:', parsed);
-
         // Remove existing tooltips
         document.querySelectorAll('.derivation-tooltip').forEach(t => t.remove());
 
@@ -32,9 +27,7 @@ export class PopupManager {
         // Find the rule that derives this atom
         let found = false;
 
-        console.log('Searching through rules:', parsed.rules);
-        for (const [ruleId, rule] of parsed.rules.entries()) {
-            console.log(`  Checking rule ${ruleId}:`, rule);
+        for (const [, rule] of parsed.rules.entries()) {
             if (rule.head === atom) {
                 found = true;
 
@@ -57,7 +50,7 @@ export class PopupManager {
                 content += '</div></div>';
 
                 // Weights section
-                const bodyWithWeights = rule.body.filter(bodyAtom => {
+                const bodyWithWeights = rule.body.filter((bodyAtom) => {
                     const weight = parsed.weights.get(bodyAtom);
                     return weight !== undefined;
                 });
@@ -75,8 +68,6 @@ export class PopupManager {
                     });
                     content += '</div></div>';
                 }
-
-                console.log('✅ Found derivation rule:', ruleId);
                 break;
             }
         }
@@ -85,19 +76,16 @@ export class PopupManager {
             content += '<div class="popup-section">';
             content += '<div class="popup-info">ℹ️ No derivation found (fact or assumption)</div>';
             content += '</div>';
-            console.warn('⚠️ No derivation rule found for atom:', atom);
         }
 
         content += '</div>';
         tooltip.innerHTML = content;
         document.body.appendChild(tooltip);
-        console.log('✅ Tooltip appended to body');
 
         // Position near the element
         const rect = element.getBoundingClientRect();
         tooltip.style.left = `${rect.left}px`;
         tooltip.style.top = `${rect.bottom + 5}px`;
-        console.log('📍 Tooltip positioned at:', { left: rect.left, top: rect.bottom + 5 });
 
         // Auto-remove on click outside
         setTimeout(() => {
@@ -105,21 +93,18 @@ export class PopupManager {
                 if (!tooltip.contains(e.target) && e.target !== element) {
                     tooltip.remove();
                     document.removeEventListener('click', removeTooltip);
-                    console.log('🗑️ Tooltip removed');
                 }
             };
             document.addEventListener('click', removeTooltip);
-            console.log('✅ Click-outside handler attached');
         }, 100);
     }
 
     /**
      * Show attack tooltip with derivation information
      * @param {Object} edge - Edge data from vis.js
-     * @param {string} frameworkCode - The framework code
      * @returns {string} - Tooltip HTML content
      */
-    static createAttackDerivationTooltip(edge, frameworkCode) {
+    static createAttackDerivationTooltip(edge) {
         const attackingElement = edge.attackingElement;
         const attackedAssumption = edge.attackedAssumption;
         const derivedBy = edge.derivedBy || [];
@@ -175,7 +160,7 @@ export class PopupManager {
      * @param {number} y - Y coordinate
      * @param {Object} data - Additional data (frameworkCode, graphMode)
      */
-    static showNodePopup(node, x, y, data) {
+    static showNodePopup(node, x, y, _data) {
         // Remove existing popups
         PopupManager.clearAllPopups();
 

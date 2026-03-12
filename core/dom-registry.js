@@ -1,0 +1,86 @@
+/**
+ * Build a single DOM registry for the playground.
+ * Feature modules should consume this object instead of querying the global DOM.
+ *
+ * @param {Document} doc
+ * @returns {import('./types.js').DomRegistry}
+ */
+export function createDomRegistry(doc = document) {
+    const byId = (id) => /** @type {any} */ (doc.getElementById(id));
+
+    return {
+        document: doc,
+        body: doc.body,
+        editor: byId('code-editor'),
+        output: byId('output'),
+        stats: byId('stats'),
+        runBtn: byId('run-btn'),
+        clearBtn: byId('clear-btn'),
+        semiringSelect: byId('semiring-select'),
+        defaultPolicySelect: byId('default-policy-select'),
+        monoidSelect: byId('monoid-select'),
+        semanticsSelect: byId('semantics-select'),
+        exampleSelect: byId('example-select'),
+        budgetInput: byId('budget-input'),
+        budgetInputLabel: byId('budget-input-label'),
+        numModelsInput: byId('num-models-input'),
+        numModelsContainer: byId('num-models-container'),
+        timeoutInput: byId('timeout-input'),
+        optimizeSelect: byId('optimize-select'),
+        optModeSelect: byId('opt-mode-select'),
+        constraintSelect: byId('constraint-select'),
+        polaritySelect: byId('polarity-select'),
+        budgetIntentSelect: byId('budget-intent-select'),
+        semiringAliasNote: byId('semiring-alias-note'),
+        supportedSurfaceNote: byId('supported-surface-note'),
+        budgetIntentNote: byId('budget-intent-note'),
+        graphModeRadios: Array.from(doc.querySelectorAll('input[name="graph-mode"]')),
+        inputMode: byId('input-mode'),
+        simpleMode: byId('simple-mode'),
+        rulesInput: byId('rules-input'),
+        assumptionsInput: byId('assumptions-input'),
+        contrariesInput: byId('contraries-input'),
+        weightsInput: byId('weights-input'),
+        fileUploadBtn: byId('file-upload-btn'),
+        fileUploadInput: byId('file-upload-input'),
+        graphCanvas: byId('cy'),
+        resetLayoutBtn: byId('reset-layout-btn'),
+        fullscreenBtn: byId('fullscreen-btn'),
+        graphPanel: doc.querySelector('.graph-panel'),
+        syntaxGuideBtn: byId('syntax-guide-btn'),
+        syntaxGuideModal: byId('syntax-guide-modal'),
+        syntaxGuideClose: byId('syntax-guide-close'),
+        downloadLpBtn: byId('download-lp-btn'),
+        downloadWabaBtn: byId('download-waba-btn'),
+        legendToggleBtn: byId('legend-toggle-btn'),
+        graphLegend: byId('graph-legend'),
+        exportPngBtn: byId('export-png-btn'),
+        exportPdfBtn: byId('export-pdf-btn'),
+        themeToggleBtn: byId('theme-toggle-btn'),
+        themeIcon: byId('theme-icon'),
+        fontIncreaseBtn: byId('font-increase-btn'),
+        fontDecreaseBtn: byId('font-decrease-btn'),
+        analysisPanel: byId('analysis-panel'),
+        exportSection: byId('export-section'),
+        graphEmptyState: byId('graph-empty-state'),
+        outputEmptyState: byId('output-empty-state'),
+        introStatus: byId('intro-status'),
+        loadingOverlay: byId('loading-overlay'),
+        loadingText: byId('loading-text'),
+        loadingSubtext: byId('loading-subtext'),
+        loadingElapsed: byId('loading-elapsed'),
+        simpleDescriptionBox: byId('simple-description-box'),
+        simpleDescriptionContent: byId('simple-description-content'),
+        simpleAddCommentBtn: byId('simple-add-comment-btn'),
+        simpleAddCommentContainer: byId('simple-add-comment-container'),
+        simpleRemoveDescriptionBtn: byId('simple-remove-description-btn'),
+        isolatedAssumptionsBanner: byId('isolated-assumptions-banner'),
+        isolatedAssumptionsList: byId('isolated-assumptions-list'),
+        panelToggles: Array.from(doc.querySelectorAll('.panel-toggle')),
+        docTabs: Array.from(doc.querySelectorAll('.doc-tab')),
+        docTabContents: Array.from(doc.querySelectorAll('.doc-tab-content')),
+        getPanel(panelId) {
+            return doc.querySelector(`[data-panel="${panelId}"]`);
+        }
+    };
+}

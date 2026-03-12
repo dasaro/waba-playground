@@ -5,7 +5,7 @@
  * from any GitHub Pages project path or from localhost without backend logic.
  */
 
-var Module = {
+window.Module = {
     locateFile(path) {
         if (!path.endsWith('.wasm') && !path.endsWith('.worker.js')) {
             return path;

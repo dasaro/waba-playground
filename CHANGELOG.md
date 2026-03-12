@@ -6,16 +6,54 @@ Deployment versions use `YYYYMMDD-N`.
 
 Version bump checklist for GitHub Pages releases:
 
-1. Pick the next deployment version.
-2. Update the version header in [app.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/app.js).
-3. Update cache-busting query strings in [index.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/index.html) for changed top-level assets.
-4. Update changed module import query strings in [app.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/app.js) and any nested imports that point at changed files.
-5. Update [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html) with the new expected version and current smoke checks.
-6. Add a new entry here summarizing user-visible changes.
-7. Run local smoke checks before commit and push.
-8. Push `main`.
-9. Push the current GitHub Pages source branch too. At the moment the live Pages workflow is building from `waba-weak-constraints`, so a `main` push alone is not sufficient for deployment.
-10. Verify the live page with a no-cache reload.
+1. Add a new entry here summarizing the release.
+2. Bump the version from the single source of truth:
+
+```bash
+npm run version:bump
+```
+
+3. Run the release gate:
+
+```bash
+npm run validate
+```
+
+4. Commit the release.
+5. Push `main`.
+6. Push the current GitHub Pages source branch too. At the moment the live Pages workflow is building from `waba-weak-constraints`, so a `main` push alone is not sufficient for deployment.
+7. Verify the live page with a no-cache reload.
+
+Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts update:
+- [core/app-version.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/app-version.js)
+- [index.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/index.html)
+- [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
+- changed module import references across the app
+
+## 20260312-7
+
+- narrowed the post-refactor cleanup instead of starting another architecture wave
+- split graph view-state logic out of [modules/graph-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js) into:
+  - [modules/graph-highlighting.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-highlighting.js)
+  - [modules/graph-assumption-builder.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-assumption-builder.js)
+- reduced [modules/graph-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js) from 1348 lines to 565 lines and left it focused on orchestration
+- removed remaining debug console noise from the graph, output, popup, and fullscreen UI paths
+- re-ran the full release gate, including Playwright headless browser checks
+
+## 20260312-6
+
+- refactored the app into explicit `core/`, `runtime/`, and `features/` layers while keeping the existing static frontend architecture
+- made `app.js` bootstrap-only and moved config/program composition into runtime helpers
+- introduced shared JSDoc contracts plus `eslint`, `tsconfig checkJs`, unit tests, and Playwright browser smoke tests
+- fixed Clingo startup so the worker is actually initialized with the correct WASM URL before the app reports success
+- serialized browser-side solver calls to avoid graph/run races in `clingo-wasm`
+- stabilized exact `preferred` in the browser:
+  - no-discard preset for the curated reference example
+  - subset-maximal multi-pass flow no longer races graph recomputation
+  - output rendering no longer calls removed legacy cost helpers
+- replaced the old manual deployment notes with version-script driven release docs
+- added architecture, testing, and audit documents
+- removed stale troubleshooting/backup artifacts from the maintained repo surface
 
 ## 20260312-4
 

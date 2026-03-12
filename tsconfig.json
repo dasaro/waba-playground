@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "files": [
+    "core/dom-registry.js",
+    "core/store.js",
+    "core/types.js",
+    "runtime/objective-utils.js",
+    "runtime/answer-set-parser.js",
+    "features/editor/simple-format.js",
+    "tests/unit/objective-utils.test.js",
+    "tests/unit/simple-format.test.js"
+  ],
+  "exclude": [
+    "waba-modules.js",
+    "clingo*.js",
+    "dist/**"
+  ]
+}

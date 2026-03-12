@@ -7,6 +7,8 @@ This directory contains the browser runtime for the static WABA playground.
 - [clingo-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/clingo-manager.js)
   - resolves semiring family + polarity
   - injects default policy, monoid, optimization, and budget modules
+  - initializes the Clingo worker with the correct path-relative WASM URL
+  - serializes browser-side solver calls so graph recomputation and semantics runs cannot race
   - runs exact browser-side `preferred`
 - [graph-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js)
   - keeps the existing vis.js graph architecture

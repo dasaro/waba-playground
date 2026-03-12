@@ -31,7 +31,7 @@
     <h1>🔍 WABA Playground Version Check</h1>
 
     <h2>Expected Version:</h2>
-    <pre>v20260312-5 (March 12, 2026)</pre>
+    <pre>v20260312-7</pre>
 
     <h2>Module Status:</h2>
     <div id="status">Checking...</div>
@@ -56,7 +56,7 @@
     </ol>
 
     <script type="module">
-        const expectedVersion = '20260312-5';
+        const expectedVersion = '20260312-7';
 
         async function checkModules() {
             const status = document.getElementById('status');
@@ -71,6 +71,10 @@
                     && typeof MetricsManager.formatMetricsHTML === 'function';
                 const { GraphManager } = await import(`./modules/graph-manager.js?v=${Date.now()}`);
                 const hasFullscreenHook = typeof GraphManager.prototype.initFullscreen === 'function';
+                const hasGraphApply = typeof GraphManager.prototype.applyGraphData === 'function';
+                const graphHighlighting = await import(`./modules/graph-highlighting.js?v=${Date.now()}`);
+                const hasHighlightHelper = typeof graphHighlighting.buildHighlightUpdates === 'function'
+                    && typeof graphHighlighting.buildResetUpdates === 'function';
 
                 checks.push(hasMethod
                     ? '<div class="check">✓ OutputManager.clearActiveExtension() exists</div>'
@@ -84,11 +88,13 @@
                     ? '<div class="check">✓ GraphManager.initFullscreen() exists</div>'
                     : '<div class="fail">✗ GraphManager.initFullscreen() missing</div>'
                 );
-                const hasColorMethod = typeof GraphManager.prototype.colorToRGBA === 'function';
-
-                checks.push(hasColorMethod
-                    ? '<div class="check">✓ GraphManager.colorToRGBA() exists</div>'
-                    : '<div class="fail">✗ GraphManager.colorToRGBA() missing</div>'
+                checks.push(hasGraphApply
+                    ? '<div class="check">✓ GraphManager.applyGraphData() exists</div>'
+                    : '<div class="fail">✗ GraphManager.applyGraphData() missing</div>'
+                );
+                checks.push(hasHighlightHelper
+                    ? '<div class="check">✓ graph-highlighting helpers loaded</div>'
+                    : '<div class="fail">✗ graph-highlighting helpers missing</div>'
                 );
 
                 status.innerHTML = checks.join('') + '<div class="check">✓ Modules loaded successfully!</div>';
