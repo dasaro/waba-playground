@@ -6,18 +6,8 @@
 
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
-    <!-- CRITICAL: Set base URL for GitHub Pages project repository (conditional) -->
-    <script>
-        // Only set base tag for GitHub Pages, not for localhost
-        if (window.location.hostname === 'dasaro.github.io') {
-            const base = document.createElement('base');
-            base.href = '/waba-playground/';
-            document.head.appendChild(base);
-        }
-    </script>
-
-    <title>WABA Playground - Interactive Framework Explorer</title>
-    <link rel="stylesheet" href="style.css">
+    <title>WABA Playground - Static WABA Frontend</title>
+    <link rel="stylesheet" href="style.css?v=20260312-1">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -31,7 +21,7 @@
     <script src="modules/prism-waba.js?v=20260104-1"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260101-1"></script>
+    <script src="modules/wasm-config.js?v=20260312-1"></script>
     <script src="clingo.web.js?v=20260101-9"></script>
 </head>
 <body>
@@ -61,15 +51,15 @@
         <!-- Introduction Section -->
         <div class="intro-section" id="intro-section">
             <div class="intro-content">
-                <p class="intro-status" id="intro-status">⏳ Loading Clingo WASM...</p>
+                <p class="intro-status" id="intro-status">Loading Clingo WASM…</p>
                 <p class="intro-tagline">
-                    <strong>WABA</strong> (Weighted Assumption-Based Argumentation) combines algebraic semirings and monoids
-                    to enable flexible reasoning with weighted arguments and budget-constrained attack resolution.
+                    <strong>WABA</strong> combines an ordered semiring for local support propagation, a default-policy layer
+                    for unweighted assumptions, a monoid for discarded-attack aggregation, and a feasibility bound over that aggregate.
                 </p>
                 <div class="intro-steps">
-                    <span>1️⃣ Configure semiring/monoid</span>
-                    <span>2️⃣ Choose example or write framework</span>
-                    <span>3️⃣ Run WABA and explore results</span>
+                    <span>1️⃣ Choose algebra and semantics</span>
+                    <span>2️⃣ Load a curated example or write a framework</span>
+                    <span>3️⃣ Run plain clingo-wasm and inspect extensions</span>
                 </div>
             </div>
         </div>
@@ -90,117 +80,92 @@
                     <div class="panel-content" id="panel-config-content">
                     <div class="config-grid">
                         <div class="config-item">
-                            <label for="semiring-select">Semiring (Weight Propagation)</label>
+                            <label for="semiring-select">Semiring Family</label>
                             <select id="semiring-select" class="select">
-                                <option value="godel">Gödel (⊗=min, ⊕=max)</option>
-                                <option value="tropical">Tropical (⊗=+, ⊕=min)</option>
-                                <option value="arctic">Arctic (⊗=+, ⊕=max)</option>
-                                <option value="lukasiewicz">Łukasiewicz (⊗=bounded sum, ⊕=bounded sum)</option>
-                                <option value="bottleneck_cost">Bottleneck (⊗=max, ⊕=min)</option>
+                                <option value="godel">Gödel</option>
+                                <option value="tropical">Tropical</option>
+                                <option value="lukasiewicz">Łukasiewicz</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="monoid-select">
-                                Monoid (Discard-Cost Aggregation)
-                                <span class="info-hint" title="Aggregates discarded attack scores into beta_cost (repair cost). Higher attack scores cost more to discard.">ⓘ</span>
-                            </label>
+                            <label for="polarity-select">Polarity</label>
+                            <select id="polarity-select" class="select">
+                                <option value="higher">Higher is better</option>
+                                <option value="lower">Lower is better</option>
+                            </select>
+                            <div id="semiring-alias-note" class="config-note">Canonical ordered-semiring view.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="default-policy-select">Default Policy</label>
+                            <select id="default-policy-select" class="select">
+                                <option value="legacy">Legacy</option>
+                                <option value="aba">ABA</option>
+                                <option value="neutral">Neutral</option>
+                            </select>
+                            <div class="config-note">Controls the injected value for unweighted assumptions.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="monoid-select">Monoid</label>
                             <select id="monoid-select" class="select">
-                                <option value="max">MAX - Worst discarded attack</option>
-                                <option value="sum">SUM - Total discard cost</option>
-                                <option value="min">MIN - Best discarded attack</option>
-                                <option value="count">COUNT - Number of discards</option>
+                                <option value="sum">SUM</option>
+                                <option value="max">MAX</option>
+                                <option value="count">COUNT</option>
+                                <option value="min">MIN</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label title="Attack score meaning (weight W)">
-                                Attack Score Meaning (W)
-                                <span class="info-hint" title="What attack weight W represents. Either way, discarding costs more for higher W (beta_cost is always a COST).">ⓘ</span>
-                            </label>
-                            <div id="polarity-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-tertiary); font-size: var(--text-sm); opacity: 0.7; font-style: italic;">
-                                Strength/Reward (↑ stronger → costlier to discard)
-                            </div>
-                            <!-- Hidden select for programmatic access -->
-                            <select id="polarity-select" class="select" style="display: none;">
-                                <option value="strength">Strength/Reward (↑ stronger → costlier to discard)</option>
-                                <option value="cost">Cost/Weakness (↑ weaker → costlier to discard)</option>
+                            <label for="optimize-select">Optimization</label>
+                            <select id="optimize-select" class="select">
+                                <option value="minimize">Minimize aggregate</option>
+                                <option value="maximize">Maximize aggregate</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label title="Budget constraint applies to beta_cost (repair cost)">
-                                Budget Constraint Type
-                                <span class="info-hint" title="Upper Bound: allow discards only if beta_cost ≤ β (standard). Lower Bound: force discards so beta_cost ≥ β (advanced).">ⓘ</span>
-                            </label>
-                            <div id="comparator-display" class="config-value" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius-sm); color: var(--text-tertiary); font-size: var(--text-sm); opacity: 0.7; font-style: italic;">
-                                Upper Bound (beta_cost ≤ β)
-                            </div>
-                            <!-- Hidden select for programmatic access -->
-                            <select id="comparator-select" class="select" style="display: none;">
-                                <option value="ub">Upper Bound (beta_cost ≤ β)</option>
-                                <option value="lb">Lower Bound (beta_cost ≥ β)</option>
+                            <label for="constraint-select">Budget Mode</label>
+                            <select id="constraint-select" class="select">
+                                <option value="none">None</option>
+                                <option value="ub" selected>Upper bound</option>
+                                <option value="lb">Lower bound</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="semantics-select">
-                                Semantics
-                                <span class="info-hint" title="Only verified implementations from WABA repository">ⓘ</span>
-                            </label>
+                            <label for="budget-intent-select">When Budget Mode = None</label>
+                            <select id="budget-intent-select" class="select">
+                                <option value="no_discard">Plain / no-discard</option>
+                                <option value="explore">Enumerate feasible discard patterns</option>
+                            </select>
+                            <div id="budget-intent-note" class="config-note">No-discard mirrors classical ABA. Explore removes the budget filter but still computes aggregates.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="semantics-select">Semantics</label>
                             <select id="semantics-select" class="select">
+                                <option value="cf">Conflict-free</option>
                                 <option value="stable" selected>Stable</option>
                                 <option value="admissible">Admissible</option>
                                 <option value="complete">Complete</option>
                                 <option value="grounded">Grounded</option>
                                 <option value="preferred">Preferred</option>
-                                <option value="semistable">Semi-Stable</option>
-                                <option value="staged">Staged</option>
-                                <option value="ideal">Ideal</option>
-                                <option value="cf">Conflict-Free</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="optimize-select">
-                                Optimization Objective
-                                <span class="info-hint" id="opt-dir-hint" title="What to optimize: repair cost (beta_cost) is standard. Advanced: can add reward objectives.">ⓘ</span>
-                            </label>
-                            <select id="optimize-select" class="select">
-                                <option value="minimize" selected>Minimize Repair Cost (beta_cost)</option>
-                                <option value="maximize">Maximize Reward (kept attacks)</option>
-                            </select>
-                            <div id="opt-dir-warning" class="warning-message" style="display: none; margin-top: 4px; font-size: 0.85em; color: var(--warning-color);">
-                                ⚠️ Maximizing reward is a separate objective from minimizing beta_cost
-                            </div>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="opt-mode-select">Optimization Mode</label>
+                            <label for="opt-mode-select">Opt Mode</label>
                             <select id="opt-mode-select" class="select">
-                                <option value="ignore" selected>Enumerate All Extensions</option>
-                                <option value="optN">Find Optimal Extensions Only</option>
+                                <option value="ignore" selected>Enumerate all surviving extensions</option>
+                                <option value="optN">Keep only optimal extensions</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="constraint-select">
-                                Budget Constraint
-                                <span class="info-hint" title="Constrains beta_cost (repair cost). UB: only allow low-cost repairs. LB: force higher-cost repairs (advanced).">ⓘ</span>
-                            </label>
-                            <select id="constraint-select" class="select">
-                                <option value="none" selected>None (Enumerate All)</option>
-                                <option value="ub">Upper Bound (beta_cost ≤ β)</option>
-                                <option value="lb">Lower Bound (beta_cost ≥ β)</option>
-                            </select>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="budget-input" id="budget-input-label">
-                                Budget Threshold (β)
-                                <span class="info-hint" title="Threshold for beta_cost. With UB: only extensions with repair cost ≤ β are allowed.">ⓘ</span>
-                            </label>
-                            <input type="number" id="budget-input" class="select" value="100" min="0" max="1000">
+                            <label for="budget-input" id="budget-input-label">Budget Threshold (β)</label>
+                            <input type="number" id="budget-input" class="select" value="2" min="-1000" max="10000">
                         </div>
 
                         <div class="config-item" id="num-models-container">
@@ -217,14 +182,6 @@
                             <label for="example-select">Load Example</label>
                             <select id="example-select" class="select">
                                 <option value="">-- Select Example --</option>
-                                <option value="simple">Simple - Mixed Attacks</option>
-                                <option value="minimal">Minimal - Derived Attack</option>
-                                <option value="linear">Linear Topology</option>
-                                <option value="cycle">Cycle Topology</option>
-                                <option value="tree">Tree Topology</option>
-                                <option value="complete" selected>Complete Topology</option>
-                                <option value="mixed">Mixed Topology</option>
-                                <option value="isolated">Isolated Components</option>
                             </select>
                         </div>
 
@@ -234,10 +191,12 @@
                             <button id="file-upload-btn" class="select file-upload-button">📁 Choose File (.lp / .waba)</button>
                         </div>
 
-                        <div class="config-item checkbox-container">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="flat-constraint" class="checkbox-input"> Flat-WABA Constraint
-                            </label>
+                        <div class="config-item">
+                            <label>Supported Surface</label>
+                            <div id="supported-surface-note" class="config-note">
+                                Canonical bounded presets are <code>sum/max/count + ub</code> and <code>min + lb</code>.
+                                Exact <code>preferred</code> is computed with a browser-side subset-maximal pass.
+                            </div>
                         </div>
                     </div>
                     </div>
@@ -962,6 +921,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260105-3"></script>
+    <script type="module" src="app.js?v=20260312-1"></script>
 </body>
 </html>

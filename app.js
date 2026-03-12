@@ -1,5 +1,5 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260104-10 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260312-1 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
@@ -8,14 +8,15 @@ import { PanelManager } from './modules/panel-manager.js?v=20260101-8';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
-import { GraphManager } from './modules/graph-manager.js?v=20260101-1';
+import { GraphManager } from './modules/graph-manager.js?v=20260312-1';
 import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
-import { ClingoManager } from './modules/clingo-manager.js?v=20260105-3';
-import { OutputManager } from './modules/output-manager.js?v=20260101-1';
+import { ClingoManager } from './modules/clingo-manager.js?v=20260312-1';
+import { OutputManager } from './modules/output-manager.js?v=20260312-1';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
 import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
 import { PrismEditor } from './modules/prism-editor.js?v=20260104-1';
-import { examples } from './examples.js?v=20260105-1';
+import { examples } from './examples.js?v=20260312-1';
+import { wabaModules } from './waba-modules.js?v=20260312-1';
 
 class WABAPlayground {
     constructor() {
@@ -26,6 +27,7 @@ class WABAPlayground {
         this.runBtn = document.getElementById('run-btn');
         this.clearBtn = document.getElementById('clear-btn');
         this.semiringSelect = document.getElementById('semiring-select');
+        this.defaultPolicySelect = document.getElementById('default-policy-select');
         this.monoidSelect = document.getElementById('monoid-select');
         this.semanticsSelect = document.getElementById('semantics-select');
         this.exampleSelect = document.getElementById('example-select');
@@ -36,9 +38,10 @@ class WABAPlayground {
         this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
         this.polaritySelect = document.getElementById('polarity-select');
-        this.polarityDisplay = document.getElementById('polarity-display');
-        this.comparatorSelect = document.getElementById('comparator-select');
-        this.comparatorDisplay = document.getElementById('comparator-display');
+        this.budgetIntentSelect = document.getElementById('budget-intent-select');
+        this.semiringAliasNote = document.getElementById('semiring-alias-note');
+        this.supportedSurfaceNote = document.getElementById('supported-surface-note');
+        this.budgetIntentNote = document.getElementById('budget-intent-note');
         this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
 
         // Simple ABA mode elements
@@ -155,7 +158,8 @@ class WABAPlayground {
             this.semiringSelect,
             this.monoidSelect,
             this.optimizeSelect,
-            this.polaritySelect
+            this.polaritySelect,
+            () => this.getCurrentConfig()
         );
 
         // Initialize Export Manager
@@ -211,10 +215,9 @@ class WABAPlayground {
         // Initialize empty states
         UIManager.initializeEmptyStates();
 
-        // Initialize polarity/comparator inference
-        this.initPolarityInference();
-
-        // Initialize budget and num models UI states
+        // Initialize the mature supported surface UI contract
+        this.populateExampleSelect();
+        this.syncConfigUi();
         this.updateBudgetInputState();
         this.updateNumModelsVisibility();
 
@@ -255,12 +258,23 @@ class WABAPlayground {
         // Drag and drop file upload
         this.initDragAndDrop();
 
-        // Graph mode changes
-        this.semiringSelect.addEventListener('change', () => {
-            this.updatePolarityFromSemiring();
-            this.regenerateGraph();
+        // Supported-surface configuration changes
+        [this.semiringSelect, this.polaritySelect, this.defaultPolicySelect].forEach((element) => {
+            element.addEventListener('change', () => {
+                this.syncConfigUi();
+                this.regenerateGraph();
+            });
         });
-        this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
+        [
+            this.monoidSelect,
+            this.optimizeSelect,
+            this.constraintSelect,
+            this.budgetIntentSelect,
+            this.semanticsSelect,
+            this.optModeSelect
+        ].forEach((element) => {
+            element.addEventListener('change', () => this.syncConfigUi());
+        });
         this.graphModeRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 // Clear active extension when switching graph modes (different structures)
@@ -269,20 +283,6 @@ class WABAPlayground {
                 this.regenerateGraph();
             });
         });
-
-        // Polarity/Comparator are always auto-inferred (no advanced mode)
-
-        // Handle constraint changes (enable/disable budget input + update comparator display)
-        this.constraintSelect.addEventListener('change', () => {
-            this.updateBudgetInputState();
-            this.updatePolarityFromSemiring(); // Update comparator display
-        });
-
-        // Handle opt mode changes (show/hide num models input)
-        this.optModeSelect.addEventListener('change', () => this.updateNumModelsVisibility());
-
-        // Handle optimization direction changes (show warning if contradicts polarity)
-        this.optimizeSelect.addEventListener('change', () => this.updateOptDirectionWarning());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -455,6 +455,142 @@ class WABAPlayground {
     }
 
     // ===================================
+    // Supported Surface Helpers
+    // ===================================
+    populateExampleSelect() {
+        this.exampleSelect.innerHTML = '<option value="">-- Select Example --</option>';
+
+        [
+            { key: 'curated', label: 'Curated WABA Examples' },
+            { key: 'demos', label: 'Playground Demos' }
+        ].forEach(({ key, label }) => {
+            const group = document.createElement('optgroup');
+            group.label = label;
+
+            Object.entries(examples)
+                .filter(([, example]) => example.section === key)
+                .forEach(([exampleKey, example]) => {
+                    const option = document.createElement('option');
+                    option.value = exampleKey;
+                    option.textContent = example.label;
+                    group.appendChild(option);
+                });
+
+            this.exampleSelect.appendChild(group);
+        });
+
+        this.exampleSelect.value = 'simple_attack';
+    }
+
+    getCurrentConfig() {
+        return {
+            semiringFamily: this.semiringSelect.value,
+            polarity: this.polaritySelect.value,
+            defaultPolicy: this.defaultPolicySelect.value,
+            monoid: this.monoidSelect.value,
+            optimization: this.optimizeSelect.value,
+            budgetMode: this.constraintSelect.value,
+            budgetIntent: this.budgetIntentSelect.value,
+            semantics: this.semanticsSelect.value,
+            optMode: this.optModeSelect.value,
+            beta: parseInt(this.budgetInput.value, 10) || 0,
+            numModels: parseInt(this.numModelsInput.value, 10) || 0,
+            timeout: (parseInt(this.timeoutInput.value, 10) || 60) * 1000,
+            filterType: 'standard'
+        };
+    }
+
+    applyConfigToUI(config) {
+        this.semiringSelect.value = config.semiringFamily;
+        this.polaritySelect.value = config.polarity;
+        this.defaultPolicySelect.value = config.defaultPolicy;
+        this.monoidSelect.value = config.monoid;
+        this.optimizeSelect.value = config.optimization;
+        this.constraintSelect.value = config.budgetMode;
+        this.budgetIntentSelect.value = config.budgetIntent || 'no_discard';
+        this.semanticsSelect.value = config.semantics;
+        this.optModeSelect.value = config.optMode;
+        this.budgetInput.value = String(config.beta ?? 0);
+    }
+
+    syncConfigUi() {
+        const alias = Object.entries(wabaModules.metadata.aliases).find(([, value]) =>
+            value.family === this.semiringSelect.value && value.polarity === this.polaritySelect.value
+        );
+
+        this.semiringAliasNote.textContent = alias
+            ? `Alias: ${alias[0].replace('_', '-')}`
+            : 'Canonical ordered-semiring view.';
+
+        const budgetMode = this.constraintSelect.value;
+        const semantics = this.semanticsSelect.value;
+
+        this.budgetIntentSelect.disabled = budgetMode !== 'none';
+        this.budgetIntentSelect.style.opacity = budgetMode === 'none' ? '1' : '0.5';
+
+        if (budgetMode === 'ub') {
+            ['sum', 'max', 'count'].forEach((value) => {
+                this.monoidSelect.querySelector(`option[value="${value}"]`).disabled = false;
+            });
+            this.monoidSelect.querySelector('option[value="min"]').disabled = true;
+            if (this.monoidSelect.value === 'min') {
+                this.monoidSelect.value = 'sum';
+            }
+        } else if (budgetMode === 'lb') {
+            ['sum', 'max', 'count'].forEach((value) => {
+                this.monoidSelect.querySelector(`option[value="${value}"]`).disabled = true;
+            });
+            this.monoidSelect.querySelector('option[value="min"]').disabled = false;
+            this.monoidSelect.value = 'min';
+        } else {
+            Array.from(this.monoidSelect.options).forEach((option) => {
+                option.disabled = false;
+            });
+        }
+
+        if (semantics === 'grounded') {
+            this.optModeSelect.value = 'optN';
+            this.optModeSelect.disabled = true;
+        } else {
+            this.optModeSelect.disabled = false;
+        }
+
+        this.updateBudgetInputState();
+        this.updateNumModelsVisibility();
+        this.updateSurfaceCopy();
+    }
+
+    updateSurfaceCopy() {
+        const config = this.getCurrentConfig();
+        const budgetDescription = config.budgetMode === 'none'
+            ? (config.budgetIntent === 'no_discard' ? 'plain / no-discard' : 'unbounded exploration')
+            : `${config.monoid} + ${config.budgetMode}`;
+        const preferredCopy = config.semantics === 'preferred'
+            ? ' Exact preferred uses browser-side subset-maximal filtering over complete candidates.'
+            : '';
+
+        this.supportedSurfaceNote.innerHTML = `
+            Canonical bounded presets are <code>sum/max/count + ub</code> and <code>min + lb</code>.
+            Current profile: <code>${budgetDescription}</code>.${preferredCopy}
+        `;
+
+        this.budgetIntentNote.textContent = config.budgetMode === 'none'
+            ? 'Plain / no-discard mirrors classical ABA. Explore removes the budget filter but still computes aggregates and thresholds.'
+            : 'Budget mode is active, so the aggregate must satisfy the selected upper/lower bound against β.';
+    }
+
+    getExampleCode(exampleKey) {
+        const example = examples[exampleKey];
+        if (!example) {
+            return null;
+        }
+        if (example.source === 'module') {
+            return wabaModules.examples[example.moduleKey] || null;
+        }
+        return example.code;
+    }
+
+    // ===================================
     // Export Methods (Moved to ExportManager)
     // ===================================
     // addWatermark(), exportGraphAsPng(), exportGraphAsPdf() now in modules/export-manager.js
@@ -480,20 +616,8 @@ class WABAPlayground {
                 return;
             }
 
-            // Build configuration
-            const optDirection = this.optimizeSelect.value; // 'minimize' or 'maximize'
-            const config = {
-                semiring: this.semiringSelect.value,
-                monoid: this.monoidSelect.value,
-                direction: optDirection === 'maximize' ? 'maximization' : 'minimization',
-                semantics: this.semanticsSelect.value,
-                constraint: this.constraintSelect.value,
-                budget: parseInt(this.budgetInput.value) || 0,
-                numModels: parseInt(this.numModelsInput.value) || 0,
-                timeout: (parseInt(this.timeoutInput.value) || 60) * 1000, // Convert seconds to milliseconds
-                optMode: this.optModeSelect.value, // 'ignore' or 'optN'
-                filterType: 'standard'
-            };
+            // Build canonical mature-surface configuration
+            const config = this.getCurrentConfig();
 
             // Run WABA via Clingo Manager
             const result = await this.clingoManager.runWABA(
@@ -515,7 +639,8 @@ class WABAPlayground {
                     result.result,
                     result.elapsed,
                     (inAssumptions, discarded, successful) => this.graphManager.highlightExtension(inAssumptions, discarded, successful),
-                    () => this.graphManager.resetGraphColors()
+                    () => this.graphManager.resetGraphColors(),
+                    result.effectiveConfig
                 );
 
                 // Hide output empty state
@@ -1038,10 +1163,21 @@ class WABAPlayground {
     // Example Loading
     // ===================================
     async loadExample(exampleName) {
+        if (exampleName === '__uploaded__') {
+            return;
+        }
         if (exampleName && examples && examples[exampleName]) {
             try {
-                const clingoCode = examples[exampleName];
+                const example = examples[exampleName];
+                const clingoCode = this.getExampleCode(exampleName);
+                if (!clingoCode) {
+                    throw new Error(`Missing example code for ${exampleName}`);
+                }
+
+                this.applyConfigToUI(example.preset);
+                this.syncConfigUi();
                 this.editor.value = clingoCode;
+                this.clearPreviousRun();
 
                 // Clear original .waba content (this is an example, not a user file)
                 this.originalWabaContent = null;
@@ -1052,7 +1188,7 @@ class WABAPlayground {
                 // Update graph visualization
                 await this.updateGraph(clingoCode);
 
-                this.outputManager.log(`📚 Loaded example: ${exampleName}`, 'info');
+                this.outputManager.log(`Loaded example: ${example.label}`, 'info');
             } catch (error) {
                 console.error(`Error loading example ${exampleName}:`, error);
                 this.outputManager.log(`❌ Error loading example: ${error.message}`, 'error');
@@ -1144,104 +1280,6 @@ class WABAPlayground {
         PopupManager.showEdgePopup(edge, x, y);
     }
 
-    // ===================================
-    // Polarity/Comparator Inference
-    // ===================================
-
-    /**
-     * Infer polarity from semiring selection
-     * @param {string} semiring - Semiring name
-     * @returns {string} 'strength' or 'cost'
-     */
-    inferPolarity(semiring) {
-        const polarityMap = {
-            'godel': 'strength',
-            'lukasiewicz': 'strength',
-            'arctic': 'strength',
-            'tropical': 'cost',
-            'bottleneck_cost': 'cost'
-        };
-        return polarityMap[semiring] || 'strength';
-    }
-
-    /**
-     * Get budget constraint type (UB or LB)
-     * NOTE: Comparator now applies to beta_cost (repair cost), not attack scores.
-     * Beta_cost is ALWAYS a cost (regardless of semiring polarity).
-     * - Upper Bound (UB): allow discards only if beta_cost ≤ β
-     * - Lower Bound (LB): force discards so beta_cost ≥ β
-     * @returns {string} 'ub' or 'lb'
-     */
-    getBudgetConstraintType() {
-        const constraint = this.constraintSelect.value;
-        return constraint === 'lb' ? 'lb' : 'ub'; // Default to UB
-    }
-
-    /**
-     * Infer optimization direction (ALWAYS minimize beta_cost by default)
-     * NOTE: beta_cost is the repair cost (always a COST to minimize)
-     * @returns {string} 'minimize' (default) or 'maximize' (explicit user choice)
-     */
-    inferOptDirection() {
-        // Always default to minimize (beta_cost is a COST)
-        // User can explicitly override to maximize reward (separate objective)
-        return 'minimize';
-    }
-
-    /**
-     * Initialize polarity inference system (always auto-inferred)
-     */
-    initPolarityInference() {
-        // Set initial values based on current semiring (always auto-inferred)
-        this.updatePolarityFromSemiring();
-    }
-
-    /**
-     * Update polarity and comparator based on current semiring (always auto-inferred)
-     */
-    updatePolarityFromSemiring() {
-        // Auto-infer from semiring
-        const semiring = this.semiringSelect.value;
-        const polarity = this.inferPolarity(semiring);
-        const constraintType = this.getBudgetConstraintType();
-        const optDirection = this.inferOptDirection();
-
-        // Update hidden selects for programmatic access
-        this.polaritySelect.value = polarity;
-        this.comparatorSelect.value = constraintType;
-        this.optimizeSelect.value = optDirection;
-
-        // Update display elements
-        const polarityText = polarity === 'strength'
-            ? 'Strength/Reward (↑ stronger → costlier to discard)'
-            : 'Cost/Weakness (↑ weaker → costlier to discard)';
-        const comparatorText = constraintType === 'ub'
-            ? 'Upper Bound (beta_cost ≤ β)'
-            : 'Lower Bound (beta_cost ≥ β)';
-
-        this.polarityDisplay.textContent = polarityText;
-        this.comparatorDisplay.textContent = comparatorText;
-
-        // Update warnings based on user's optimization choice
-        this.updateOptDirectionWarning();
-    }
-
-    /**
-     * Update optimization direction warning
-     * Show warning when user selects maximize (separate objective from beta_cost)
-     */
-    updateOptDirectionWarning() {
-        const warningDiv = document.getElementById('opt-dir-warning');
-        if (warningDiv) {
-            const optDir = this.optimizeSelect.value;
-            if (optDir === 'maximize') {
-                warningDiv.style.display = 'block';
-            } else {
-                warningDiv.style.display = 'none';
-            }
-        }
-    }
-
     /**
      * Update budget input state based on constraint selection
      */
@@ -1250,18 +1288,18 @@ class WABAPlayground {
         const budgetInput = this.budgetInput;
         const budgetLabel = document.getElementById('budget-input-label');
 
-        if (constraint === 'none') {
+        if (constraint === 'none' && this.budgetIntentSelect.value === 'no_discard') {
             budgetInput.disabled = true;
             budgetInput.style.opacity = '0.5';
             if (budgetLabel) {
-                budgetLabel.textContent = 'Budget (β - inactive)';
+                budgetLabel.textContent = 'Budget (β - inactive in plain / no-discard mode)';
                 budgetLabel.style.opacity = '0.5';
             }
         } else {
             budgetInput.disabled = false;
             budgetInput.style.opacity = '1';
             if (budgetLabel) {
-                budgetLabel.textContent = 'Budget (β)';
+                budgetLabel.textContent = 'Budget Threshold (β)';
                 budgetLabel.style.opacity = '1';
             }
         }
@@ -1275,11 +1313,7 @@ class WABAPlayground {
         const numModelsContainer = document.getElementById('num-models-container');
 
         if (numModelsContainer) {
-            if (optMode === 'ignore') {
-                numModelsContainer.style.display = 'block';
-            } else {
-                numModelsContainer.style.display = 'none';
-            }
+            numModelsContainer.style.display = optMode === 'ignore' ? 'block' : 'none';
         }
     }
 }
