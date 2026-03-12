@@ -1,4 +1,4 @@
-import { GraphUtils } from './graph-utils.js?v=20260312-7';
+import { GraphUtils } from './graph-utils.js?v=20260312-8';
 
 function assumptionNodeColor() {
     return GraphUtils.createNodeColor('assumption');

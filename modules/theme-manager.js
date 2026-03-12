@@ -1,7 +1,7 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
-import { GraphUtils } from './graph-utils.js?v=20260312-7';
+import { GraphUtils } from './graph-utils.js?v=20260312-8';
 
 export class ThemeManager {
     constructor(themeToggleBtn, themeIcon, network, networkData) {
@@ -12,9 +12,9 @@ export class ThemeManager {
     }
 
     initTheme() {
-        // Load saved theme or default to dark
-        const savedTheme = localStorage.getItem('waba-theme') || 'dark';
-        this.setTheme(savedTheme);
+        const savedTheme = localStorage.getItem('waba-theme');
+        const initialTheme = savedTheme || this.getTimeBasedTheme();
+        this.setTheme(initialTheme, Boolean(savedTheme));
 
         // Add theme toggle listener
         this.themeToggleBtn.addEventListener('click', () => {
@@ -22,22 +22,33 @@ export class ThemeManager {
         });
     }
 
-    setTheme(theme) {
+    getTimeBasedTheme() {
+        const hour = new Date().getHours();
+        return hour >= 7 && hour < 18 ? 'light' : 'dark';
+    }
+
+    setTheme(theme, persist = true) {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('waba-theme', theme);
+        if (persist) {
+            localStorage.setItem('waba-theme', theme);
+        } else {
+            localStorage.removeItem('waba-theme');
+        }
 
         // Update icon
         if (theme === 'light') {
             this.themeIcon.textContent = '☀️';
+            this.themeToggleBtn.setAttribute('title', 'Switch to dark theme');
         } else {
             this.themeIcon.textContent = '🌙';
+            this.themeToggleBtn.setAttribute('title', 'Switch to light theme');
         }
     }
 
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        this.setTheme(newTheme);
+        this.setTheme(newTheme, true);
 
         // Update graph colors for new theme
         this.updateGraphTheme();
