@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260312-7';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260312-7';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260312-8';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260312-8';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
@@ -10,6 +10,7 @@ export class EditorController {
         this.rulesInput = dom.rulesInput;
         this.contrariesInput = dom.contrariesInput;
         this.weightsInput = dom.weightsInput;
+        this.isDescriptionEditorOpen = false;
     }
 
     init(onFrameworkChanged) {
@@ -84,6 +85,14 @@ export class EditorController {
             this.dom.simpleAddCommentBtn.addEventListener('click', () => this.addDescriptionTemplate());
         }
 
+        if (this.dom.simpleEditDescriptionBtn) {
+            this.dom.simpleEditDescriptionBtn.addEventListener('click', () => this.openDescriptionEditor());
+        }
+
+        if (this.dom.simpleHideDescriptionEditorBtn) {
+            this.dom.simpleHideDescriptionEditorBtn.addEventListener('click', () => this.hideDescriptionEditor());
+        }
+
         if (this.dom.simpleRemoveDescriptionBtn) {
             this.dom.simpleRemoveDescriptionBtn.addEventListener('click', () => {
                 this.removeDescription();
@@ -135,6 +144,7 @@ export class EditorController {
     }
 
     populateSimpleFields(fields) {
+        this.isDescriptionEditorOpen = false;
         if (this.dom.simpleDescriptionContent) {
             this.dom.simpleDescriptionContent.value = fields.description || '';
         }
@@ -165,14 +175,33 @@ export class EditorController {
     }
 
     updateSimpleDescription() {
-        const hasDescription = Boolean(this.dom.simpleDescriptionContent?.value.trim().length);
+        const description = this.dom.simpleDescriptionContent?.value.trim() || '';
+        const hasDescription = Boolean(description.length);
 
-        if (this.dom.simpleDescriptionBox && this.dom.simpleAddCommentContainer) {
+        if (this.dom.simpleDescriptionPreview) {
+            this.dom.simpleDescriptionPreview.textContent = description;
+        }
+
+        if (this.dom.simpleDescriptionBar) {
             if (hasDescription) {
+                this.dom.simpleDescriptionBar.removeAttribute('hidden');
+            } else {
+                this.dom.simpleDescriptionBar.setAttribute('hidden', '');
+            }
+        }
+
+        if (this.dom.simpleDescriptionBox) {
+            if (hasDescription && this.isDescriptionEditorOpen) {
                 this.dom.simpleDescriptionBox.removeAttribute('hidden');
-                this.dom.simpleAddCommentContainer.setAttribute('hidden', '');
             } else {
                 this.dom.simpleDescriptionBox.setAttribute('hidden', '');
+            }
+        }
+
+        if (this.dom.simpleAddCommentContainer) {
+            if (hasDescription) {
+                this.dom.simpleAddCommentContainer.setAttribute('hidden', '');
+            } else {
                 this.dom.simpleAddCommentContainer.removeAttribute('hidden');
             }
         }
@@ -183,9 +212,21 @@ export class EditorController {
             return;
         }
 
+        this.isDescriptionEditorOpen = true;
         this.dom.simpleDescriptionContent.value = 'Enter your description here';
         this.dom.simpleDescriptionContent.focus();
         this.dom.simpleDescriptionContent.select();
+        this.updateSimpleDescription();
+    }
+
+    openDescriptionEditor() {
+        this.isDescriptionEditorOpen = true;
+        this.updateSimpleDescription();
+        this.dom.simpleDescriptionContent?.focus();
+    }
+
+    hideDescriptionEditor() {
+        this.isDescriptionEditorOpen = false;
         this.updateSimpleDescription();
     }
 
@@ -193,6 +234,7 @@ export class EditorController {
         if (this.dom.simpleDescriptionContent) {
             this.dom.simpleDescriptionContent.value = '';
         }
+        this.isDescriptionEditorOpen = false;
         this.updateSimpleDescription();
     }
 }

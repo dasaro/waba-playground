@@ -1,9 +1,10 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260312-7';
-import { wabaModules } from '../waba-modules.js?v=20260312-7';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260312-8';
+import { wabaModules } from '../waba-modules.js?v=20260312-8';
 
 export class ConfigController {
     constructor(dom) {
         this.dom = dom;
+        this.lastBoundedBudgetMode = 'ub';
     }
 
     getCurrentConfig() {
@@ -35,6 +36,10 @@ export class ConfigController {
         this.dom.semanticsSelect.value = config.semantics;
         this.dom.optModeSelect.value = config.optMode;
         this.dom.budgetInput.value = String(config.beta ?? 0);
+
+        if (config.budgetMode === 'ub' || config.budgetMode === 'lb') {
+            this.lastBoundedBudgetMode = config.budgetMode;
+        }
     }
 
     populateExampleSelect(examples, defaultKey = 'demo_complete') {
@@ -74,6 +79,19 @@ export class ConfigController {
 
         const budgetMode = this.dom.constraintSelect.value;
         const semantics = this.dom.semanticsSelect.value;
+
+        if (budgetMode === 'ub' || budgetMode === 'lb') {
+            this.lastBoundedBudgetMode = budgetMode;
+        }
+
+        if (this.dom.budgetActiveToggle) {
+            this.dom.budgetActiveToggle.checked = budgetMode !== 'none';
+        }
+        if (this.dom.budgetActiveCopy) {
+            this.dom.budgetActiveCopy.textContent = budgetMode === 'none'
+                ? 'Disabled / list minimum β'
+                : `Enabled / ${budgetMode.toUpperCase()} bound`;
+        }
 
         this.dom.budgetIntentSelect.disabled = budgetMode !== 'none';
         this.dom.budgetIntentSelect.style.opacity = budgetMode === 'none' ? '1' : '0.5';
@@ -129,6 +147,12 @@ export class ConfigController {
                 ? 'Plain / no-discard is still available, but the default browser mode keeps beta disabled and ranks extensions by their minimum threshold.'
                 : 'Beta is disabled. The playground enumerates surviving extensions and reports the minimum β needed for each one.')
             : 'Budget mode is active, so the aggregate must satisfy the selected upper/lower bound against β.';
+
+        if (this.dom.budgetActiveNote) {
+            this.dom.budgetActiveNote.textContent = config.budgetMode === 'none'
+                ? 'β is off. The playground ranks extensions by the smallest threshold that would admit them.'
+                : `β is active. The current ${config.monoid} aggregate must satisfy the ${config.budgetMode.toUpperCase()} bound.`;
+        }
     }
 
     updateBudgetInputState() {
@@ -151,6 +175,20 @@ export class ConfigController {
                 this.dom.budgetInputLabel.style.opacity = '1';
             }
         }
+    }
+
+    activateBudgetBeta() {
+        if (this.dom.constraintSelect.value === 'none') {
+            this.dom.constraintSelect.value = this.lastBoundedBudgetMode || 'ub';
+        }
+    }
+
+    deactivateBudgetBeta() {
+        if (this.dom.constraintSelect.value === 'ub' || this.dom.constraintSelect.value === 'lb') {
+            this.lastBoundedBudgetMode = this.dom.constraintSelect.value;
+        }
+        this.dom.constraintSelect.value = 'none';
+        this.dom.budgetIntentSelect.value = 'explore';
     }
 
     updateNumModelsVisibility() {

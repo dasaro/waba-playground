@@ -64,6 +64,9 @@
  * @property {HTMLSelectElement} exampleSelect
  * @property {HTMLInputElement} budgetInput
  * @property {HTMLElement | null} budgetInputLabel
+ * @property {HTMLInputElement | null} budgetActiveToggle
+ * @property {HTMLElement | null} budgetActiveCopy
+ * @property {HTMLElement | null} budgetActiveNote
  * @property {HTMLInputElement} numModelsInput
  * @property {HTMLElement | null} numModelsContainer
  * @property {HTMLInputElement} timeoutInput
@@ -110,10 +113,16 @@
  * @property {HTMLElement | null} loadingText
  * @property {HTMLElement | null} loadingSubtext
  * @property {HTMLElement | null} loadingElapsed
+ * @property {HTMLElement | null} simpleDescriptionBar
+ * @property {HTMLElement | null} simpleDescriptionTrigger
+ * @property {HTMLElement | null} simpleDescriptionHoverPanel
+ * @property {HTMLElement | null} simpleDescriptionPreview
  * @property {HTMLElement | null} simpleDescriptionBox
  * @property {HTMLTextAreaElement | null} simpleDescriptionContent
  * @property {HTMLElement | null} simpleAddCommentBtn
  * @property {HTMLElement | null} simpleAddCommentContainer
+ * @property {HTMLElement | null} simpleEditDescriptionBtn
+ * @property {HTMLElement | null} simpleHideDescriptionEditorBtn
  * @property {HTMLElement | null} simpleRemoveDescriptionBtn
  * @property {HTMLElement | null} isolatedAssumptionsBanner
  * @property {HTMLElement | null} isolatedAssumptionsList

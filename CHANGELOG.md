@@ -30,6 +30,24 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260312-8
+
+- polished the visual surface after the larger architecture refactor
+- improved the light theme so editor and framework surfaces are actually light instead of inheriting dark styling
+- added time-based theme defaults when no user preference is saved:
+  - light in daytime
+  - dark in the evening
+- reduced always-visible instructional clutter:
+  - configuration notes remain hover/focus help
+  - simple-editor field guidance now also lives in hover/focus help
+- added an explicit `β` activation toggle:
+  - when off, the playground disables budget filtering and ranks extensions by minimum `β`
+  - when on, it restores the current bounded profile
+- moved simple-mode descriptions out of the main layout:
+  - descriptions now live behind a compact hover preview chip
+  - editing remains available through explicit edit/remove actions
+- verified the release with the full browser/headless validation gate
+
 ## 20260312-7
 
 - narrowed the post-refactor cleanup instead of starting another architecture wave
