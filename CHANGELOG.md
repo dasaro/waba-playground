@@ -30,6 +30,17 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260312-10
+
+- restored the Analysis & Export panel as a visibly populated section on first load instead of leaving it blank until a solver run
+- added a persistent panel home state with:
+  - decision-analysis guidance
+  - always-available graph export actions
+- wired panel proxy buttons for PNG/PDF export so the export side of the panel remains useful before results exist
+- restored the placeholder after clearing output, instead of leaving the panel empty again
+- added a browser regression check that the analysis panel is visibly present on load
+- re-ran the full lint, type-check, unit, and Playwright validation gate
+
 ## 20260312-9
 
 - restored informative graph hover panels across the visualization modes

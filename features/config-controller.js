@@ -1,5 +1,5 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260312-9';
-import { wabaModules } from '../waba-modules.js?v=20260312-9';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260312-10';
+import { wabaModules } from '../waba-modules.js?v=20260312-10';
 
 export class ConfigController {
     constructor(dom) {
