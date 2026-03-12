@@ -30,6 +30,29 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260312-9
+
+- restored informative graph hover panels across the visualization modes
+- made assumption-node hover panels explain:
+  - explicit vs default weight status
+  - declared contrary
+  - incoming attack sources
+  - outgoing attack roles
+- made attack-edge hover panels explain:
+  - attack type
+  - attacking element and target assumption
+  - derived contrary
+  - derivation rule or joint contributors
+  - semantic role of the edge
+- made junction-node hover panels explain:
+  - the joint rule behind the junction
+  - required contributors
+  - derived contrary and target
+  - resulting attack weight
+- improved standard graph hover panels so extension nodes and set-attack edges describe what they represent instead of only showing raw support lists
+- aligned click popups with the richer hover content instead of duplicating a thinner legacy summary
+- added unit coverage for the tooltip builders and re-ran the full lint, type-check, unit, and Playwright browser validation gate
+
 ## 20260312-8
 
 - polished the visual surface after the larger architecture refactor

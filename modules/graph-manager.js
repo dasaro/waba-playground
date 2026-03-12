@@ -2,11 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260312-8';
-import { ParserUtils } from './parser-utils.js?v=20260312-8';
-import { UIManager } from './ui-manager.js?v=20260312-8';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260312-8';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260312-8';
+import { GraphUtils } from './graph-utils.js?v=20260312-9';
+import { ParserUtils } from './parser-utils.js?v=20260312-9';
+import { UIManager } from './ui-manager.js?v=20260312-9';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260312-9';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260312-9';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260312-9';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
@@ -404,23 +405,32 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                     setsMap.forEach(targetSet => {
                         if (targetSet.assumptions.includes(assumption)) {
                             // Include attacking element in edge ID to ensure uniqueness
-                            const edgeId = `${set.id}-attacks-${targetSet.id}-via-${assumption}-from-${attackingElement}`;
-                            elements.push({
-                                data: {
-                                    id: edgeId,
-                                    source: set.id,
-                                    target: targetSet.id,
-                                    label: `${displayWeight}`,
-                                    width: normalizedWidth,
-                                    color: color,
-                                    attackedAssumption: assumption,
-                                    attackingElement: attackingElement,
-                                    derivedBy: derivedBy,
-                                    sourceSet: set.id,
-                                    targetSet: targetSet.id
-                                }
-                            });
+                    const edgeId = `${set.id}-attacks-${targetSet.id}-via-${assumption}-from-${attackingElement}`;
+                    elements.push({
+                        data: {
+                            id: edgeId,
+                            source: set.id,
+                            target: targetSet.id,
+                            label: `${displayWeight}`,
+                            width: normalizedWidth,
+                            color: color,
+                            weight: attack.weight,
+                            attackedAssumption: assumption,
+                            attackingElement: attackingElement,
+                            derivedBy: derivedBy,
+                            sourceSet: set.id,
+                            targetSet: targetSet.id,
+                            title: buildSetAttackTooltip({
+                                sourceSet: set.id,
+                                targetSet: targetSet.id,
+                                targetAssumption: assumption,
+                                attackingElement,
+                                weight: attack.weight,
+                                derivedBy
+                            })
                         }
+                    });
+                }
                     });
                 });
             });
@@ -450,7 +460,9 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         attackingElement: el.data.attackingElement,
                         derivedBy: el.data.derivedBy,
                         sourceSet: el.data.sourceSet,
-                        targetSet: el.data.targetSet
+                        targetSet: el.data.targetSet,
+                        weight: el.data.weight,
+                        title: el.data.title
                     });
                 }
             });
@@ -483,11 +495,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                         label: el.data.label,
                         size: Math.max(25, 15 + (el.data.size * 3)),  // Min size 25 for labels to fit inside
                         color: nodeColor,
-                        title: `Supported: ${el.data.supported || 'none'}`, // Tooltip
+                        title: buildSetNodeTooltip({
+                            setId: el.data.id,
+                            assumptions: el.data.id === '∅' ? [] : el.data.id.split(','),
+                            supported: el.data.supported ? el.data.supported.split(', ').filter(Boolean) : [],
+                            attacks: Array.from(setsMap.get(el.data.id)?.attacks || [])
+                        }),
                         font: {
                             color: isDark ? '#f1f5f9' : '#1e293b'
                         },
-                        assumptions: el.data.id.split(',').filter(a => a !== '∅') // Store assumptions for filtering
+                        assumptions: el.data.id.split(',').filter(a => a !== '∅'),
+                        supportedAtoms: el.data.supported ? el.data.supported.split(', ').filter(Boolean) : [],
+                        attackCount: el.data.attackCount
                     };
 
                     // Only include nodes that have at least one edge (not isolated)

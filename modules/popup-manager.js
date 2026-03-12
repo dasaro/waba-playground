@@ -2,6 +2,16 @@
  * PopupManager - Handles popup displays for nodes, edges, and derivation chains
  */
 export class PopupManager {
+    static renderTooltipContent(content) {
+        if (!content) {
+            return '';
+        }
+        if (/<[a-z][\s\S]*>/i.test(content)) {
+            return content;
+        }
+        return content.replace(/\n/g, '<br>');
+    }
+
     /**
      * Show derivation chain popup for a derived atom
      * @param {string} atom - The derived atom
@@ -128,19 +138,15 @@ export class PopupManager {
         const popup = document.createElement('div');
         popup.className = 'node-popup graph-tooltip';
 
-        let content = `<strong>Node: ${node.label || node.id}</strong><br>`;
-
-        // Add node-specific information
-        if (node.title) {
-            content += `${node.title}<br>`;
-        }
-
-        if (node.assumptions && node.assumptions.length > 0) {
-            content += `<strong>Assumptions:</strong> ${node.assumptions.join(', ')}<br>`;
-        }
-
-        if (node.size !== undefined) {
-            content += `<strong>Size:</strong> ${node.size}<br>`;
+        let content = PopupManager.renderTooltipContent(node.title);
+        if (!content) {
+            content = `<strong>Node: ${node.label || node.id}</strong><br>`;
+            if (node.assumptions && node.assumptions.length > 0) {
+                content += `<strong>Assumptions:</strong> ${node.assumptions.join(', ')}<br>`;
+            }
+            if (node.size !== undefined) {
+                content += `<strong>Size:</strong> ${node.size}<br>`;
+            }
         }
 
         popup.innerHTML = content;
@@ -212,43 +218,38 @@ export class PopupManager {
         const popup = document.createElement('div');
         popup.className = 'node-popup graph-tooltip';
 
-        let content = '<strong>Attack Details</strong><br>';
+        let content = PopupManager.renderTooltipContent(edge.title);
 
-        // Extract weight information
-        let displayWeight = 'N/A';
-        if (edge.weight !== undefined) {
-            if (edge.weight === Infinity || edge.weight === '#sup') {
-                displayWeight = '#sup (supremum)';
-            } else if (edge.weight === -Infinity || edge.weight === '#inf') {
-                displayWeight = '#inf (infimum)';
-            } else {
-                displayWeight = edge.weight;
+        if (!content) {
+            content = '<strong>Attack Details</strong><br>';
+
+            let displayWeight = 'N/A';
+            if (edge.weight !== undefined) {
+                if (edge.weight === Infinity || edge.weight === '#sup') {
+                    displayWeight = '#sup (supremum)';
+                } else if (edge.weight === -Infinity || edge.weight === '#inf') {
+                    displayWeight = '#inf (infimum)';
+                } else {
+                    displayWeight = edge.weight;
+                }
+            } else if (edge.label) {
+                displayWeight = edge.label;
             }
-        } else if (edge.label) {
-            // Try to extract weight from label
-            displayWeight = edge.label;
-        }
 
-        content += `<strong>Weight:</strong> ${displayWeight}<br>`;
+            content += `<strong>Weight:</strong> ${displayWeight}<br>`;
 
-        // Show attack relationship
-        if (edge.attackingElement && edge.attackedAssumption) {
-            content += `<strong>Attack:</strong> ${edge.attackingElement} → ${edge.attackedAssumption}<br>`;
-        } else if (edge.contrary && edge.targetAssumption) {
-            content += `<strong>Attack:</strong> ${edge.contrary} → ${edge.targetAssumption}<br>`;
-        } else if (edge.from && edge.to) {
-            content += `<strong>From:</strong> ${edge.from}<br>`;
-            content += `<strong>To:</strong> ${edge.to}<br>`;
-        }
+            if (edge.attackingElement && edge.attackedAssumption) {
+                content += `<strong>Attack:</strong> ${edge.attackingElement} → ${edge.attackedAssumption}<br>`;
+            } else if (edge.contrary && edge.targetAssumption) {
+                content += `<strong>Attack:</strong> ${edge.contrary} → ${edge.targetAssumption}<br>`;
+            } else if (edge.from && edge.to) {
+                content += `<strong>From:</strong> ${edge.from}<br>`;
+                content += `<strong>To:</strong> ${edge.to}<br>`;
+            }
 
-        // Show derivation info if available
-        if (edge.derivedBy && edge.derivedBy.length > 0) {
-            content += `<strong>Derived by:</strong> ${edge.derivedBy.join(', ')}<br>`;
-        }
-
-        // Show edge type if available
-        if (edge.title) {
-            content += `<em>${edge.title}</em><br>`;
+            if (edge.derivedBy && edge.derivedBy.length > 0) {
+                content += `<strong>Derived by:</strong> ${edge.derivedBy.join(', ')}<br>`;
+            }
         }
 
         popup.innerHTML = content;

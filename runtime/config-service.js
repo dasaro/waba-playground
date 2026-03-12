@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260312-8';
+import { wabaModules } from '../waba-modules.js?v=20260312-9';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
