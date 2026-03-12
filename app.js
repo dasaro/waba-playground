@@ -1,18 +1,22 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260101-1 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260312-1 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
-import { UIManager } from './modules/ui-manager.js?v=20260101-1';
+import { UIManager } from './modules/ui-manager.js?v=20260101-8';
+import { PanelManager } from './modules/panel-manager.js?v=20260101-8';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
-import { GraphManager } from './modules/graph-manager.js?v=20260101-1';
+import { GraphManager } from './modules/graph-manager.js?v=20260312-1';
 import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
-import { ClingoManager } from './modules/clingo-manager.js?v=20260101-1';
-import { OutputManager } from './modules/output-manager.js?v=20260101-1';
+import { ClingoManager } from './modules/clingo-manager.js?v=20260312-1';
+import { OutputManager } from './modules/output-manager.js?v=20260312-1';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
-import { examples } from './examples.js?v=20260101-1';
+import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
+import { PrismEditor } from './modules/prism-editor.js?v=20260104-1';
+import { examples } from './examples.js?v=20260312-1';
+import { wabaModules } from './waba-modules.js?v=20260312-1';
 
 class WABAPlayground {
     constructor() {
@@ -23,14 +27,21 @@ class WABAPlayground {
         this.runBtn = document.getElementById('run-btn');
         this.clearBtn = document.getElementById('clear-btn');
         this.semiringSelect = document.getElementById('semiring-select');
+        this.defaultPolicySelect = document.getElementById('default-policy-select');
         this.monoidSelect = document.getElementById('monoid-select');
         this.semanticsSelect = document.getElementById('semantics-select');
         this.exampleSelect = document.getElementById('example-select');
         this.budgetInput = document.getElementById('budget-input');
         this.numModelsInput = document.getElementById('num-models-input');
+        this.timeoutInput = document.getElementById('timeout-input');
         this.optimizeSelect = document.getElementById('optimize-select');
         this.optModeSelect = document.getElementById('opt-mode-select');
         this.constraintSelect = document.getElementById('constraint-select');
+        this.polaritySelect = document.getElementById('polarity-select');
+        this.budgetIntentSelect = document.getElementById('budget-intent-select');
+        this.semiringAliasNote = document.getElementById('semiring-alias-note');
+        this.supportedSurfaceNote = document.getElementById('supported-surface-note');
+        this.budgetIntentNote = document.getElementById('budget-intent-note');
         this.graphModeRadios = document.querySelectorAll('input[name="graph-mode"]');
 
         // Simple ABA mode elements
@@ -41,15 +52,18 @@ class WABAPlayground {
         this.contrariesInput = document.getElementById('contraries-input');
         this.weightsInput = document.getElementById('weights-input');
 
+        // Store original .waba file content (with all comments)
+        this.originalWabaContent = null;
+
         // File upload elements
         this.fileUploadBtn = document.getElementById('file-upload-btn');
         this.fileUploadInput = document.getElementById('file-upload-input');
 
         // Graph visualization elements
         this.graphCanvas = document.getElementById('cy');
-        this.graphContainer = document.getElementById('graph-container');
         this.resetLayoutBtn = document.getElementById('reset-layout-btn');
         this.fullscreenBtn = document.getElementById('fullscreen-btn');
+        this.graphPanel = document.querySelector('.graph-panel');
 
         // Syntax guide and download
         this.syntaxGuideBtn = document.getElementById('syntax-guide-btn');
@@ -86,7 +100,7 @@ class WABAPlayground {
 
     initializeManagers() {
         // Initialize Graph Manager
-        this.graphManager = new GraphManager(this.graphCanvas, this.resetLayoutBtn);
+        this.graphManager = new GraphManager(this.graphCanvas, this.resetLayoutBtn, this.fullscreenBtn);
         // Share network references for backwards compatibility
         this.network = null; // Will be set by graphManager.initGraph()
         this.networkData = { nodes: null, edges: null };
@@ -110,10 +124,16 @@ class WABAPlayground {
         this.uiManager = new UIManager(
             this.syntaxGuideBtn,
             this.syntaxGuideModal,
-            this.syntaxGuideClose,
-            this.fullscreenBtn,
-            this.graphContainer
+            this.syntaxGuideClose
         );
+
+        // Initialize Panel Manager
+        this.panelManager = new PanelManager();
+        this.panelManager.registerPanel('config', true);
+        this.panelManager.registerPanel('editor', true);
+        this.panelManager.registerPanel('graph', true);
+        this.panelManager.registerPanel('output', true);
+        this.panelManager.registerPanel('analysis', true);
 
         // Initialize File Manager
         this.fileManager = new FileManager(
@@ -137,7 +157,9 @@ class WABAPlayground {
             this.stats,
             this.semiringSelect,
             this.monoidSelect,
-            this.optimizeSelect
+            this.optimizeSelect,
+            this.polaritySelect,
+            () => this.getCurrentConfig()
         );
 
         // Initialize Export Manager
@@ -145,7 +167,7 @@ class WABAPlayground {
             this.graphManager,
             this.exportPngBtn,
             this.exportPdfBtn,
-            this.themeManager
+            this  // Pass app instance for exportGraphInLightMode
         );
     }
 
@@ -156,6 +178,12 @@ class WABAPlayground {
         // Initialize font size
         this.fontManager.initFontSize();
 
+        // Initialize Prism editors for Simple Mode (syntax highlighting)
+        this.initPrismEditors();
+
+        // Run metrics unit tests (silent in production)
+        MetricsManager.runUnitTest();
+
         // Initialize Clingo
         await this.clingoManager.initClingo();
 
@@ -164,6 +192,9 @@ class WABAPlayground {
         // Share network references
         this.network = this.graphManager.network;
         this.networkData = this.graphManager.networkData;
+
+        // Initialize fullscreen functionality
+        this.graphManager.initFullscreen(this.graphPanel);
 
         // Update theme manager with initialized network
         this.themeManager.network = this.network;
@@ -175,30 +206,6 @@ class WABAPlayground {
             (edge, x, y) => this.handleEdgeClick(edge, x, y)
         );
 
-        // Setup fullscreen change callback to resize graph
-        this.uiManager.setFullscreenChangeCallback(() => {
-            if (this.network) {
-                const canvas = document.getElementById('cy');
-                if (canvas) {
-                    // Force reflow to ensure layout is calculated
-                    const _ = canvas.offsetHeight;
-
-                    // Get the actual computed dimensions
-                    const width = canvas.offsetWidth;
-                    const height = canvas.offsetHeight;
-
-                    console.log(`📐 Resizing vis.js network to ${width}x${height}`);
-
-                    // Explicitly set the size - this forces vis.js to resize the canvas
-                    this.network.setSize(width + 'px', height + 'px');
-
-                    // Then redraw and fit
-                    this.network.redraw();
-                    this.network.fit();
-                }
-            }
-        });
-
         // Attach event listeners
         this.attachEventListeners();
 
@@ -207,6 +214,12 @@ class WABAPlayground {
 
         // Initialize empty states
         UIManager.initializeEmptyStates();
+
+        // Initialize the mature supported surface UI contract
+        this.populateExampleSelect();
+        this.syncConfigUi();
+        this.updateBudgetInputState();
+        this.updateNumModelsVisibility();
 
         // Preload selected example on startup
         setTimeout(() => {
@@ -235,13 +248,33 @@ class WABAPlayground {
                 e,
                 (code) => this.updateGraph(code),
                 () => this.parseSimpleABA(),
-                (msg, type) => this.outputManager.log(msg, type)
+                (msg, type) => this.outputManager.log(msg, type),
+                () => this.clearPreviousRun(),
+                (content) => this.originalWabaContent = content,
+                (filename) => this.updateExampleSelectWithFilename(filename)
             );
         });
 
-        // Graph mode changes
-        this.semiringSelect.addEventListener('change', () => this.regenerateGraph());
-        this.semanticsSelect.addEventListener('change', () => this.regenerateGraph());
+        // Drag and drop file upload
+        this.initDragAndDrop();
+
+        // Supported-surface configuration changes
+        [this.semiringSelect, this.polaritySelect, this.defaultPolicySelect].forEach((element) => {
+            element.addEventListener('change', () => {
+                this.syncConfigUi();
+                this.regenerateGraph();
+            });
+        });
+        [
+            this.monoidSelect,
+            this.optimizeSelect,
+            this.constraintSelect,
+            this.budgetIntentSelect,
+            this.semanticsSelect,
+            this.optModeSelect
+        ].forEach((element) => {
+            element.addEventListener('change', () => this.syncConfigUi());
+        });
         this.graphModeRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 // Clear active extension when switching graph modes (different structures)
@@ -249,20 +282,6 @@ class WABAPlayground {
                 this.graphManager.resetGraphColors();
                 this.regenerateGraph();
             });
-        });
-
-        // Disable budget when optimization is enabled
-        this.optimizeSelect.addEventListener('change', (e) => {
-            const isOptimizing = e.target.value !== 'none';
-            this.constraintSelect.disabled = isOptimizing;
-            this.budgetInput.disabled = isOptimizing;
-            if (isOptimizing) {
-                this.constraintSelect.style.opacity = '0.5';
-                this.budgetInput.style.opacity = '0.5';
-            } else {
-                this.constraintSelect.style.opacity = '1';
-                this.budgetInput.style.opacity = '1';
-            }
         });
 
         // Keyboard shortcuts
@@ -282,18 +301,87 @@ class WABAPlayground {
             }
         });
 
+        // Documentation tabs
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const targetTab = e.target.dataset.tab;
+                this.switchDocTab(targetTab);
+            });
+        });
+
         // Download buttons
         this.downloadLpBtn.addEventListener('click', () => this.downloadAsLp());
         this.downloadWabaBtn.addEventListener('click', () => this.downloadAsWaba());
 
-        // Fullscreen button
-        this.fullscreenBtn.addEventListener('click', () => this.uiManager.toggleFullscreen());
-        document.addEventListener('fullscreenchange', () => this.uiManager.updateFullscreenButton());
-
         // Legend toggle button
         this.legendToggleBtn.addEventListener('click', () => this.toggleLegend());
 
+        // Panel toggle buttons
+        document.querySelectorAll('.panel-toggle').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const panel = e.target.closest('.panel');
+                const panelId = panel.dataset.panel;
+                this.panelManager.togglePanel(panelId);
+            });
+        });
+
         // Export buttons (handled by ExportManager)
+    }
+
+    initDragAndDrop() {
+        let dragCounter = 0; // Track enter/leave events
+
+        // Prevent default drag behaviors on the whole document
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        // Add visual feedback when dragging over
+        document.addEventListener('dragenter', (e) => {
+            dragCounter++;
+            if (dragCounter === 1) {
+                document.body.classList.add('drag-over');
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter === 0) {
+                document.body.classList.remove('drag-over');
+            }
+        });
+
+        // Handle dropped files
+        document.addEventListener('drop', (e) => {
+            dragCounter = 0;
+            document.body.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+
+                // Create a synthetic event for the file manager
+                const syntheticEvent = {
+                    target: {
+                        files: [file]
+                    }
+                };
+
+                // Use existing file upload handler
+                this.fileManager.handleFileUpload(
+                    syntheticEvent,
+                    (code) => this.updateGraph(code),
+                    () => this.parseSimpleABA(),
+                    (msg, type) => this.outputManager.log(msg, type),
+                    () => this.clearPreviousRun(),
+                    (content) => this.originalWabaContent = content,
+                    (filename) => this.updateExampleSelectWithFilename(filename)
+                );
+            }
+        });
     }
 
     toggleLegend() {
@@ -304,6 +392,29 @@ class WABAPlayground {
         } else {
             this.graphLegend.setAttribute('hidden', '');
             this.legendToggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    switchDocTab(targetTab) {
+        // Remove active class from all tabs and content
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.classList.remove('active');
+            tab.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.doc-tab-content').forEach(content => {
+            content.classList.remove('active');
+            content.setAttribute('hidden', '');
+        });
+
+        // Add active class to target tab and content
+        const targetTabBtn = document.querySelector(`[data-tab="${targetTab}"]`);
+        const targetContent = document.getElementById(`tab-${targetTab}`);
+
+        if (targetTabBtn && targetContent) {
+            targetTabBtn.classList.add('active');
+            targetTabBtn.setAttribute('aria-selected', 'true');
+            targetContent.classList.add('active');
+            targetContent.removeAttribute('hidden');
         }
     }
 
@@ -319,17 +430,164 @@ class WABAPlayground {
 
             // Wait for graph to re-render
             setTimeout(() => {
-                callback();
-                // Restore original theme
-                setTimeout(() => {
-                    document.documentElement.setAttribute('data-theme', currentTheme || 'dark');
-                    this.themeManager.updateGraphTheme();
-                }, 100);
+                try {
+                    callback();
+                } catch (error) {
+                    console.error('Export failed:', error);
+                    alert('Export failed. Please try again.');
+                } finally {
+                    // Restore original theme even if export failed
+                    setTimeout(() => {
+                        document.documentElement.setAttribute('data-theme', currentTheme || 'dark');
+                        this.themeManager.updateGraphTheme();
+                    }, 100);
+                }
             }, 200);
         } else {
             // Already in light mode
-            callback();
+            try {
+                callback();
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Export failed. Please try again.');
+            }
         }
+    }
+
+    // ===================================
+    // Supported Surface Helpers
+    // ===================================
+    populateExampleSelect() {
+        this.exampleSelect.innerHTML = '<option value="">-- Select Example --</option>';
+
+        [
+            { key: 'curated', label: 'Curated WABA Examples' },
+            { key: 'demos', label: 'Playground Demos' }
+        ].forEach(({ key, label }) => {
+            const group = document.createElement('optgroup');
+            group.label = label;
+
+            Object.entries(examples)
+                .filter(([, example]) => example.section === key)
+                .forEach(([exampleKey, example]) => {
+                    const option = document.createElement('option');
+                    option.value = exampleKey;
+                    option.textContent = example.label;
+                    group.appendChild(option);
+                });
+
+            this.exampleSelect.appendChild(group);
+        });
+
+        this.exampleSelect.value = 'simple_attack';
+    }
+
+    getCurrentConfig() {
+        return {
+            semiringFamily: this.semiringSelect.value,
+            polarity: this.polaritySelect.value,
+            defaultPolicy: this.defaultPolicySelect.value,
+            monoid: this.monoidSelect.value,
+            optimization: this.optimizeSelect.value,
+            budgetMode: this.constraintSelect.value,
+            budgetIntent: this.budgetIntentSelect.value,
+            semantics: this.semanticsSelect.value,
+            optMode: this.optModeSelect.value,
+            beta: parseInt(this.budgetInput.value, 10) || 0,
+            numModels: parseInt(this.numModelsInput.value, 10) || 0,
+            timeout: (parseInt(this.timeoutInput.value, 10) || 60) * 1000,
+            filterType: 'standard'
+        };
+    }
+
+    applyConfigToUI(config) {
+        this.semiringSelect.value = config.semiringFamily;
+        this.polaritySelect.value = config.polarity;
+        this.defaultPolicySelect.value = config.defaultPolicy;
+        this.monoidSelect.value = config.monoid;
+        this.optimizeSelect.value = config.optimization;
+        this.constraintSelect.value = config.budgetMode;
+        this.budgetIntentSelect.value = config.budgetIntent || 'no_discard';
+        this.semanticsSelect.value = config.semantics;
+        this.optModeSelect.value = config.optMode;
+        this.budgetInput.value = String(config.beta ?? 0);
+    }
+
+    syncConfigUi() {
+        const alias = Object.entries(wabaModules.metadata.aliases).find(([, value]) =>
+            value.family === this.semiringSelect.value && value.polarity === this.polaritySelect.value
+        );
+
+        this.semiringAliasNote.textContent = alias
+            ? `Alias: ${alias[0].replace('_', '-')}`
+            : 'Canonical ordered-semiring view.';
+
+        const budgetMode = this.constraintSelect.value;
+        const semantics = this.semanticsSelect.value;
+
+        this.budgetIntentSelect.disabled = budgetMode !== 'none';
+        this.budgetIntentSelect.style.opacity = budgetMode === 'none' ? '1' : '0.5';
+
+        if (budgetMode === 'ub') {
+            ['sum', 'max', 'count'].forEach((value) => {
+                this.monoidSelect.querySelector(`option[value="${value}"]`).disabled = false;
+            });
+            this.monoidSelect.querySelector('option[value="min"]').disabled = true;
+            if (this.monoidSelect.value === 'min') {
+                this.monoidSelect.value = 'sum';
+            }
+        } else if (budgetMode === 'lb') {
+            ['sum', 'max', 'count'].forEach((value) => {
+                this.monoidSelect.querySelector(`option[value="${value}"]`).disabled = true;
+            });
+            this.monoidSelect.querySelector('option[value="min"]').disabled = false;
+            this.monoidSelect.value = 'min';
+        } else {
+            Array.from(this.monoidSelect.options).forEach((option) => {
+                option.disabled = false;
+            });
+        }
+
+        if (semantics === 'grounded') {
+            this.optModeSelect.value = 'optN';
+            this.optModeSelect.disabled = true;
+        } else {
+            this.optModeSelect.disabled = false;
+        }
+
+        this.updateBudgetInputState();
+        this.updateNumModelsVisibility();
+        this.updateSurfaceCopy();
+    }
+
+    updateSurfaceCopy() {
+        const config = this.getCurrentConfig();
+        const budgetDescription = config.budgetMode === 'none'
+            ? (config.budgetIntent === 'no_discard' ? 'plain / no-discard' : 'unbounded exploration')
+            : `${config.monoid} + ${config.budgetMode}`;
+        const preferredCopy = config.semantics === 'preferred'
+            ? ' Exact preferred uses browser-side subset-maximal filtering over complete candidates.'
+            : '';
+
+        this.supportedSurfaceNote.innerHTML = `
+            Canonical bounded presets are <code>sum/max/count + ub</code> and <code>min + lb</code>.
+            Current profile: <code>${budgetDescription}</code>.${preferredCopy}
+        `;
+
+        this.budgetIntentNote.textContent = config.budgetMode === 'none'
+            ? 'Plain / no-discard mirrors classical ABA. Explore removes the budget filter but still computes aggregates and thresholds.'
+            : 'Budget mode is active, so the aggregate must satisfy the selected upper/lower bound against β.';
+    }
+
+    getExampleCode(exampleKey) {
+        const example = examples[exampleKey];
+        if (!example) {
+            return null;
+        }
+        if (example.source === 'module') {
+            return wabaModules.examples[example.moduleKey] || null;
+        }
+        return example.code;
     }
 
     // ===================================
@@ -358,18 +616,8 @@ class WABAPlayground {
                 return;
             }
 
-            // Build configuration
-            const config = {
-                semiring: this.semiringSelect.value,
-                monoid: this.monoidSelect.value,
-                direction: 'minimization', // Default to minimization
-                semantics: this.semanticsSelect.value,
-                constraint: this.constraintSelect.value,
-                budget: parseInt(this.budgetInput.value) || 0,
-                numModels: parseInt(this.numModelsInput.value) || 0,
-                optMode: this.optModeSelect.value, // 'ignore' or 'optN'
-                filterType: 'standard'
-            };
+            // Build canonical mature-surface configuration
+            const config = this.getCurrentConfig();
 
             // Run WABA via Clingo Manager
             const result = await this.clingoManager.runWABA(
@@ -391,7 +639,8 @@ class WABAPlayground {
                     result.result,
                     result.elapsed,
                     (inAssumptions, discarded, successful) => this.graphManager.highlightExtension(inAssumptions, discarded, successful),
-                    () => this.graphManager.resetGraphColors()
+                    () => this.graphManager.resetGraphColors(),
+                    result.effectiveConfig
                 );
 
                 // Hide output empty state
@@ -410,10 +659,8 @@ class WABAPlayground {
     // Graph Visualization
     // ===================================
     async regenerateGraph() {
-        console.log('🔄 [regenerateGraph] CALLED');
         // Store currently highlighted extension (if any)
         const activeExtension = this.outputManager.getActiveExtensionData();
-        console.log('📊 [regenerateGraph] Active extension ID:', activeExtension);
 
         let framework;
         if (this.inputMode.value === 'simple') {
@@ -427,22 +674,15 @@ class WABAPlayground {
 
             // Restore highlighted extension after graph update
             if (activeExtension) {
-                console.log('⏱️ [regenerateGraph] Scheduling extension restoration in 500ms...');
                 setTimeout(() => {
                     // Verify header element exists before restoring
                     const header = this.output.querySelector(`.answer-header[data-extension-id="${activeExtension}"]`);
-                    console.log('🔍 [regenerateGraph] Looking for header with ID:', activeExtension);
-                    console.log('Header element:', header ? 'FOUND' : 'NOT FOUND');
                     if (header) {
-                        console.log('✅ [regenerateGraph] Restoring active extension:', activeExtension);
                         this.outputManager.restoreActiveExtension();
                     } else {
-                        console.error('❌ [regenerateGraph] Could not restore extension - header not found:', activeExtension);
-                        console.log('Available headers in output:', Array.from(this.output.querySelectorAll('.answer-header')).map(h => h.dataset.extensionId));
+                        console.error('Could not restore extension - header not found:', activeExtension);
                     }
                 }, 500);  // Increased delay to allow graph to fully render
-            } else {
-                console.log('ℹ️ [regenerateGraph] No active extension to restore');
             }
         }
     }
@@ -452,8 +692,19 @@ class WABAPlayground {
         const selectedMode = Array.from(this.graphModeRadios).find(r => r.checked);
         const mode = selectedMode ? selectedMode.value : 'standard';
 
+        // Store current framework and mode for popups
+        this.currentFrameworkCode = frameworkCode;
+        this.currentGraphMode = mode;
+
         // Delegate to GraphManager
         await this.graphManager.updateGraph(frameworkCode, mode, this.clingoManager);
+    }
+
+    clearPreviousRun() {
+        // Clear all information from previous WABA run when loading new file
+        this.outputManager.clearPreviousRun(() => {
+            this.graphManager.resetGraphColors();
+        });
     }
 
     // Note: Graph update methods have been moved to GraphManager class in modules/graph-manager.js
@@ -467,80 +718,300 @@ class WABAPlayground {
         // Toggle between simple and advanced mode
         this.inputMode.addEventListener('change', (e) => {
             if (e.target.value === 'simple') {
+                // Switching to Simple mode
                 this.simpleMode.style.display = 'block';
                 this.editor.style.display = 'none';
+
+                // Parse Advanced editor content and populate Simple mode fields
+                const advancedCode = this.editor.value.trim();
+                if (advancedCode) {
+                    // Convert .lp format to .waba and populate Simple mode
+                    const wabaContent = this.fileManager.convertLpToWaba(advancedCode);
+                    const parsed = this.fileManager.parseWabaFile(wabaContent);
+
+                    // Populate Simple mode fields
+                    this.assumptionsInput.value = parsed.assumptions.join('\n');
+                    this.rulesInput.value = parsed.rules.join('\n');
+                    this.contrariesInput.value = parsed.contraries.join('\n');
+                    this.weightsInput.value = parsed.weights.join('\n');
+
+                    // Update description if present
+                    const descriptionContent = document.getElementById('simple-description-content');
+                    if (descriptionContent && parsed.description && parsed.description.length > 0) {
+                        descriptionContent.value = parsed.description.join('\n');
+                    }
+                }
+
+                this.updateSimpleDescription();
             } else {
+                // Switching to Advanced mode
                 this.simpleMode.style.display = 'none';
                 this.editor.style.display = 'block';
+
+                // Populate editor with original .waba content (if available) or generate from Simple Mode
+                if (this.originalWabaContent) {
+                    // Use original .waba content with all comments preserved
+                    this.editor.value = this.originalWabaContent;
+                } else {
+                    // Generate ASP code from Simple Mode fields
+                    const aspCode = this.parseSimpleABA();
+                    this.editor.value = aspCode;
+                }
             }
         });
 
-        // Update graph when simple mode inputs change
+        // Update graph and description when simple mode inputs change
         [this.assumptionsInput, this.rulesInput, this.contrariesInput, this.weightsInput].forEach(input => {
             input.addEventListener('input', () => {
                 if (this.inputMode.value === 'simple') {
+                    // Clear original .waba content when user edits Simple Mode fields
+                    // (their edits should be used when switching to Advanced mode)
+                    this.originalWabaContent = null;
+                    this.updateSimpleDescription();
                     this.regenerateGraph();
                 }
             });
         });
 
+        // Add Description button
+        const addCommentBtn = document.getElementById('simple-add-comment-btn');
+        if (addCommentBtn) {
+            addCommentBtn.addEventListener('click', () => this.addDescriptionTemplate());
+        }
+
+        // Remove Description button
+        const removeDescriptionBtn = document.getElementById('simple-remove-description-btn');
+        if (removeDescriptionBtn) {
+            removeDescriptionBtn.addEventListener('click', () => this.removeDescription());
+        }
+
+        // Regenerate graph when description changes
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.addEventListener('input', () => {
+                if (this.inputMode.value === 'simple') {
+                    this.regenerateGraph();
+                }
+            });
+        }
+
         // Initial state
         if (this.inputMode.value === 'simple') {
             this.simpleMode.style.display = 'block';
             this.editor.style.display = 'none';
+            this.updateSimpleDescription();
         } else {
             this.simpleMode.style.display = 'none';
             this.editor.style.display = 'block';
         }
     }
 
-    parseSimpleABA() {
-        const rulesText = this.rulesInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const assumptions = this.assumptionsInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const contrariesText = this.contrariesInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
-        const weightsText = this.weightsInput.value.trim().split('\n').map(s => s.trim()).filter(s => s);
+    initPrismEditors() {
+        // Initialize Prism syntax highlighting for Simple Mode textareas
+        // Replace textareas with contenteditable elements that support syntax highlighting
 
-        let clingoCode = '%% Auto-generated from Simple ABA Mode\n\n';
+        // Store original textarea references
+        const originalAssumptions = this.assumptionsInput;
+        const originalRules = this.rulesInput;
+        const originalContraries = this.contrariesInput;
+        const originalWeights = this.weightsInput;
+
+        // Create PrismEditor instances
+        this.assumptionsEditor = new PrismEditor(originalAssumptions, 'waba');
+        this.rulesEditor = new PrismEditor(originalRules, 'waba');
+        this.contrariesEditor = new PrismEditor(originalContraries, 'waba');
+        this.weightsEditor = new PrismEditor(originalWeights, 'waba');
+
+        // Update references to use editor API (transparent textarea-like interface)
+        // The original textareas are still accessible but hidden
+        this.assumptionsInput = this.assumptionsEditor;
+        this.rulesInput = this.rulesEditor;
+        this.contrariesInput = this.contrariesEditor;
+        this.weightsInput = this.weightsEditor;
+
+        // Update FileManager references to use PrismEditor instances
+        this.fileManager.assumptionsInput = this.assumptionsEditor;
+        this.fileManager.rulesInput = this.rulesEditor;
+        this.fileManager.contrariesInput = this.contrariesEditor;
+        this.fileManager.weightsInput = this.weightsEditor;
+    }
+
+    updateSimpleDescription() {
+        // Check if description textarea has content
+        const descriptionBox = document.getElementById('simple-description-box');
+        const descriptionContent = document.getElementById('simple-description-content');
+        const addCommentContainer = document.getElementById('simple-add-comment-container');
+
+        const hasDescription = descriptionContent && descriptionContent.value.trim().length > 0;
+
+        if (hasDescription) {
+            descriptionBox.removeAttribute('hidden');
+            addCommentContainer.setAttribute('hidden', '');
+        } else {
+            descriptionBox.setAttribute('hidden', '');
+            addCommentContainer.removeAttribute('hidden');
+        }
+    }
+
+    addDescriptionTemplate() {
+        // Add description template directly to description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.value = 'Enter your description here';
+
+            // Focus the description textarea and select the placeholder text
+            descriptionContent.focus();
+            descriptionContent.select();
+        }
+
+        // Update the description box visibility
+        this.updateSimpleDescription();
+    }
+
+    removeDescription() {
+        // Clear the description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent) {
+            descriptionContent.value = '';
+        }
+
+        // Update the description box visibility
+        this.updateSimpleDescription();
+
+        // Regenerate graph
+        this.regenerateGraph();
+    }
+
+    syncDescriptionToComment() {
+        // Sync description textarea content back to // description lines in assumptions input
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (!descriptionContent) return;
+
+        const newDescription = descriptionContent.value;
+        const lines = this.assumptionsInput.value.split('\n');
+
+        // Find and remove all existing % // description lines
+        const nonDescriptionLines = lines.filter(line => !line.trim().startsWith('% //'));
+
+        // Build new description lines
+        const newDescriptionLines = newDescription.split('\n').map(line => '% // ' + line);
+
+        // Prepend new description lines to the content
+        if (newDescriptionLines.length > 0) {
+            newDescriptionLines.push(''); // Add blank line after description
+        }
+
+        // Update the assumptions input
+        this.assumptionsInput.value = [...newDescriptionLines, ...nonDescriptionLines].join('\n');
+    }
+
+    parseSimpleABA() {
+        // Helper function to process lines, preserving comments (except % // description)
+        const processLines = (lines) => {
+            const result = [];
+
+            for (let line of lines) {
+                const trimmed = line.trim();
+
+                // Skip empty lines
+                if (!trimmed) continue;
+
+                // Skip description lines (% //) - those go in description box
+                if (trimmed.startsWith('% //')) {
+                    continue;
+                }
+
+                // Preserve all other lines (including % comments)
+                result.push(trimmed);
+            }
+
+            return result;
+        };
+
+        // Get description directly from description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        const description = descriptionContent && descriptionContent.value
+            ? descriptionContent.value.split('\n').filter(line => line.trim())
+            : [];
+
+        // Update description box and button visibility
+        this.updateSimpleDescription();
+
+        // Process each input, preserving comments
+        const assumptionsLines = processLines(this.assumptionsInput.value.split('\n'));
+        const rulesLines = processLines(this.rulesInput.value.split('\n'));
+        const contrariesLines = processLines(this.contrariesInput.value.split('\n'));
+        const weightsLines = processLines(this.weightsInput.value.split('\n'));
+
+        let clingoCode = '%% Auto-generated from Simple Editor\n';
+
+        // Add description as special comments (% //) if it exists
+        if (description.length > 0) {
+            description.forEach(line => {
+                clingoCode += `% // ${line}\n`;
+            });
+            clingoCode += '\n';
+        }
+
+        clingoCode += '\n';
 
         // Parse assumptions
-        if (assumptions.length > 0) {
+        if (assumptionsLines.length > 0) {
             clingoCode += '%% Assumptions\n';
-            assumptions.forEach(a => {
-                clingoCode += `assumption(${a}).\n`;
+            assumptionsLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise treat as assumption
+                    clingoCode += `assumption(${line}).\n`;
+                }
             });
             clingoCode += '\n';
         }
 
         // Parse weights
-        if (weightsText.length > 0) {
+        if (weightsLines.length > 0) {
             clingoCode += '%% Weights\n';
-            weightsText.forEach(line => {
-                const match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
-                if (match) {
-                    const [, atom, weight] = match;
-                    clingoCode += `weight(${atom}, ${weight}).\n`;
+            weightsLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as weight
+                    const match = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*(\d+)$/i);
+                    if (match) {
+                        const [, atom, weight] = match;
+                        clingoCode += `weight(${atom}, ${weight}).\n`;
+                    }
                 }
             });
             clingoCode += '\n';
         }
 
         // Parse rules
-        if (rulesText.length > 0) {
+        if (rulesLines.length > 0) {
             clingoCode += '%% Rules\n';
             let ruleCounter = 1;
-            rulesText.forEach((rule) => {
-                const match = rule.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
-                if (match) {
-                    const [, head, bodyStr] = match;
-                    const ruleId = `r${ruleCounter++}`;
+            rulesLines.forEach((line) => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as rule
+                    const match = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
+                    if (match) {
+                        const [, head, bodyStr] = match;
+                        const ruleId = `r${ruleCounter++}`;
 
-                    if (bodyStr.trim() === '') {
-                        clingoCode += `% ${ruleId}: ${head} <- (fact)\n`;
-                        clingoCode += `head(${ruleId}, ${head}).\n`;
-                    } else {
-                        const bodyAtoms = bodyStr.split(',').map(s => s.trim()).filter(s => s);
-                        clingoCode += `% ${ruleId}: ${head} <- ${bodyAtoms.join(', ')}\n`;
-                        clingoCode += `head(${ruleId}, ${head}). body(${ruleId}, ${bodyAtoms.join(`; ${ruleId}, `)}).\n`;
+                        if (bodyStr.trim() === '') {
+                            clingoCode += `% ${ruleId}: ${head} <- (fact)\n`;
+                            clingoCode += `head(${ruleId}, ${head}).\n`;
+                        } else {
+                            const bodyAtoms = bodyStr.split(',').map(s => s.trim()).filter(s => s);
+                            clingoCode += `% ${ruleId}: ${head} <- ${bodyAtoms.join(', ')}\n`;
+                            clingoCode += `head(${ruleId}, ${head}). body(${ruleId}, ${bodyAtoms.join(`; ${ruleId}, `)}).\n`;
+                        }
                     }
                 }
             });
@@ -548,13 +1019,20 @@ class WABAPlayground {
         }
 
         // Parse contraries
-        if (contrariesText.length > 0) {
+        if (contrariesLines.length > 0) {
             clingoCode += '%% Contraries\n';
-            contrariesText.forEach(line => {
-                const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
-                if (match) {
-                    const [, assumption, contrary] = match;
-                    clingoCode += `contrary(${assumption}, ${contrary}).\n`;
+            contrariesLines.forEach(line => {
+                // If it's a comment, preserve it
+                if (line.startsWith('%')) {
+                    clingoCode += `${line}\n`;
+                } else {
+                    // Otherwise parse as contrary
+                    // Format: (assumption, contrary)
+                    const match = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+                    if (match) {
+                        const [, assumption, contrary] = match;
+                        clingoCode += `contrary(${assumption}, ${contrary}).\n`;
+                    }
                 }
             });
         }
@@ -563,39 +1041,146 @@ class WABAPlayground {
     }
 
     populateSimpleModeFromClingo(clingoCode) {
-        // Parse clingo code and populate simple mode fields
-        const assumptions = ParserUtils.parseAssumptions(clingoCode);
-        const contraries = ParserUtils.parseContraries(clingoCode);
-        const rules = ParserUtils.parseRules(clingoCode);
-        const weights = ParserUtils.parseWeights(clingoCode);
+        // Parse clingo code and populate simple mode fields (with comments preserved)
+        const lines = clingoCode.split('\n').map(l => l.trim());
 
-        // Populate assumptions
-        this.assumptionsInput.value = assumptions.join('\n');
+        // Extract description and section-specific content with comments
+        const descriptionLines = [];
+        const assumptionLines = [];
+        const ruleLines = [];
+        const contraryLines = [];
+        const weightLines = [];
 
-        // Populate rules
-        const rulesFormatted = rules.map(r => {
-            const bodyStr = r.body.length > 0 ? r.body.join(', ') : '';
-            return `${r.head} <- ${bodyStr}`;
-        });
-        this.rulesInput.value = rulesFormatted.join('\n');
+        // Track processed rule IDs to avoid duplicates
+        const processedRules = new Set();
 
-        // Populate contraries
-        const contrariesFormatted = contraries.map(c => `(${c.assumption}, ${c.contrary})`);
-        this.contrariesInput.value = contrariesFormatted.join('\n');
+        for (const line of lines) {
+            // Skip empty lines
+            if (!line) continue;
 
-        // Populate weights
-        const weightsFormatted = Object.entries(weights).map(([atom, weight]) => `${atom}: ${weight}`);
-        this.weightsInput.value = weightsFormatted.join('\n');
+            // Extract description lines (% //)
+            if (line.startsWith('% //')) {
+                const descLine = line.substring(4).trim();
+                descriptionLines.push(descLine);
+                continue;
+            }
+
+            // Skip section header comments
+            if (line.match(/%+\s*(Assumptions|Rules|Contraries|Weights)/i)) {
+                continue;
+            }
+
+            // Strip inline comments (everything after % on the same line)
+            // but only if the line doesn't START with %
+            let cleanLine = line;
+            if (!line.startsWith('%')) {
+                const commentIndex = line.indexOf('%');
+                if (commentIndex !== -1) {
+                    cleanLine = line.substring(0, commentIndex).trim();
+                }
+            }
+
+            // Try to match specific patterns (order matters!)
+            // Use cleanLine (with inline comments stripped) for all pattern matching
+
+            // 1. Check for assumption
+            let match = cleanLine.match(/^assumption\(([^)]+)\)\.$/);
+            if (match) {
+                assumptionLines.push(match[1].trim());
+                continue;
+            }
+
+            // 2. Check for weight
+            match = cleanLine.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+            if (match) {
+                weightLines.push(`${match[1].trim()}: ${match[2]}`);
+                continue;
+            }
+
+            // 3. Check for contrary
+            match = cleanLine.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                const arg1 = match[1].trim();
+                const arg2 = match[2].trim();
+                contraryLines.push(`(${arg1}, ${arg2})`);
+                continue;
+            }
+
+            // 4. Check for head (rule)
+            match = cleanLine.match(/^head\(([^,]+),\s*([^)]+)\)\./);
+            if (match) {
+                const ruleId = match[1];
+                const head = match[2];
+
+                // Skip if already processed (avoid duplicates from multiple head() calls)
+                if (processedRules.has(ruleId)) continue;
+                processedRules.add(ruleId);
+
+                // Extract rule comment if present
+                const commentMatch = clingoCode.match(new RegExp(`%\\s*${ruleId}:\\s*([^\\n]+)`, 'i'));
+                if (commentMatch) {
+                    ruleLines.push(`% ${commentMatch[1]}`);
+                }
+
+                // Build rule from head/body predicates
+                const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
+                const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
+                const bodyAtoms = bodyMatches.map(m => m[1]);
+
+                const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
+                ruleLines.push(`${head} <- ${bodyStr}`);
+                continue;
+            }
+
+            // 5. Preserve other comments (not description, not section headers)
+            if (line.startsWith('%')) {
+                // Try to guess which section this comment belongs to based on context
+                // For now, just skip standalone comments that don't belong to a specific section
+                // (Could be improved by tracking last parsed item type)
+                continue;
+            }
+        }
+
+        // Populate description textarea
+        const descriptionContent = document.getElementById('simple-description-content');
+        if (descriptionContent && descriptionLines.length > 0) {
+            descriptionContent.value = descriptionLines.join('\n');
+        } else if (descriptionContent) {
+            descriptionContent.value = '';
+        }
+
+        // Populate simple mode fields
+        this.assumptionsInput.value = assumptionLines.join('\n');
+        this.rulesInput.value = ruleLines.join('\n');
+        this.contrariesInput.value = contraryLines.join('\n');
+        this.weightsInput.value = weightLines.join('\n');
+
+        // Update description box visibility
+        this.updateSimpleDescription();
     }
 
     // ===================================
     // Example Loading
     // ===================================
     async loadExample(exampleName) {
+        if (exampleName === '__uploaded__') {
+            return;
+        }
         if (exampleName && examples && examples[exampleName]) {
             try {
-                const clingoCode = examples[exampleName];
+                const example = examples[exampleName];
+                const clingoCode = this.getExampleCode(exampleName);
+                if (!clingoCode) {
+                    throw new Error(`Missing example code for ${exampleName}`);
+                }
+
+                this.applyConfigToUI(example.preset);
+                this.syncConfigUi();
                 this.editor.value = clingoCode;
+                this.clearPreviousRun();
+
+                // Clear original .waba content (this is an example, not a user file)
+                this.originalWabaContent = null;
 
                 // Also parse and populate simple mode fields
                 this.populateSimpleModeFromClingo(clingoCode);
@@ -603,15 +1188,36 @@ class WABAPlayground {
                 // Update graph visualization
                 await this.updateGraph(clingoCode);
 
-                this.outputManager.log(`📚 Loaded example: ${exampleName}`, 'info');
+                this.outputManager.log(`Loaded example: ${example.label}`, 'info');
             } catch (error) {
                 console.error(`Error loading example ${exampleName}:`, error);
                 this.outputManager.log(`❌ Error loading example: ${error.message}`, 'error');
             }
         } else if (exampleName) {
             console.error(`Example not found: ${exampleName}`);
-            console.log('Available examples:', Object.keys(examples || {}));
             this.outputManager.log(`❌ Example "${exampleName}" not found`, 'error');
+        }
+    }
+
+    updateExampleSelectWithFilename(filename) {
+        // Remove existing "Uploaded File" option if present
+        const existingOption = this.exampleSelect.querySelector('option[value="__uploaded__"]');
+        if (existingOption) {
+            existingOption.remove();
+        }
+
+        // Add new option with uploaded filename (without extension)
+        const filenameWithoutExt = filename.replace(/\.(lp|waba)$/i, '');
+        const option = document.createElement('option');
+        option.value = '__uploaded__';
+        option.textContent = `📁 ${filenameWithoutExt}`;
+        option.selected = true;
+
+        // Insert at the top (after "-- Select Example --")
+        if (this.exampleSelect.options.length > 0) {
+            this.exampleSelect.insertBefore(option, this.exampleSelect.options[1]);
+        } else {
+            this.exampleSelect.appendChild(option);
         }
     }
 
@@ -672,6 +1278,43 @@ class WABAPlayground {
     handleEdgeClick(edge, x, y) {
         // Show edge popup with attack details
         PopupManager.showEdgePopup(edge, x, y);
+    }
+
+    /**
+     * Update budget input state based on constraint selection
+     */
+    updateBudgetInputState() {
+        const constraint = this.constraintSelect.value;
+        const budgetInput = this.budgetInput;
+        const budgetLabel = document.getElementById('budget-input-label');
+
+        if (constraint === 'none' && this.budgetIntentSelect.value === 'no_discard') {
+            budgetInput.disabled = true;
+            budgetInput.style.opacity = '0.5';
+            if (budgetLabel) {
+                budgetLabel.textContent = 'Budget (β - inactive in plain / no-discard mode)';
+                budgetLabel.style.opacity = '0.5';
+            }
+        } else {
+            budgetInput.disabled = false;
+            budgetInput.style.opacity = '1';
+            if (budgetLabel) {
+                budgetLabel.textContent = 'Budget Threshold (β)';
+                budgetLabel.style.opacity = '1';
+            }
+        }
+    }
+
+    /**
+     * Update num models input visibility based on optimization mode
+     */
+    updateNumModelsVisibility() {
+        const optMode = this.optModeSelect.value;
+        const numModelsContainer = document.getElementById('num-models-container');
+
+        if (numModelsContainer) {
+            numModelsContainer.style.display = optMode === 'ignore' ? 'block' : 'none';
+        }
     }
 }
 

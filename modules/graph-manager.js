@@ -400,13 +400,18 @@ export class GraphManager {
         }
 
         try {
-            const semiring = document.getElementById('semiring-select').value;
+            const semiringFamily = document.getElementById('semiring-select').value;
+            const polarity = document.getElementById('polarity-select')?.value || 'higher';
+            const defaultPolicy = document.getElementById('default-policy-select')?.value || 'legacy';
 
             // Build set-based attack graph program
             const setProgram = `
 ${frameworkCode}
 ${clingoManager.getCoreModule()}
-${clingoManager.getSemiringModule(semiring)}
+${clingoManager.getSemiringModule({
+                semiringKey: clingoManager.resolveSemiringModuleKey(semiringFamily, polarity)
+            })}
+${clingoManager.getDefaultPolicyModule(defaultPolicy)}
 
 % Enumerate all sets of assumptions (power set)
 in(X) :- assumption(X), not out(X).

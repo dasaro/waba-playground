@@ -194,7 +194,7 @@ Does diagnostic script show all true?
 Include ALL of these:
 
 1. **Browser**: Chrome 120.0.6099.109 (exact version)
-2. **URL**: https://dasaro.github.io/waba-playground/ (or localhost)
+2. **URL**: your deployed project URL (or localhost)
 3. **Module test**: Pass/Fail (screenshot if fail)
 4. **Console errors**: Full red error messages (copy/paste)
 5. **Diagnostic script output**: Copy/paste all of it
@@ -203,7 +203,7 @@ Include ALL of these:
 Example good report:
 ```
 Browser: Chrome 120.0.6099.109
-URL: https://dasaro.github.io/waba-playground/
+URL: your deployed project URL
 Module test: PASS (all green)
 Console errors: None
 Diagnostic script: All true except "showDerivationChain exists: false"

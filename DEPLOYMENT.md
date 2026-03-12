@@ -57,9 +57,9 @@ GitHub Pages typically takes 1-2 minutes to rebuild and deploy.
 
 ### 6. Verify Deployment
 
-Visit the version check page:
-```
-https://dasaro.github.io/waba-playground/version-check.html
+Visit the version check page for your deployed project:
+``` 
+<your-project-url>/version-check.html
 ```
 
 Should show:
@@ -68,7 +68,7 @@ Should show:
 
 ### 7. Test Changes
 
-1. Visit https://dasaro.github.io/waba-playground/
+1. Visit your deployed project URL
 2. Hard refresh **ONCE** (Cmd+Shift+R / Ctrl+Shift+R)
 3. Verify all changes work as expected
 4. Check browser console for any errors

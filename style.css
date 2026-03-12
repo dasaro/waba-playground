@@ -309,6 +309,16 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     color: var(--text-secondary);
 }
 
+.config-note {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.config-note code {
+    font-size: 0.95em;
+}
+
 .select {
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-tertiary);

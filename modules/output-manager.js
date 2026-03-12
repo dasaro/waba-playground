@@ -2,33 +2,37 @@
  * OutputManager - Handles result display, parsing, and logging
  */
 import { PopupManager } from './popup-manager.js?v=20260101-1';
+import { MetricsManager } from './metrics-manager.js?v=20260102-1';
 
 export class OutputManager {
-    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect) {
+    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect, polaritySelect, getConfig = null) {
         this.output = output;
         this.stats = stats;
         this.semiringSelect = semiringSelect;
         this.monoidSelect = monoidSelect;
         this.optimizeSelect = optimizeSelect;
+        this.polaritySelect = polaritySelect;
+        this.getConfig = getConfig;
         this.activeExtensionId = null;  // Track currently highlighted extension
     }
 
     // ===================================
     // Display Results
     // ===================================
-    displayResults(result, elapsed, onHighlightExtension, onResetGraph) {
+    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null) {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
                             result.Result === 'OPTIMUM FOUND';
+        const config = effectiveConfig || (this.getConfig ? this.getConfig() : {
+            monoid: this.monoidSelect?.value || 'sum',
+            optimization: this.optimizeSelect?.value || 'minimize',
+            budgetMode: 'none',
+            budgetIntent: 'no_discard'
+        });
 
         // Reset active extension when displaying new results
         this.activeExtensionId = null;
-
-        // Debug logging
-        console.log('Result:', result.Result);
-        console.log('Witnesses count:', witnesses.length);
-        console.log('All witnesses:', witnesses);
 
         this.log(`\n${result.Result}`, 'info');
 
@@ -36,48 +40,58 @@ export class OutputManager {
             this.log('⚠️ No extensions found', 'warning');
             this.log('Try adjusting the budget or framework constraints', 'info');
         } else {
-            // Determine sort direction from optimization direction selector
-            const optDirection = this.optimizeSelect.value;
-            const isMinimization = optDirection === 'minimize' || optDirection === 'none';
-
-            // Pre-compute costs for all witnesses (parse predicates to get discarded attacks)
-            const witnessesWithCosts = witnesses.map(witness => {
+            const witnessesWithCosts = witnesses.map((witness) => {
                 const predicates = witness.Value || [];
                 const parsed = this.parseAnswerSet(predicates);
+                const aggregateValue = parsed.budgetValueRaw !== null
+                    ? this.normalizeAggregateValue(parsed.budgetValueRaw)
+                    : this.computeAggregateFromDiscarded(parsed.discarded, config.monoid);
+                const cost = (config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
+                    ? null
+                    : this.extractDisplayCost(witness, aggregateValue, config.monoid);
 
-                // Extract cost from Optimization field, or compute from discarded attacks
-                let cost = this.extractCost(witness);
-                if (witness.Optimization === undefined && parsed.discarded.length > 0) {
-                    cost = this.computeCostFromDiscarded(parsed.discarded);
-                }
-
-                return { witness, cost, parsed };
+                return {
+                    witness,
+                    parsed,
+                    cost,
+                    aggregateValue,
+                    objectiveTuple: this.getObjectiveTuple(config, aggregateValue)
+                };
             });
 
-            // Sort by pre-computed costs
-            // Minimization: ascending order (0, 70, 90, 95 - lower cost first)
-            // Maximization: descending order (95, 90, 70, 0 - higher reward first)
             witnessesWithCosts.sort((a, b) => {
-                return isMinimization ? (a.cost - b.cost) : (b.cost - a.cost);
-            });
-
-            console.log('Optimization direction:', optDirection);
-            console.log('Sort order:', isMinimization ? 'ascending (lower cost first)' : 'descending (higher reward first)');
-            console.log('Sorted costs:');
-            witnessesWithCosts.forEach((item, i) => {
-                console.log(`  ${i+1}. Cost: ${item.cost}`);
+                const tupleComparison = this.compareTuples(a.objectiveTuple, b.objectiveTuple);
+                if (tupleComparison !== 0) {
+                    return tupleComparison;
+                }
+                return a.parsed.in.join(',').localeCompare(b.parsed.in.join(','));
             });
 
             // Display all witnesses in sorted order
-            console.log('Displaying witnesses...');
             witnessesWithCosts.forEach((item, index) => {
-                console.log(`Processing witness ${index + 1}:`, item.witness, 'cost:', item.cost);
-                this.appendAnswerSet(item.witness, index + 1, onHighlightExtension, onResetGraph, item.cost);
+                this.appendAnswerSet(
+                    item.witness,
+                    index + 1,
+                    onHighlightExtension,
+                    onResetGraph,
+                    item.cost,
+                    item.parsed.budgetValue
+                );
             });
 
             if (result.Result === 'OPTIMUM FOUND') {
                 this.log(`\n✓ Found ${witnesses.length} optimal extension(s)`, 'success');
             }
+
+            // Store witnesses for download
+            this.storedWitnesses = witnessesWithCosts;
+
+            // Add download and metrics buttons if there are extensions
+            this.addDownloadButton();
+            if (witnessesWithCosts.every((item) => typeof item.cost === 'number' && Number.isFinite(item.cost))) {
+                this.addMetricsButton();
+            }
+            this.addRankingSummary(witnessesWithCosts, config);
         }
 
         // Display statistics
@@ -86,11 +100,230 @@ export class OutputManager {
             ${witnesses.length} extension(s) found |
             Computed in ${elapsed}s |
             Semiring: ${this.semiringSelect.options[this.semiringSelect.selectedIndex].text} |
-            Monoid: ${this.monoidSelect.options[this.monoidSelect.selectedIndex].text}
+            Monoid: ${this.monoidSelect.options[this.monoidSelect.selectedIndex].text} |
+            Mode: ${config.budgetMode === 'none' ? config.budgetIntent : config.budgetMode}
         `;
     }
 
-    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null) {
+    addDownloadButton() {
+        // Check if button already exists
+        if (document.getElementById('download-all-extensions-btn')) {
+            return;
+        }
+
+        // Create download button with unified styling
+        const button = document.createElement('button');
+        button.id = 'download-all-extensions-btn';
+        button.className = 'analysis-action-btn';
+        button.innerHTML = '💾 Download All Extensions';
+        button.addEventListener('click', () => this.downloadAllExtensions());
+
+        // Get or create button group container
+        let buttonGroup = document.getElementById('analysis-button-group');
+        const exportSection = document.getElementById('export-section');
+
+        if (!buttonGroup && exportSection) {
+            buttonGroup = document.createElement('div');
+            buttonGroup.id = 'analysis-button-group';
+            buttonGroup.className = 'analysis-button-group';
+            exportSection.appendChild(buttonGroup);
+        }
+
+        if (buttonGroup) {
+            buttonGroup.appendChild(button);
+        } else {
+            // Fallback: insert at top of output if export section not found
+            this.output.insertBefore(button, this.output.firstChild);
+        }
+    }
+
+    downloadAllExtensions() {
+        if (!this.storedWitnesses || this.storedWitnesses.length === 0) {
+            return;
+        }
+
+        let textContent = '';
+
+        this.storedWitnesses.forEach((item, index) => {
+            const parsed = item.parsed;
+            const extensionNumber = index + 1;
+
+            // Build textual representation for this extension
+            let extensionText = `${extensionNumber}: `;
+            let parts = [];
+
+            // In assumptions
+            if (parsed.in && parsed.in.length > 0) {
+                parts.push(parsed.in.map(a => `in(${a})`).join('. ') + '.');
+            }
+
+            // Supported atoms with weights
+            if (parsed.supported && parsed.supported.length > 0) {
+                const supportedPredicates = parsed.supported.map(a => {
+                    const weight = parsed.weights.get(a);
+                    if (weight !== undefined) {
+                        return `supported_with_weight(${a}, ${weight})`;
+                    }
+                    return `supported(${a})`;
+                }).join('. ') + '.';
+                parts.push(supportedPredicates);
+            }
+
+            // Discarded attacks
+            if (parsed.discarded && parsed.discarded.length > 0) {
+                const discardedPredicates = parsed.discarded.map(attack => {
+                    const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+                    if (match) {
+                        return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                    }
+                    return attack;
+                }).join('. ') + '.';
+                parts.push(discardedPredicates);
+            }
+
+            // Cost
+            if (item.cost !== null) {
+                parts.push(`cost(${item.cost}).`);
+            }
+
+            extensionText += parts.join(' ');
+            textContent += extensionText + '\n';
+        });
+
+        // Create and download file
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        link.download = `waba-extensions-${timestamp}.txt`;
+
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    addMetricsButton() {
+        // Check if button already exists
+        if (document.getElementById('metrics-toggle-btn')) {
+            return;
+        }
+
+        // Create metrics toggle button with unified styling
+        const button = document.createElement('button');
+        button.id = 'metrics-toggle-btn';
+        button.className = 'analysis-action-btn';
+        button.innerHTML = '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+        button.addEventListener('click', () => this.toggleMetrics(button));
+
+        // Add to the same button group as download button
+        let buttonGroup = document.getElementById('analysis-button-group');
+        const exportSection = document.getElementById('export-section');
+
+        if (!buttonGroup && exportSection) {
+            buttonGroup = document.createElement('div');
+            buttonGroup.id = 'analysis-button-group';
+            buttonGroup.className = 'analysis-button-group';
+            exportSection.appendChild(buttonGroup);
+        }
+
+        if (buttonGroup) {
+            buttonGroup.appendChild(button);
+        } else {
+            // Fallback: insert after download button if button group not found
+            const downloadBtn = document.getElementById('download-all-extensions-btn');
+            if (downloadBtn && downloadBtn.nextSibling) {
+                this.output.insertBefore(button, downloadBtn.nextSibling);
+            } else {
+                this.output.insertBefore(button, this.output.firstChild);
+            }
+        }
+    }
+
+    toggleMetrics(button) {
+        const metricsDiv = document.getElementById('metrics-display');
+
+        if (metricsDiv) {
+            // Toggle visibility
+            const isHidden = metricsDiv.style.display === 'none';
+            metricsDiv.style.display = isHidden ? 'block' : 'none';
+            button.innerHTML = isHidden
+                ? '<span class="toggle-icon">▼</span> Hide Metrics'
+                : '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+            button.classList.toggle('expanded', isHidden);
+        } else {
+            // Compute and display metrics for the first time
+            this.displayMetrics(button);
+        }
+    }
+
+    displayMetrics(button) {
+        if (!this.storedWitnesses || this.storedWitnesses.length === 0) {
+            return;
+        }
+
+        // Build config for metrics computation
+        const config = {
+            polarity: this.polaritySelect && this.polaritySelect.value === 'higher' ? 'strength' : 'cost',
+            monoid: this.monoidSelect ? this.monoidSelect.value : 'max'
+        };
+
+        // Compute metrics with config
+        const metricsData = MetricsManager.computeMetrics(this.storedWitnesses, config);
+
+        if (!metricsData) {
+            this.log('⚠️ Could not compute metrics', 'warning');
+            return;
+        }
+
+        // Store metrics data for CSV export
+        this.storedMetricsData = metricsData;
+
+        // Create metrics display div
+        let metricsDiv = document.getElementById('metrics-display');
+        if (!metricsDiv) {
+            metricsDiv = document.createElement('div');
+            metricsDiv.id = 'metrics-display';
+            metricsDiv.style.display = 'block';
+
+            // Insert into export section after button group
+            const exportSection = document.getElementById('export-section');
+            const buttonGroup = document.getElementById('analysis-button-group');
+
+            if (exportSection && buttonGroup && buttonGroup.parentNode === exportSection) {
+                // Insert after button group
+                if (buttonGroup.nextSibling) {
+                    exportSection.insertBefore(metricsDiv, buttonGroup.nextSibling);
+                } else {
+                    exportSection.appendChild(metricsDiv);
+                }
+            } else {
+                // Fallback: insert after button
+                if (button.nextSibling) {
+                    button.parentNode.insertBefore(metricsDiv, button.nextSibling);
+                } else {
+                    button.parentNode.appendChild(metricsDiv);
+                }
+            }
+        }
+
+        // Render metrics HTML
+        metricsDiv.innerHTML = MetricsManager.formatMetricsHTML(metricsData);
+
+        // Wire up CSV export button
+        const csvButton = document.getElementById('export-metrics-csv-btn');
+        if (csvButton) {
+            csvButton.addEventListener('click', () => {
+                MetricsManager.downloadMetricsCSV(this.storedMetricsData);
+            });
+        }
+
+        // Update button text
+        button.innerHTML = '<span class="toggle-icon">▼</span> Hide Metrics';
+        button.classList.add('expanded');
+    }
+
+    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null, budgetValue = null) {
         // witness is an object with Time and Value properties
         // Value is an array of predicate strings
         const predicates = witness.Value || [];
@@ -217,12 +450,67 @@ export class OutputManager {
             contentHTML += '</div></div>';
         }
 
+        // Textual Result (Clingo-like format) - Collapsible
+        contentHTML += '<div class="assumption-section textual-result-section">';
+        contentHTML += '<span class="section-label textual-result-toggle" data-extension="${answerNumber}" style="cursor: pointer; user-select: none;">';
+        contentHTML += '<span class="toggle-icon">▶</span> Textual Result';
+        contentHTML += '</span>';
+        contentHTML += '<div class="textual-result" data-extension="${answerNumber}" style="display: none;">';
+
+        // Build textual representation
+        let textualLines = [];
+
+        // In assumptions
+        if (parsed.in.length > 0) {
+            const inPredicates = parsed.in.map(a => `in(${a})`).join('. ') + '.';
+            textualLines.push(inPredicates);
+        }
+
+        // Supported atoms with weights
+        if (parsed.supported && parsed.supported.length > 0) {
+            const supportedPredicates = parsed.supported.map(a => {
+                const weight = parsed.weights.get(a);
+                if (weight !== undefined) {
+                    return `supported_with_weight(${a}, ${weight})`;
+                }
+                return `supported(${a})`;
+            }).join('. ') + '.';
+            textualLines.push(supportedPredicates);
+        }
+
+        // Discarded attacks
+        if (parsed.discarded && parsed.discarded.length > 0) {
+            const discardedPredicates = parsed.discarded.map(attack => {
+                const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+                if (match) {
+                    return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                }
+                return attack;
+            }).join('. ') + '.';
+            textualLines.push(discardedPredicates);
+        }
+
+        if (parsed.budgetValue !== null) {
+            textualLines.push(`budget_value(${parsed.budgetValue}).`);
+        }
+
+        // Cost information
+        if (parsed.cost !== null) {
+            textualLines.push(`cost(${parsed.cost}).`);
+        }
+
+        // Join all lines with newlines
+        const textualResult = textualLines.join('\n');
+        contentHTML += `<pre class="textual-result-content">${textualResult}</pre>`;
+        contentHTML += '</div></div>';
+
         contentHTML += '</div>';
 
         answerDiv.innerHTML = `
             <div class="answer-header clickable-extension" data-extension-id="${answerNumber}">
                 <span class="answer-number">Extension ${answerNumber}</span>
                 ${parsed.cost !== null ? `<span class="extension-cost-badge">💰 Cost: ${parsed.cost}</span>` : ''}
+                ${budgetValue !== null && budgetValue !== undefined ? `<span class="extension-cost-badge">β*: ${budgetValue}</span>` : ''}
                 <span class="click-hint" style="font-size: 0.85em; color: var(--text-muted); margin-left: 10px;">👆 Click to highlight</span>
             </div>
             ${contentHTML}
@@ -311,6 +599,22 @@ export class OutputManager {
         } else {
             console.log('ℹ️ [appendAnswerSet] No derived atoms to attach handlers to');
         }
+
+        // Add click handler for textual result toggle
+        const toggleButton = answerDiv.querySelector('.textual-result-toggle');
+        const textualContent = answerDiv.querySelector('.textual-result');
+        if (toggleButton && textualContent) {
+            toggleButton.addEventListener('click', () => {
+                const isHidden = textualContent.style.display === 'none';
+                textualContent.style.display = isHidden ? 'block' : 'none';
+
+                // Update icon
+                const icon = toggleButton.querySelector('.toggle-icon');
+                if (icon) {
+                    icon.textContent = isHidden ? '▼' : '▶';
+                }
+            });
+        }
     }
 
     findSupportingAssumptions(element, parsed) {
@@ -341,6 +645,8 @@ export class OutputManager {
             in: [],
             out: [],
             cost: null,
+            budgetValue: null,
+            budgetValueRaw: null,
             discarded: [],
             successful: [],
             supported: [],
@@ -431,6 +737,13 @@ export class OutputManager {
                 return;
             }
 
+            const budgetValueMatch = pred.match(/^budget_value\(([^)]+)\)$/);
+            if (budgetValueMatch) {
+                result.budgetValueRaw = budgetValueMatch[1];
+                result.budgetValue = budgetValueMatch[1];
+                return;
+            }
+
             // Extract successful attacks
             if (pred.startsWith('attacks_successfully_with_weight(')) {
                 result.successful.push(pred);
@@ -452,70 +765,219 @@ export class OutputManager {
         return result;
     }
 
-    extractCost(witness) {
-        // Try witness.Optimization field (weak constraint-based system)
+    extractDisplayCost(witness, aggregateValue, monoid) {
         if (witness.Optimization !== undefined) {
             const opt = witness.Optimization;
-            if (Array.isArray(opt)) {
-                // MAX/MIN monoid: [0, 0, 80] → return 80 (last value)
+            if (Array.isArray(opt) && opt.length > 0) {
                 const lastValue = opt[opt.length - 1];
-                if (lastValue === '#sup') return Infinity;
-                if (lastValue === '#inf') return -Infinity;
-                return parseFloat(lastValue) || 0;
+                return this.displayValue(lastValue);
             }
-            // SUM/COUNT monoid: 210 → return 210
-            if (opt === '#sup') return Infinity;
-            if (opt === '#inf') return -Infinity;
-            return parseFloat(opt) || 0;
+            return this.displayValue(opt);
+        }
+
+        if (aggregateValue !== null && aggregateValue !== undefined) {
+            return this.displayValue(aggregateValue);
+        }
+
+        return monoid === 'count' ? 0 : null;
+    }
+
+    computeAggregateFromDiscarded(discardedAttacks, monoid) {
+        const weights = discardedAttacks
+            .map((attack) => attack.match(/discarded_attack\([^,]+,\s*[^,]+,\s*([^)]+)\)/))
+            .filter(Boolean)
+            .map((match) => match[1]);
+
+        if (monoid === 'count') {
+            return weights.length;
+        }
+
+        const normalized = weights.map((weight) => {
+            if (weight === '#sup') {
+                return '#sup';
+            }
+            if (weight === '#inf') {
+                return '#inf';
+            }
+            return parseFloat(weight) || 0;
+        });
+
+        if (monoid === 'sum') {
+            return normalized.reduce((total, value) => {
+                if (total === '#sup' || value === '#sup') {
+                    return '#sup';
+                }
+                if (total === '#inf' || value === '#inf') {
+                    return '#inf';
+                }
+                return total + value;
+            }, 0);
+        }
+
+        if (monoid === 'max') {
+            if (normalized.length === 0) {
+                return '#inf';
+            }
+            return normalized.reduce((left, right) => this.maxWithSentinels(left, right), '#inf');
+        }
+
+        if (monoid === 'min') {
+            if (normalized.length === 0) {
+                return '#sup';
+            }
+            return normalized.reduce((left, right) => this.minWithSentinels(left, right), '#sup');
+        }
+
+        return 0;
+    }
+
+    normalizeAggregateValue(value) {
+        if (value === '#sup' || value === '#inf') {
+            return value;
+        }
+        return parseFloat(value) || 0;
+    }
+
+    maxWithSentinels(left, right) {
+        if (left === '#sup' || right === '#sup') {
+            return '#sup';
+        }
+        if (left === '#inf') {
+            return right;
+        }
+        if (right === '#inf') {
+            return left;
+        }
+        return Math.max(left, right);
+    }
+
+    minWithSentinels(left, right) {
+        if (left === '#inf' || right === '#inf') {
+            return '#inf';
+        }
+        if (left === '#sup') {
+            return right;
+        }
+        if (right === '#sup') {
+            return left;
+        }
+        return Math.min(left, right);
+    }
+
+    getObjectiveTuple(config, aggregateValue) {
+        const monoid = config.monoid;
+        const optimization = config.optimization;
+
+        if (monoid === 'sum' || monoid === 'count') {
+            return [0, 0, optimization === 'minimize' ? aggregateValue : -aggregateValue];
+        }
+
+        if (monoid === 'max' && optimization === 'minimize') {
+            if (aggregateValue === '#sup') {
+                return [1, 0, 0];
+            }
+            if (aggregateValue === '#inf') {
+                return [0, 0, 0];
+            }
+            return [0, 0, aggregateValue];
+        }
+
+        if (monoid === 'max' && optimization === 'maximize') {
+            if (aggregateValue === '#inf') {
+                return [1, -1, 0];
+            }
+            if (aggregateValue === '#sup') {
+                return [0, 0, 0];
+            }
+            return [0, -1, -aggregateValue];
+        }
+
+        if (monoid === 'min' && optimization === 'minimize') {
+            if (aggregateValue === '#inf') {
+                return [1, 0, 0];
+            }
+            if (aggregateValue === '#sup') {
+                return [0, 0, 0];
+            }
+            return [0, 0, aggregateValue];
+        }
+
+        if (monoid === 'min' && optimization === 'maximize') {
+            if (aggregateValue === '#inf') {
+                return [1, 0, 0];
+            }
+            if (aggregateValue === '#sup') {
+                return [0, -1, 0];
+            }
+            return [0, -1, -aggregateValue];
+        }
+
+        return [0, 0, 0];
+    }
+
+    compareTuples(left, right) {
+        for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+            const leftValue = left[index] ?? 0;
+            const rightValue = right[index] ?? 0;
+            if (leftValue < rightValue) {
+                return -1;
+            }
+            if (leftValue > rightValue) {
+                return 1;
+            }
         }
         return 0;
     }
 
-    computeCostFromDiscarded(discardedAttacks) {
-        // Manually compute cost from discarded attacks based on selected monoid
-        if (discardedAttacks.length === 0) return 0;
+    displayValue(value) {
+        if (value === '#sup' || value === '#inf') {
+            return value;
+        }
+        if (value === Infinity) {
+            return '#sup';
+        }
+        if (value === -Infinity) {
+            return '#inf';
+        }
+        return value;
+    }
 
-        const monoid = this.monoidSelect.value;
-        const weights = [];
+    addRankingSummary(witnessesWithCosts, config) {
+        if (!Array.isArray(witnessesWithCosts) || witnessesWithCosts.length === 0) {
+            return;
+        }
 
-        // Extract weights from discarded attacks
-        discardedAttacks.forEach(attack => {
-            const match = attack.match(/discarded_attack\([^,]+,\s*[^,]+,\s*([^)]+)\)/);
-            if (match) {
-                const weight = match[1];
-                if (weight === '#sup') {
-                    weights.push(Infinity);
-                } else if (weight === '#inf') {
-                    weights.push(-Infinity);
-                } else {
-                    weights.push(parseFloat(weight) || 0);
-                }
+        const shouldShow = config.budgetMode === 'none' && config.budgetIntent === 'explore';
+        if (!shouldShow) {
+            return;
+        }
+
+        const grouped = new Map();
+        witnessesWithCosts.forEach((item) => {
+            const key = item.parsed.in.slice().sort().join(',') || '∅';
+            if (!grouped.has(key)) {
+                grouped.set(key, { extension: item.parsed.in.slice(), thresholds: [] });
             }
+            grouped.get(key).thresholds.push(item.parsed.budgetValue ?? item.aggregateValue);
         });
 
-        if (weights.length === 0) return 0;
+        const container = document.createElement('div');
+        container.className = 'info-message';
+        const lines = ['Threshold view (grouped by extension):'];
 
-        // Compute cost based on monoid
-        switch (monoid) {
-            case 'max':
-            case 'max_minimization':
-            case 'max_maximization':
-                return Math.max(...weights);
-            case 'sum':
-            case 'sum_minimization':
-            case 'sum_maximization':
-                return weights.reduce((a, b) => a + b, 0);
-            case 'min':
-            case 'min_minimization':
-            case 'min_maximization':
-                return Math.min(...weights);
-            case 'count':
-            case 'count_minimization':
-            case 'count_maximization':
-                return weights.length;
-            default:
-                return 0;
-        }
+        grouped.forEach((value) => {
+            const sortedThresholds = value.thresholds
+                .slice()
+                .sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
+            const threshold = config.budgetMode === 'lb'
+                ? sortedThresholds[sortedThresholds.length - 1]
+                : sortedThresholds[0];
+            const extensionLabel = value.extension.length > 0 ? `{${value.extension.join(', ')}}` : '∅';
+            lines.push(`${extensionLabel} -> β*: ${threshold}`);
+        });
+
+        container.innerHTML = `<pre style="margin: 0; white-space: pre-wrap;">${lines.join('\n')}</pre>`;
+        this.output.insertBefore(container, this.output.firstChild);
     }
 
     // ===================================
@@ -558,11 +1020,35 @@ export class OutputManager {
     clearOutput() {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
+
+        // Clear analysis panel section
+        const exportSection = document.getElementById('export-section');
+        if (exportSection) exportSection.innerHTML = '';
+
         // Show output empty state after clearing
         if (window.showOutputEmptyState) {
             window.showOutputEmptyState();
         }
         // Note: Don't clear isolatedNodes here - they're populated by updateGraph()
         // and needed for displayResults()
+    }
+
+    clearPreviousRun(onResetGraph) {
+        // Clear all information from previous WABA run
+
+        // Clear output and stats
+        this.clearOutput();
+
+        // Clear stored data
+        this.storedWitnesses = null;
+        this.storedMetricsData = null;
+        this.activeExtensionId = null;
+
+        // Reset graph highlighting
+        if (onResetGraph) {
+            onResetGraph();
+        }
+
+        this.log('🔄 Previous run cleared. Ready to load new framework.', 'info');
     }
 }
