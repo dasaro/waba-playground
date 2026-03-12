@@ -2,6 +2,8 @@
 
 `waba-playground` is a static frontend for the mature WABA CLI surface.
 
+Release/version notes live in [CHANGELOG.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/CHANGELOG.md), which also contains the GitHub Pages version-bump checklist.
+
 The page stays GitHub-Pages compatible:
 
 - no backend
@@ -15,7 +17,7 @@ The main UI exposes only the mature WABA contract:
 
 - semiring family: `godel`, `tropical`, `lukasiewicz`
 - polarity: `higher`, `lower`
-- default policy: `legacy`, `aba`, `neutral`
+- default policy: `neutral` only in the browser UI
 - monoid: `sum`, `max`, `count`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
@@ -36,8 +38,27 @@ Bounded presets intentionally match the mature WABA support policy:
 
 When `budget mode = none`, the UI distinguishes:
 
-- `plain / no-discard`: loads `constraint/no_discard.lp`
-- `enumerate feasible discard patterns`: omits the budget constraint but still computes aggregates and `budget_value/1`
+- default `disabled / list minimum β`: omits the budget constraint and reports the minimum `budget_value/1` threshold per extension
+- optional `plain / no-discard`: loads `constraint/no_discard.lp`
+
+The startup configuration is exploration-first:
+
+- neutral defaults
+- `budget mode = none`
+- enumerate mode
+- a topology demo as the initial loaded example
+
+## Analysis Panel
+
+The analysis panel is now decision-oriented rather than witness-oriented.
+
+- extensions are grouped by their accepted assumptions before analysis
+- grouped extensions are ranked by the active objective, or by minimum `β*` in exploration mode
+- assumptions receive a `Decision Score` via a Borda-style aggregation over those ranked extensions
+- robustness is reported as presence in the near-best set `S`
+- level advantage reports whether the best extension containing an assumption outranks the best extension without it
+
+This makes the panel more useful for “best course of action” or “best assumption” workflows, where the main question is which assumptions survive in the strongest ranked alternatives.
 
 `preferred` is exact. The browser does not use `asprin`; it performs the same plain-`clingo` multi-pass flow as the mature CLI surface:
 

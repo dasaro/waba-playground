@@ -31,7 +31,7 @@
     <h1>🔍 WABA Playground Version Check</h1>
 
     <h2>Expected Version:</h2>
-    <pre>v20260312-1 (March 12, 2026)</pre>
+    <pre>v20260312-4 (March 12, 2026)</pre>
 
     <h2>Module Status:</h2>
     <div id="status">Checking...</div>
@@ -56,20 +56,27 @@
     </ol>
 
     <script type="module">
-        const expectedVersion = '20260312-1';
+        const expectedVersion = '20260312-4';
 
         async function checkModules() {
             const status = document.getElementById('status');
             const checks = [];
 
             try {
-                // Check if clearActiveExtension exists in OutputManager
+                // Check if decision-analysis rendering exists in OutputManager / MetricsManager
                 const { OutputManager } = await import(`./modules/output-manager.js?v=${Date.now()}`);
                 const hasMethod = typeof OutputManager.prototype.clearActiveExtension === 'function';
+                const { MetricsManager } = await import(`./modules/metrics-manager.js?v=${Date.now()}`);
+                const hasDecisionMetrics = typeof MetricsManager.computeMetrics === 'function'
+                    && typeof MetricsManager.formatMetricsHTML === 'function';
 
                 checks.push(hasMethod
                     ? '<div class="check">✓ OutputManager.clearActiveExtension() exists</div>'
                     : '<div class="fail">✗ OutputManager.clearActiveExtension() missing</div>'
+                );
+                checks.push(hasDecisionMetrics
+                    ? '<div class="check">✓ Decision analysis metrics module loaded</div>'
+                    : '<div class="fail">✗ Decision analysis metrics module missing</div>'
                 );
 
                 // Check if colorToRGBA exists in GraphManager
