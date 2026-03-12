@@ -7,14 +7,17 @@ import { ParserUtils } from './parser-utils.js?v=20260101-1';
 import { UIManager } from './ui-manager.js?v=20260101-1';
 
 export class GraphManager {
-    constructor(graphCanvas, resetLayoutBtn) {
+    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null) {
         this.graphCanvas = graphCanvas;
         this.resetLayoutBtn = resetLayoutBtn;
+        this.fullscreenBtn = fullscreenBtn;
         this.network = null;
         this.networkData = { nodes: null, edges: null };
         this.isolatedNodes = [];
         this.currentFrameworkCode = '';
         this.currentGraphMode = 'standard';
+        this.graphPanel = null;
+        this.isFullscreen = false;
     }
 
     /**
@@ -130,6 +133,87 @@ export class GraphManager {
         // Trigger initial layout when graph data is loaded
         if (!this.network) return;
         this.runGraphLayout(false);
+    }
+
+    initFullscreen(graphPanel) {
+        this.graphPanel = graphPanel;
+
+        if (this.fullscreenBtn) {
+            this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        }
+
+        document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('mozfullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('MSFullscreenChange', () => this.handleFullscreenChange());
+    }
+
+    async toggleFullscreen() {
+        if (!this.graphPanel) {
+            console.error('Graph panel not initialized for fullscreen');
+            return;
+        }
+
+        try {
+            if (!this.isFullscreen) {
+                if (this.graphPanel.requestFullscreen) {
+                    await this.graphPanel.requestFullscreen();
+                } else if (this.graphPanel.webkitRequestFullscreen) {
+                    await this.graphPanel.webkitRequestFullscreen();
+                } else if (this.graphPanel.mozRequestFullScreen) {
+                    await this.graphPanel.mozRequestFullScreen();
+                } else if (this.graphPanel.msRequestFullscreen) {
+                    await this.graphPanel.msRequestFullscreen();
+                }
+            } else if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                await document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                await document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                await document.msExitFullscreen();
+            }
+        } catch (error) {
+            console.error('Fullscreen error:', error);
+        }
+    }
+
+    handleFullscreenChange() {
+        this.isFullscreen = !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement
+        );
+
+        if (this.fullscreenBtn) {
+            if (this.isFullscreen) {
+                this.fullscreenBtn.innerHTML = '⛶ Exit Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Exit fullscreen mode');
+            } else {
+                this.fullscreenBtn.innerHTML = '⛶ Fullscreen';
+                this.fullscreenBtn.setAttribute('aria-label', 'Toggle fullscreen mode');
+            }
+        }
+
+        if (!this.network) {
+            return;
+        }
+
+        setTimeout(() => {
+            try {
+                this.network.redraw();
+                this.network.fit({
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            } catch (error) {
+                console.warn('Graph resize after fullscreen change failed:', error);
+            }
+        }, 150);
     }
 
     resetGraphColors() {

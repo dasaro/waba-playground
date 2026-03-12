@@ -29,3 +29,10 @@ Version bump checklist for GitHub Pages releases:
   - level-advantage diagnostics
   - CSV export for summary and assumption ranking
 - updated the version-check page to verify the decision-analysis surface
+
+## 20260312-5
+
+- restored the missing panel component CSS, so the +/- collapse controls work again
+- restored `GraphManager.initFullscreen()` so app startup no longer aborts before panel handlers are attached
+- verified panel collapse/expand with a headless Chromium check against a local static server
+- updated the version-check page to cover the fullscreen hook regression
