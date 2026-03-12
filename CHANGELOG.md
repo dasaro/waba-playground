@@ -13,7 +13,9 @@ Version bump checklist for GitHub Pages releases:
 5. Update [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html) with the new expected version and current smoke checks.
 6. Add a new entry here summarizing user-visible changes.
 7. Run local smoke checks before commit and push.
-8. Push `main` and verify the live page with a no-cache reload.
+8. Push `main`.
+9. Push the current GitHub Pages source branch too. At the moment the live Pages workflow is building from `waba-weak-constraints`, so a `main` push alone is not sufficient for deployment.
+10. Verify the live page with a no-cache reload.
 
 ## 20260312-4
 

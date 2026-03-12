@@ -4,6 +4,8 @@
 
 Release/version notes live in [CHANGELOG.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/CHANGELOG.md), which also contains the GitHub Pages version-bump checklist.
 
+Important deployment note: the current live GitHub Pages workflow is building from `waba-weak-constraints`, so releases need the deploy commit on that branch as well as on `main`.
+
 The page stays GitHub-Pages compatible:
 
 - no backend

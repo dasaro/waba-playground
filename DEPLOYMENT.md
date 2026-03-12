@@ -51,6 +51,12 @@ git commit -m "Update module cache version to 20260101-2"
 git push origin main
 ```
 
+If GitHub Pages is currently sourcing the site from `waba-weak-constraints`, also push that branch:
+
+```bash
+git push origin waba-weak-constraints
+```
+
 ### 5. Wait for Deployment
 
 GitHub Pages typically takes 1-2 minutes to rebuild and deploy.
