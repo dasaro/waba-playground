@@ -245,7 +245,7 @@ export const examples = {
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'preferred',
             optMode: 'ignore',
             beta: 0

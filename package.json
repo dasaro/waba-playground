@@ -1,13 +1,28 @@
 {
   "name": "waba-playground",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-modules.js",
+    "sync:check": "node scripts/check-sync-schema.js",
+    "version:sync": "node scripts/sync-version-refs.js",
+    "version:bump": "node scripts/bump-version.js",
     "build": "npm run sync",
-    "dev": "npm run sync && npx http-server -p 8080"
+    "dev": "npm run sync && npm run version:sync && npx http-server -p 8080",
+    "lint": "eslint app.js core runtime features modules examples.js scripts tests --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:browser": "playwright test",
+    "test": "npm run test:unit && npm run test:browser",
+    "validate": "npm run sync:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:browser"
   },
   "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/node": "^22.13.10",
+    "@playwright/test": "^1.52.0",
+    "eslint": "^9.22.0",
+    "globals": "^15.15.0",
+    "typescript": "^5.8.2",
     "http-server": "^14.1.1"
   }
 }

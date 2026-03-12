@@ -46,31 +46,21 @@ export class UIManager {
     }
 
     updateFullscreenButton() {
-        console.log('🖥️ [updateFullscreenButton] CALLED');
-        console.log('Fullscreen element:', document.fullscreenElement ? 'YES' : 'NO');
-
         if (document.fullscreenElement) {
             this.fullscreenBtn.textContent = '✕ Exit Fullscreen';
-            console.log('Button text set to: Exit Fullscreen');
         } else {
             this.fullscreenBtn.textContent = '⛶ Fullscreen';
-            console.log('Button text set to: Fullscreen');
         }
 
         // Trigger callback to resize graph using requestAnimationFrame
         // This ensures the DOM has updated after fullscreen transition
         if (this.onFullscreenChange) {
-            console.log('✅ [updateFullscreenButton] Scheduling graph resize...');
             // Use requestAnimationFrame to let browser complete fullscreen layout
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    console.log('📞 [updateFullscreenButton] Executing vis.js resize...');
                     this.onFullscreenChange();
-                    console.log('✅ [updateFullscreenButton] Graph resized via vis.js redraw() and fit()');
                 });
             });
-        } else {
-            console.warn('⚠️ [updateFullscreenButton] No callback set! Graph will not be resized.');
         }
     }
 

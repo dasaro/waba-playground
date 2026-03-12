@@ -1,17 +1,20 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260101-1';
-import { MetricsManager } from './metrics-manager.js?v=20260312-5';
+import { PopupManager } from './popup-manager.js?v=20260312-7';
+import { MetricsManager } from './metrics-manager.js?v=20260312-7';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260312-7';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260312-7';
 
 export class OutputManager {
-    constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect, polaritySelect, getConfig = null) {
-        this.output = output;
-        this.stats = stats;
-        this.semiringSelect = semiringSelect;
-        this.monoidSelect = monoidSelect;
-        this.optimizeSelect = optimizeSelect;
-        this.polaritySelect = polaritySelect;
+    constructor(dom, getConfig = null) {
+        this.dom = dom;
+        this.output = dom.output;
+        this.stats = dom.stats;
+        this.semiringSelect = dom.semiringSelect;
+        this.monoidSelect = dom.monoidSelect;
+        this.optimizeSelect = dom.optimizeSelect;
+        this.polaritySelect = dom.polaritySelect;
         this.getConfig = getConfig;
         this.activeExtensionId = null;  // Track currently highlighted extension
     }
@@ -45,8 +48,8 @@ export class OutputManager {
                 const predicates = witness.Value || [];
                 const parsed = this.parseAnswerSet(predicates);
                 const aggregateValue = parsed.budgetValueRaw !== null
-                    ? this.normalizeAggregateValue(parsed.budgetValueRaw)
-                    : this.computeAggregateFromDiscarded(parsed.discarded, config.monoid);
+                    ? normalizeAggregateValue(parsed.budgetValueRaw)
+                    : computeAggregateFromDiscarded(parsed.discarded, config.monoid);
                 const cost = (config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
                     ? null
                     : this.extractDisplayCost(witness, aggregateValue, config.monoid);
@@ -56,12 +59,12 @@ export class OutputManager {
                     parsed,
                     cost,
                     aggregateValue,
-                    objectiveTuple: this.getObjectiveTuple(config, aggregateValue)
+                    objectiveTuple: getObjectiveTuple(config, aggregateValue)
                 };
             });
 
             witnessesWithCosts.sort((a, b) => {
-                const tupleComparison = this.compareTuples(a.objectiveTuple, b.objectiveTuple);
+                const tupleComparison = compareTuples(a.objectiveTuple, b.objectiveTuple);
                 if (tupleComparison !== 0) {
                     return tupleComparison;
                 }
@@ -106,7 +109,7 @@ export class OutputManager {
 
     addDownloadButton() {
         // Check if button already exists
-        if (document.getElementById('download-all-extensions-btn')) {
+        if (this.dom.document.getElementById('download-all-extensions-btn')) {
             return;
         }
 
@@ -118,8 +121,8 @@ export class OutputManager {
         button.addEventListener('click', () => this.downloadAllExtensions());
 
         // Get or create button group container
-        let buttonGroup = document.getElementById('analysis-button-group');
-        const exportSection = document.getElementById('export-section');
+        let buttonGroup = this.dom.document.getElementById('analysis-button-group');
+        const exportSection = this.dom.exportSection;
 
         if (!buttonGroup && exportSection) {
             buttonGroup = document.createElement('div');
@@ -204,7 +207,7 @@ export class OutputManager {
 
     addMetricsButton() {
         // Check if button already exists
-        if (document.getElementById('metrics-toggle-btn')) {
+        if (this.dom.document.getElementById('metrics-toggle-btn')) {
             return;
         }
 
@@ -216,8 +219,8 @@ export class OutputManager {
         button.addEventListener('click', () => this.toggleMetrics(button));
 
         // Add to the same button group as download button
-        let buttonGroup = document.getElementById('analysis-button-group');
-        const exportSection = document.getElementById('export-section');
+        let buttonGroup = this.dom.document.getElementById('analysis-button-group');
+        const exportSection = this.dom.exportSection;
 
         if (!buttonGroup && exportSection) {
             buttonGroup = document.createElement('div');
@@ -230,7 +233,7 @@ export class OutputManager {
             buttonGroup.appendChild(button);
         } else {
             // Fallback: insert after download button if button group not found
-            const downloadBtn = document.getElementById('download-all-extensions-btn');
+            const downloadBtn = this.dom.document.getElementById('download-all-extensions-btn');
             if (downloadBtn && downloadBtn.nextSibling) {
                 this.output.insertBefore(button, downloadBtn.nextSibling);
             } else {
@@ -240,7 +243,7 @@ export class OutputManager {
     }
 
     toggleMetrics(button) {
-        const metricsDiv = document.getElementById('metrics-display');
+        const metricsDiv = this.dom.document.getElementById('metrics-display');
 
         if (metricsDiv) {
             // Toggle visibility
@@ -282,15 +285,15 @@ export class OutputManager {
         this.storedMetricsData = metricsData;
 
         // Create metrics display div
-        let metricsDiv = document.getElementById('metrics-display');
+        let metricsDiv = this.dom.document.getElementById('metrics-display');
         if (!metricsDiv) {
             metricsDiv = document.createElement('div');
             metricsDiv.id = 'metrics-display';
             metricsDiv.style.display = 'block';
 
             // Insert into export section after button group
-            const exportSection = document.getElementById('export-section');
-            const buttonGroup = document.getElementById('analysis-button-group');
+            const exportSection = this.dom.exportSection;
+            const buttonGroup = this.dom.document.getElementById('analysis-button-group');
 
             if (exportSection && buttonGroup && buttonGroup.parentNode === exportSection) {
                 // Insert after button group
@@ -313,7 +316,7 @@ export class OutputManager {
         metricsDiv.innerHTML = MetricsManager.formatMetricsHTML(metricsData);
 
         // Wire up CSV export button
-        const csvButton = document.getElementById('export-metrics-csv-btn');
+        const csvButton = this.dom.document.getElementById('export-metrics-csv-btn');
         if (csvButton) {
             csvButton.addEventListener('click', () => {
                 MetricsManager.downloadMetricsCSV(this.storedMetricsData);
@@ -338,10 +341,16 @@ export class OutputManager {
         if (precomputedCost !== null) {
             cost = precomputedCost;
         } else {
-            cost = this.extractCost(witness);
-            if (witness.Optimization === undefined && parsed.discarded.length > 0) {
-                cost = this.computeCostFromDiscarded(parsed.discarded);
-            }
+            const config = this.lastRunConfig || (this.getConfig ? this.getConfig() : {
+                monoid: this.monoidSelect?.value || 'sum',
+                optimization: this.optimizeSelect?.value || 'minimize',
+                budgetMode: 'none',
+                budgetIntent: 'explore'
+            });
+            const aggregateValue = parsed.budgetValueRaw !== null
+                ? normalizeAggregateValue(parsed.budgetValueRaw)
+                : computeAggregateFromDiscarded(parsed.discarded, config.monoid);
+            cost = this.extractDisplayCost(witness, aggregateValue, config.monoid);
         }
         parsed.cost = cost;
 
@@ -377,7 +386,7 @@ export class OutputManager {
             parsed.successful.forEach(attack => {
                 const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
                 if (match) {
-                    const [, attackingElement, targetAssumption, weight] = match;
+                    const [, attackingElement, targetAssumption] = match;
 
                     // Find assumptions that support the attacking element (contrary)
                     const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
@@ -544,14 +553,14 @@ export class OutputManager {
             // Check if clicking the already-active extension (toggle off)
             if (this.activeExtensionId === answerNumber) {
                 // Turn off highlighting
-                document.querySelectorAll('.answer-header').forEach(h => {
+                this.dom.document.querySelectorAll('.answer-header').forEach(h => {
                     h.classList.remove('active-extension');
                 });
                 onResetGraph();
                 this.activeExtensionId = null;
             } else {
                 // Turn on highlighting for this extension (turn off others)
-                document.querySelectorAll('.answer-header').forEach(h => {
+                this.dom.document.querySelectorAll('.answer-header').forEach(h => {
                     h.classList.remove('active-extension');
                 });
 
@@ -570,22 +579,13 @@ export class OutputManager {
         // Add click handlers for derived atoms to show derivation chain
         this.output.appendChild(answerDiv);
 
-        // Attach event listeners to derived atom chips AFTER appending to DOM
-        console.log('🔗 [appendAnswerSet] Checking for derived atoms...');
-        console.log('Parsed derived atoms:', parsed.derived);
         if (parsed.derived && parsed.derived.length > 0) {
-            console.log(`📌 [appendAnswerSet] Attaching click handlers to ${parsed.derived.length} derived atoms`);
             parsed.derived.forEach(atom => {
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
                 const chipElement = answerDiv.querySelector(`#${atomId}`);
-                console.log(`  Looking for element with ID: ${atomId}`, chipElement ? 'FOUND' : 'NOT FOUND');
                 if (chipElement) {
                     chipElement.addEventListener('click', (e) => {
                         e.stopPropagation(); // Don't trigger extension highlight
-                        console.log('✅ [Derived atom click] Atom clicked:', atom);
-                        console.log('About to call showDerivationChain');
-                        console.log('PopupManager available?', typeof PopupManager);
-                        console.log('showDerivationChain exists?', typeof PopupManager.showDerivationChain);
                         try {
                             PopupManager.showDerivationChain(atom, parsed, chipElement);
                         } catch (error) {
@@ -593,13 +593,10 @@ export class OutputManager {
                             console.error('Error stack:', error.stack);
                         }
                     });
-                    console.log(`  ✅ Click handler attached to ${atomId}`);
                 } else {
                     console.error(`  ❌ Could not find element with ID ${atomId}`);
                 }
             });
-        } else {
-            console.log('ℹ️ [appendAnswerSet] No derived atoms to attach handlers to');
         }
 
         // Add click handler for textual result toggle
@@ -626,7 +623,7 @@ export class OutputManager {
         }
 
         // Find the rule that derives this element
-        for (const [ruleId, rule] of parsed.rules.entries()) {
+        for (const [, rule] of parsed.rules.entries()) {
             if (rule.head === element) {
                 // Found the rule, recursively find assumptions supporting the body
                 const assumptions = new Set();
@@ -643,128 +640,7 @@ export class OutputManager {
     }
 
     parseAnswerSet(predicates) {
-        const result = {
-            in: [],
-            out: [],
-            cost: null,
-            budgetValue: null,
-            budgetValueRaw: null,
-            discarded: [],
-            successful: [],
-            supported: [],
-            assumptions: new Set(),
-            contraries: new Map(),  // Map from assumption to contrary
-            weights: new Map(),  // Map from atom to weight
-            rules: new Map()  // Map from rule ID to {head, body[]}
-        };
-
-        // First pass: collect assumptions, contraries, and rules
-        predicates.forEach(pred => {
-            const assumptionMatch = pred.match(/^assumption\(([^)]+)\)$/);
-            if (assumptionMatch) {
-                result.assumptions.add(assumptionMatch[1]);
-                return;
-            }
-
-            const contraryMatch = pred.match(/^contrary\(([^,]+),\s*([^)]+)\)$/);
-            if (contraryMatch) {
-                result.contraries.set(contraryMatch[1], contraryMatch[2]);
-                return;
-            }
-
-            const headMatch = pred.match(/^head\(([^,]+),\s*([^)]+)\)$/);
-            if (headMatch) {
-                const ruleId = headMatch[1];
-                const head = headMatch[2];
-                if (!result.rules.has(ruleId)) {
-                    result.rules.set(ruleId, { head, body: [] });
-                } else {
-                    result.rules.get(ruleId).head = head;
-                }
-                return;
-            }
-
-            const bodyMatch = pred.match(/^body\(([^,]+),\s*([^)]+)\)$/);
-            if (bodyMatch) {
-                const ruleId = bodyMatch[1];
-                const bodyAtom = bodyMatch[2];
-                if (!result.rules.has(ruleId)) {
-                    result.rules.set(ruleId, { head: null, body: [bodyAtom] });
-                } else {
-                    result.rules.get(ruleId).body.push(bodyAtom);
-                }
-                return;
-            }
-        });
-
-        // Second pass: collect everything else
-        predicates.forEach(pred => {
-            // Extract in() predicates
-            const inMatch = pred.match(/^in\(([^)]+)\)$/);
-            if (inMatch) {
-                result.in.push(inMatch[1]);
-                return;
-            }
-
-            // Extract out() predicates
-            const outMatch = pred.match(/^out\(([^)]+)\)$/);
-            if (outMatch) {
-                result.out.push(outMatch[1]);
-                return;
-            }
-
-            // Extract supported atoms (legacy - no longer in output)
-            const supportedMatch = pred.match(/^supported\(([^)]+)\)$/);
-            if (supportedMatch) {
-                result.supported.push(supportedMatch[1]);
-                return;
-            }
-
-            // Extract supported_with_weight predicates
-            const weightMatch = pred.match(/^supported_with_weight\(([^,]+),\s*([^)]+)\)$/);
-            if (weightMatch) {
-                const atom = weightMatch[1];
-                const weight = weightMatch[2];
-                result.weights.set(atom, weight);
-                // Also add to supported array since supported/1 is no longer in output
-                if (!result.supported.includes(atom)) {
-                    result.supported.push(atom);
-                }
-                return;
-            }
-
-            // Extract discarded attacks
-            if (pred.startsWith('discarded_attack(')) {
-                result.discarded.push(pred);
-                return;
-            }
-
-            const budgetValueMatch = pred.match(/^budget_value\(([^)]+)\)$/);
-            if (budgetValueMatch) {
-                result.budgetValueRaw = budgetValueMatch[1];
-                result.budgetValue = budgetValueMatch[1];
-                return;
-            }
-
-            // Extract successful attacks
-            if (pred.startsWith('attacks_successfully_with_weight(')) {
-                result.successful.push(pred);
-                return;
-            }
-        });
-
-        // Compute derived atoms (supported but not assumptions)
-        result.derived = result.supported.filter(atom => !result.assumptions.has(atom));
-
-        // Compute active contraries (contrary atoms that are supported)
-        result.activeContraries = [];
-        result.contraries.forEach((contrary, assumption) => {
-            if (result.supported.includes(contrary)) {
-                result.activeContraries.push({ assumption, contrary });
-            }
-        });
-
-        return result;
+        return parseAnswerSet(predicates);
     }
 
     extractDisplayCost(witness, aggregateValue, monoid) {
@@ -772,176 +648,16 @@ export class OutputManager {
             const opt = witness.Optimization;
             if (Array.isArray(opt) && opt.length > 0) {
                 const lastValue = opt[opt.length - 1];
-                return this.displayValue(lastValue);
+                return displayValue(lastValue);
             }
-            return this.displayValue(opt);
+            return displayValue(opt);
         }
 
         if (aggregateValue !== null && aggregateValue !== undefined) {
-            return this.displayValue(aggregateValue);
+            return displayValue(aggregateValue);
         }
 
         return monoid === 'count' ? 0 : null;
-    }
-
-    computeAggregateFromDiscarded(discardedAttacks, monoid) {
-        const weights = discardedAttacks
-            .map((attack) => attack.match(/discarded_attack\([^,]+,\s*[^,]+,\s*([^)]+)\)/))
-            .filter(Boolean)
-            .map((match) => match[1]);
-
-        if (monoid === 'count') {
-            return weights.length;
-        }
-
-        const normalized = weights.map((weight) => {
-            if (weight === '#sup') {
-                return '#sup';
-            }
-            if (weight === '#inf') {
-                return '#inf';
-            }
-            return parseFloat(weight) || 0;
-        });
-
-        if (monoid === 'sum') {
-            return normalized.reduce((total, value) => {
-                if (total === '#sup' || value === '#sup') {
-                    return '#sup';
-                }
-                if (total === '#inf' || value === '#inf') {
-                    return '#inf';
-                }
-                return total + value;
-            }, 0);
-        }
-
-        if (monoid === 'max') {
-            if (normalized.length === 0) {
-                return '#inf';
-            }
-            return normalized.reduce((left, right) => this.maxWithSentinels(left, right), '#inf');
-        }
-
-        if (monoid === 'min') {
-            if (normalized.length === 0) {
-                return '#sup';
-            }
-            return normalized.reduce((left, right) => this.minWithSentinels(left, right), '#sup');
-        }
-
-        return 0;
-    }
-
-    normalizeAggregateValue(value) {
-        if (value === '#sup' || value === '#inf') {
-            return value;
-        }
-        return parseFloat(value) || 0;
-    }
-
-    maxWithSentinels(left, right) {
-        if (left === '#sup' || right === '#sup') {
-            return '#sup';
-        }
-        if (left === '#inf') {
-            return right;
-        }
-        if (right === '#inf') {
-            return left;
-        }
-        return Math.max(left, right);
-    }
-
-    minWithSentinels(left, right) {
-        if (left === '#inf' || right === '#inf') {
-            return '#inf';
-        }
-        if (left === '#sup') {
-            return right;
-        }
-        if (right === '#sup') {
-            return left;
-        }
-        return Math.min(left, right);
-    }
-
-    getObjectiveTuple(config, aggregateValue) {
-        const monoid = config.monoid;
-        const optimization = config.optimization;
-
-        if (monoid === 'sum' || monoid === 'count') {
-            return [0, 0, optimization === 'minimize' ? aggregateValue : -aggregateValue];
-        }
-
-        if (monoid === 'max' && optimization === 'minimize') {
-            if (aggregateValue === '#sup') {
-                return [1, 0, 0];
-            }
-            if (aggregateValue === '#inf') {
-                return [0, 0, 0];
-            }
-            return [0, 0, aggregateValue];
-        }
-
-        if (monoid === 'max' && optimization === 'maximize') {
-            if (aggregateValue === '#inf') {
-                return [1, -1, 0];
-            }
-            if (aggregateValue === '#sup') {
-                return [0, 0, 0];
-            }
-            return [0, -1, -aggregateValue];
-        }
-
-        if (monoid === 'min' && optimization === 'minimize') {
-            if (aggregateValue === '#inf') {
-                return [1, 0, 0];
-            }
-            if (aggregateValue === '#sup') {
-                return [0, 0, 0];
-            }
-            return [0, 0, aggregateValue];
-        }
-
-        if (monoid === 'min' && optimization === 'maximize') {
-            if (aggregateValue === '#inf') {
-                return [1, 0, 0];
-            }
-            if (aggregateValue === '#sup') {
-                return [0, -1, 0];
-            }
-            return [0, -1, -aggregateValue];
-        }
-
-        return [0, 0, 0];
-    }
-
-    compareTuples(left, right) {
-        for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-            const leftValue = left[index] ?? 0;
-            const rightValue = right[index] ?? 0;
-            if (leftValue < rightValue) {
-                return -1;
-            }
-            if (leftValue > rightValue) {
-                return 1;
-            }
-        }
-        return 0;
-    }
-
-    displayValue(value) {
-        if (value === '#sup' || value === '#inf') {
-            return value;
-        }
-        if (value === Infinity) {
-            return '#sup';
-        }
-        if (value === -Infinity) {
-            return '#inf';
-        }
-        return value;
     }
 
     addRankingSummary(witnessesWithCosts, config) {
@@ -963,14 +679,14 @@ export class OutputManager {
             grouped.get(key).thresholds.push(item.parsed.budgetValue ?? item.aggregateValue);
         });
 
-        const container = document.createElement('div');
+        const container = this.dom.document.createElement('div');
         container.className = 'info-message';
         const lines = ['Threshold view (grouped by extension):'];
 
         grouped.forEach((value) => {
-            const sortedThresholds = value.thresholds
-                .slice()
-                .sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
+            const sortedThresholds = value.thresholds.slice().sort((left, right) =>
+                String(left).localeCompare(String(right), undefined, { numeric: true })
+            );
             const threshold = config.budgetMode === 'lb'
                 ? sortedThresholds[sortedThresholds.length - 1]
                 : sortedThresholds[0];
@@ -986,7 +702,7 @@ export class OutputManager {
     // Logging
     // ===================================
     log(message, type = 'info') {
-        const msgDiv = document.createElement('div');
+        const msgDiv = this.dom.document.createElement('div');
         msgDiv.className = type === 'error' ? 'error-message' :
                           type === 'warning' ? 'info-message' :
                           type === 'success' ? 'info-message' :
@@ -1014,7 +730,7 @@ export class OutputManager {
     clearActiveExtension() {
         // Clear the active extension and remove visual highlights
         this.activeExtensionId = null;
-        document.querySelectorAll('.answer-header').forEach(h => {
+        this.dom.document.querySelectorAll('.answer-header').forEach(h => {
             h.classList.remove('active-extension');
         });
     }
@@ -1024,7 +740,7 @@ export class OutputManager {
         this.stats.innerHTML = '';
 
         // Clear analysis panel section
-        const exportSection = document.getElementById('export-section');
+        const exportSection = this.dom.exportSection;
         if (exportSection) exportSection.innerHTML = '';
 
         // Show output empty state after clearing

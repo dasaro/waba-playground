@@ -2,15 +2,19 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260101-1';
-import { ParserUtils } from './parser-utils.js?v=20260101-1';
-import { UIManager } from './ui-manager.js?v=20260101-1';
+import { GraphUtils } from './graph-utils.js?v=20260312-7';
+import { ParserUtils } from './parser-utils.js?v=20260312-7';
+import { UIManager } from './ui-manager.js?v=20260312-7';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260312-7';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260312-7';
 
 export class GraphManager {
-    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null) {
+    constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
         this.graphCanvas = graphCanvas;
         this.resetLayoutBtn = resetLayoutBtn;
         this.fullscreenBtn = fullscreenBtn;
+        this.isolatedBanner = options.isolatedBanner || null;
+        this.isolatedList = options.isolatedList || null;
         this.network = null;
         this.networkData = { nodes: null, edges: null };
         this.isolatedNodes = [];
@@ -18,37 +22,6 @@ export class GraphManager {
         this.currentGraphMode = 'standard';
         this.graphPanel = null;
         this.isFullscreen = false;
-    }
-
-    /**
-     * Convert color to RGBA with specified opacity
-     * @param {string|object} color - Color in hex, rgb, or vis.js object format
-     * @param {number} opacity - Opacity value (0-1)
-     * @returns {string} RGBA color string
-     */
-    colorToRGBA(color, opacity = 0.3) {
-        // Handle vis.js color object
-        if (typeof color === 'object' && color.color) {
-            color = color.color;
-        }
-
-        // If already RGBA, extract RGB and replace opacity
-        const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (rgbaMatch) {
-            return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${opacity})`;
-        }
-
-        // Handle hex color
-        if (color.startsWith('#')) {
-            const hex = color.replace('#', '');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-            return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-        }
-
-        // Fallback to gray if color format is unknown
-        return `rgba(156, 163, 175, ${opacity})`;
     }
 
     initGraph() {
@@ -68,7 +41,6 @@ export class GraphManager {
             });
         }
 
-        console.log('Graph initialized with vis.js');
     }
 
     setupEventListeners(onNodeClick, onEdgeClick) {
@@ -85,7 +57,6 @@ export class GraphManager {
                 // Clicked on a node
                 const nodeId = params.nodes[0];
                 const node = this.networkData.nodes.get(nodeId);
-                console.log('Node clicked:', node);
                 if (onNodeClick) {
                     onNodeClick(node, screenX, screenY);
                 }
@@ -93,7 +64,6 @@ export class GraphManager {
                 // Clicked on an edge
                 const edgeId = params.edges[0];
                 const edge = this.networkData.edges.get(edgeId);
-                console.log('Edge clicked:', edge);
                 if (onEdgeClick) {
                     onEdgeClick(edge, screenX, screenY);
                 }
@@ -125,7 +95,6 @@ export class GraphManager {
         // Stop physics after stabilization for semi-static behavior
         this.network.once('stabilizationIterationsDone', () => {
             this.network.setOptions({ physics: { enabled: false } });
-            console.log('Graph layout complete - physics disabled');
         });
     }
 
@@ -218,240 +187,52 @@ export class GraphManager {
 
     resetGraphColors() {
         if (!this.network) return;
-
-        console.log('🔄 [resetGraphColors] CALLED');
-        console.log('Resetting graph colors...');
-
-        // Reset all nodes to original colors
-        const nodes = this.networkData.nodes.get();
-        console.log(`📊 [resetGraphColors] Processing ${nodes.length} nodes`);
-        const nodeUpdates = nodes.map(node => ({
-            id: node.id,
-            color: node.originalColor || node.color,
-            borderWidth: node.originalBorderWidth || 2
-        }));
+        const { nodeUpdates, edgeUpdates } = buildResetUpdates(this.networkData);
         this.networkData.nodes.update(nodeUpdates);
-
-        // Reset all edges to original colors, widths, dashes, and smooth curves
-        const edges = this.networkData.edges.get();
-        console.log(`📊 [resetGraphColors] Processing ${edges.length} edges`);
-
-        // Debug: Check first edge's color properties
-        if (edges.length > 0) {
-            console.log('📋 [resetGraphColors] Sample edge (first):');
-            console.log('  - id:', edges[0].id);
-            console.log('  - originalColor:', edges[0].originalColor);
-            console.log('  - color:', edges[0].color);
-            console.log('  - originalWidth:', edges[0].originalWidth);
-            console.log('  - width:', edges[0].width);
-        }
-
-        const edgeUpdates = edges.map(edge => ({
-            id: edge.id,
-            color: edge.originalColor || edge.color,
-            width: edge.originalWidth || edge.width || 2,
-            dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
-        }));
         this.networkData.edges.update(edgeUpdates);
-
-        console.log(`✅ [resetGraphColors] Reset ${nodeUpdates.length} nodes and ${edgeUpdates.length} edges`);
     }
 
     highlightExtension(inAssumptions, discardedAttacks, successfulAttacks) {
-        console.log('🔍 [highlightExtension] CALLED');
-
         if (!this.network) {
-            console.error('❌ [highlightExtension] Network not initialized!');
             return;
         }
 
-        console.log('=== HIGHLIGHTING EXTENSION ===');
-        console.log('In assumptions:', inAssumptions);
-        console.log('Discarded attacks:', discardedAttacks);
-        console.log('Discarded attacks detail:', discardedAttacks.map(da => `${da.source} → ${da.via} (weight: ${da.weight})`));
-        console.log('Successful attacks:', successfulAttacks);
-
-        // Guard: If called with empty parameters, just reset instead of dimming everything
-        if (!inAssumptions || inAssumptions.length === 0) {
-            console.warn('⚠️ [highlightExtension] Called with empty inAssumptions - resetting instead of highlighting');
+        const updates = buildHighlightUpdates(this.networkData, inAssumptions, discardedAttacks, successfulAttacks);
+        if (updates.resetOnly) {
             this.resetGraphColors();
             return;
         }
-
-        // Note: Reset is now handled by caller (output-manager.js) to avoid double-reset
-
-        // Get all nodes and edges
-        const nodes = this.networkData.nodes.get();
-        const edges = this.networkData.edges.get();
-        console.log(`Total edges in graph: ${edges.length}`);
-
-        // Highlight nodes that match "in" assumptions
-        const nodeUpdates = [];
-        nodes.forEach(node => {
-            const nodeAssumptions = node.assumptions || [];
-            const hasIn = inAssumptions.some(a => nodeAssumptions.includes(a));
-
-            if (hasIn) {
-                nodeUpdates.push({
-                    id: node.id,
-                    color: {
-                        border: '#10b981',
-                        background: '#34d399',
-                        highlight: {
-                            border: '#059669',
-                            background: '#10b981'
-                        }
-                    },
-                    borderWidth: 4
-                });
-            }
-        });
-
-        if (nodeUpdates.length > 0) {
-            this.networkData.nodes.update(nodeUpdates);
-            console.log(`Highlighted ${nodeUpdates.length} nodes`);
+        if (updates.nodeUpdates.length > 0) {
+            this.networkData.nodes.update(updates.nodeUpdates);
         }
-
-        // Parse successful attacks from string format
-        const parsedSuccessful = successfulAttacks.map(attack => {
-            const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-            if (match) {
-                return {
-                    source: match[1],      // attacking element
-                    target: match[2],      // attacked assumption
-                    weight: match[3]
-                };
-            }
-            return null;
-        }).filter(a => a !== null);
-        console.log('Parsed successful attacks:', parsedSuccessful);
-
-        // Highlight edges - unified matching logic
-        const edgeUpdates = [];
-        let discardedCount = 0;
-        let successfulCount = 0;
-
-        edges.forEach(edge => {
-            console.log(`Checking edge ${edge.id}:`, {
-                from: edge.from,
-                to: edge.to,
-                attackingElement: edge.attackingElement,
-                contrary: edge.contrary,
-                attackedAssumption: edge.attackedAssumption,
-                targetAssumption: edge.targetAssumption
-            });
-
-            let matched = false;
-
-            // Check for discarded attack match
-            for (const da of discardedAttacks) {
-                // For assumption-level modes, the contrary property stores the attacking element
-                // For standard mode, attackingElement IS the attacking element
-                const contraryMatch = edge.contrary === da.source;
-                const attackingMatch = edge.attackingElement === da.source;
-                const fromMatch = contraryMatch || attackingMatch;
-                const toMatch = edge.to === da.via || edge.attackedAssumption === da.via || edge.targetAssumption === da.via;
-
-                console.log(`  Checking discarded ${da.source} → ${da.via}:`, {
-                    'edge.contrary': edge.contrary,
-                    'da.source': da.source,
-                    'contraryMatch': contraryMatch,
-                    'attackingMatch': attackingMatch,
-                    'fromMatch': fromMatch,
-                    'toMatch': toMatch
-                });
-
-                if (fromMatch && toMatch) {
-                    console.log(`  ✓ MATCHED DISCARDED: ${da.source} → ${da.via}`);
-                    edgeUpdates.push({
-                        id: edge.id,
-                        color: { color: '#9ca3af', highlight: '#6b7280' },
-                        width: 3,  // Slightly thicker for visibility
-                        dashes: [8, 4],  // Longer dashes for better visibility
-                        smooth: { enabled: false }  // Disable smooth curves for dashed lines to make pattern clearer
-                    });
-                    discardedCount++;
-                    matched = true;
-                    return; // Skip checking successful
-                }
-            }
-
-            // Check for successful attack match
-            for (const sa of parsedSuccessful) {
-                // For assumption-level modes, the contrary property stores the attacking element
-                // For standard mode, attackingElement IS the attacking element
-                const fromMatch = edge.contrary === sa.source || edge.attackingElement === sa.source;
-                const toMatch = edge.to === sa.target || edge.attackedAssumption === sa.target || edge.targetAssumption === sa.target;
-
-                console.log(`  Checking successful ${sa.source} → ${sa.target}: fromMatch=${fromMatch}, toMatch=${toMatch}`);
-
-                if (fromMatch && toMatch) {
-                    console.log(`  ✓ MATCHED SUCCESSFUL: ${sa.source} → ${sa.target}`);
-                    edgeUpdates.push({
-                        id: edge.id,
-                        color: { color: '#ef4444', highlight: '#dc2626' },
-                        width: 2,  // Thin line
-                        dashes: false  // Solid line for successful attacks
-                    });
-                    successfulCount++;
-                    matched = true;
-                    return;
-                }
-            }
-
-            if (!matched) {
-                console.log(`  ✗ No match for this edge`);
-                // Dim non-matched edges by reducing opacity of original color
-                const originalColor = edge.originalColor || edge.color || '#9ca3af';
-                const dimmedColor = this.colorToRGBA(originalColor, 0.2);
-                const dimmedHighlight = this.colorToRGBA(originalColor, 0.4);
-                edgeUpdates.push({
-                    id: edge.id,
-                    color: { color: dimmedColor, highlight: dimmedHighlight }
-                });
-            }
-        });
-
-        console.log(`Highlighting: ${discardedCount} discarded, ${successfulCount} successful attacks`);
-
-        if (edgeUpdates.length > 0) {
-            console.log('📊 [highlightExtension] Updating edges with new styles...');
-            this.networkData.edges.update(edgeUpdates);
-            console.log('✅ [highlightExtension] Edge updates applied successfully');
-        } else {
-            console.warn('⚠️ [highlightExtension] No edge updates to apply');
+        if (updates.edgeUpdates.length > 0) {
+            this.networkData.edges.update(updates.edgeUpdates);
         }
-
-        console.log('=== HIGHLIGHTING COMPLETE ===');
     }
 
     updateIsolatedAssumptionsOverlay() {
-        console.log('🏝️ [updateIsolatedAssumptionsOverlay] CALLED');
-        const banner = document.getElementById('isolated-assumptions-banner');
-        const list = document.getElementById('isolated-assumptions-list');
+        renderIsolatedAssumptionsOverlay(this.isolatedBanner, this.isolatedList, this.isolatedNodes);
+    }
 
-        console.log('Banner element:', banner ? 'found' : 'NOT FOUND');
-        console.log('List element:', list ? 'found' : 'NOT FOUND');
+    applyGraphData(visNodes, visEdges, isolatedNodes) {
+        this.networkData.nodes.clear();
+        this.networkData.edges.clear();
+        this.networkData.nodes.add(visNodes);
+        this.networkData.edges.add(visEdges);
+        this.isolatedNodes = isolatedNodes;
 
-        if (!banner || !list) {
-            console.error('❌ [updateIsolatedAssumptionsOverlay] Required elements not found in DOM');
-            return;
-        }
+        UIManager.hideGraphEmptyState();
+        this.updateIsolatedAssumptionsOverlay();
 
-        console.log('Isolated nodes count:', this.isolatedNodes.length);
-        console.log('Isolated nodes:', this.isolatedNodes);
-
-        if (this.isolatedNodes.length > 0) {
-            const labels = this.isolatedNodes.map(n => n.label || n.id);
-            console.log('📋 [updateIsolatedAssumptionsOverlay] Setting labels:', labels);
-            list.textContent = labels.join(', ');
-            banner.removeAttribute('hidden');
-            console.log('✅ [updateIsolatedAssumptionsOverlay] Banner shown with', labels.length, 'items');
-        } else {
-            banner.setAttribute('hidden', '');
-            console.log('✅ [updateIsolatedAssumptionsOverlay] Banner hidden (no isolated nodes)');
-        }
+        this.runGraphLayout(true);
+        setTimeout(() => {
+            this.network.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+        }, 600);
     }
 
     /**
@@ -460,16 +241,16 @@ export class GraphManager {
      * @param {string} graphMode - The graph visualization mode ('standard', 'assumption-direct', 'assumption-branching')
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
      */
-    async updateGraph(frameworkCode, graphMode, clingoManager) {
+    async updateGraph(frameworkCode, graphMode, clingoManager, config) {
         this.currentFrameworkCode = frameworkCode;
         this.currentGraphMode = graphMode;
 
         if (graphMode === 'assumption-direct') {
-            await this.updateGraphAssumptionLevelDirect(frameworkCode, clingoManager);
+            await this.updateGraphAssumptionLevelDirect(frameworkCode, clingoManager, config);
         } else if (graphMode === 'assumption-branching') {
-            await this.updateGraphAssumptionLevelBranching(frameworkCode, clingoManager);
+            await this.updateGraphAssumptionLevelBranching(frameworkCode, clingoManager, config);
         } else {
-            await this.updateGraphStandard(frameworkCode, clingoManager);
+            await this.updateGraphStandard(frameworkCode, clingoManager, config);
         }
     }
 
@@ -478,24 +259,20 @@ export class GraphManager {
      * @param {string} frameworkCode - The WABA framework code
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
      */
-    async updateGraphStandard(frameworkCode, clingoManager) {
+    async updateGraphStandard(frameworkCode, clingoManager, config) {
         if (!clingoManager.clingoReady) {
             return;
         }
 
         try {
-            const semiringFamily = document.getElementById('semiring-select').value;
-            const polarity = document.getElementById('polarity-select')?.value || 'higher';
-            const defaultPolicy = document.getElementById('default-policy-select')?.value || 'legacy';
-
             // Build set-based attack graph program
             const setProgram = `
 ${frameworkCode}
 ${clingoManager.getCoreModule()}
 ${clingoManager.getSemiringModule({
-                semiringKey: clingoManager.resolveSemiringModuleKey(semiringFamily, polarity)
+                semiringKey: config.semiringKey
             })}
-${clingoManager.getDefaultPolicyModule(defaultPolicy)}
+${clingoManager.getDefaultPolicyModule(config.defaultPolicy)}
 
 % Enumerate all sets of assumptions (power set)
 in(X) :- assumption(X), not out(X).
@@ -516,13 +293,13 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 `;
 
             // Run Clingo to enumerate all sets with their support and attacks
-            const result = await clingo.run(setProgram, 0);
+            const result = await clingoManager.runRaw(setProgram, 0, ['--opt-mode=ignore'], 30000);
 
             // Parse sets and their attacks
             const setsMap = new Map(); // Map from set_id -> {assumptions: [], supported: Set, attacks: []}
 
             if (result.Call && result.Call[0] && result.Call[0].Witnesses) {
-                result.Call[0].Witnesses.forEach((witness, idx) => {
+                result.Call[0].Witnesses.forEach((witness) => {
                     const predicates = witness.Value || [];
 
                     // Extract data for this set
@@ -723,36 +500,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 }
             });
 
-            // Store isolated nodes for display in UI
-            this.isolatedNodes = isolatedNodes;
-            if (isolatedNodes.length > 0) {
-                console.log(`Filtered ${isolatedNodes.length} isolated nodes:`, isolatedNodes.map(n => n.id));
-            }
-
-            // Update vis.js network
-            this.networkData.nodes.clear();
-            this.networkData.edges.clear();
-            this.networkData.nodes.add(visNodes);
-            this.networkData.edges.add(visEdges);
-
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
-
-            // Update banner with isolated assumptions
-            this.updateIsolatedAssumptionsOverlay();
-
-            // Run layout and then fit to view with animation
-            this.runGraphLayout(true); // Use quick mode for cleaner initial layout
-
-            // Auto-zoom and center after layout stabilizes
-            setTimeout(() => {
-                this.network.fit({
-                    animation: {
-                        duration: 500,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-            }, 600);
+            this.applyGraphData(visNodes, visEdges, isolatedNodes);
 
         } catch (error) {
             console.error('Error updating graph:', error);
@@ -764,254 +512,23 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
      * @param {string} frameworkCode - The WABA framework code
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
      */
-    async updateGraphAssumptionLevelDirect(frameworkCode, clingoManager) {
+    async updateGraphAssumptionLevelDirect(frameworkCode, clingoManager, _config) {
         if (!clingoManager.clingoReady) {
             return;
         }
 
         try {
-            // Parse framework to extract assumptions, contraries, rules, and weights
             const assumptions = ParserUtils.parseAssumptions(frameworkCode);
             const contraries = ParserUtils.parseContraries(frameworkCode);
             const rules = ParserUtils.parseRules(frameworkCode);
             const weights = ParserUtils.parseWeights(frameworkCode);
-
-            // Build vis.js nodes (one per assumption)
-            const visNodes = [];
-            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-
-            assumptions.forEach(assumption => {
-                const weight = weights[assumption] || '?';
-                const nodeColor = {
-                    border: '#5568d3',
-                    background: '#667eea',
-                    highlight: {
-                        border: '#4557c2',
-                        background: '#5568d3'
-                    }
-                };
-
-                visNodes.push({
-                    id: assumption,
-                    label: assumption,
-                    size: 25,  // Increased for labels inside nodes
-                    color: nodeColor,
-                    title: `Assumption: ${assumption}\nWeight: ${weight}`,
-                    font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b'
-                    },
-                    isAssumption: true
-                });
-            });
-
-            // Build vis.js edges (attacks between assumptions) - DIRECT MODE
-            const visEdges = [];
-            const factBasedAttacks = []; // Track attacks from facts (via ⊤)
-
-            console.log('=== FACT-BASED ATTACK DETECTION (DIRECT) ===');
-            console.log('Total contraries:', contraries.length);
-            console.log('Assumptions:', assumptions);
-            console.log('Rules:', rules);
-
-            // For each contrary relationship, determine how the contrary can be supported
-            contraries.forEach(({ assumption, contrary }) => {
-                // Find rules that derive this contrary
-                const derivingRules = rules.filter(rule => rule.head === contrary);
-
-                // Check if contrary has any rules with non-empty bodies (derived attacks)
-                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
-
-                if (!hasNonFactRules) {
-                    // Contrary is a fact (no rules, or only empty-body/fact rules)
-                    if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another (treat as derived)
-                        const weight = weights[contrary] || 1;
-                        const displayWeight = weight === '?' ? '' : weight;
-                        const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
-                        visEdges.push({
-                            id: `${contrary}-attacks-${assumption}`,
-                            from: contrary,
-                            to: assumption,
-                            label: displayWeight,
-                            width: 2,
-                            color: edgeColor,
-                            arrows: 'to',
-                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
-                            attackType: 'direct',
-                            attackingElement: contrary,
-                            targetAssumption: assumption,
-                            originalWidth: 2,
-                            originalColor: edgeColor,
-                            originalDashes: false
-                        });
-                    } else {
-                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
-                        const weight = weights[contrary] || 1;
-                        console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
-                        factBasedAttacks.push({ assumption, contrary, weight });
-                    }
-                } else {
-                    // Contrary is derived by rule(s)
-                    derivingRules.forEach(rule => {
-                        const attackers = rule.body;
-
-                        if (attackers.length === 1) {
-                            // Simple derived attack
-                            const attacker = attackers[0];
-                            if (assumptions.includes(attacker)) {
-                                const weight = weights[contrary] || 1;
-                                const displayWeight = weight === '?' ? '' : weight;
-                                const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
-                                visEdges.push({
-                                    id: `${attacker}-attacks-${assumption}-via-${contrary}`,
-                                    from: attacker,
-                                    to: assumption,
-                                    label: displayWeight,
-                                    width: 2,
-                                    color: edgeColor,
-                                    arrows: 'to',
-                                    dashes: false,
-                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
-                                    attackType: 'derived',
-                                    attackingElement: attacker,
-                                    targetAssumption: assumption,
-                                    contrary: contrary,
-                                    originalWidth: 2,
-                                    originalColor: edgeColor,
-                                    originalDashes: false
-                                });
-                            }
-                        } else if (attackers.length > 1) {
-                            // Joint attack - use individual dashed edges
-                            const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
-
-                            if (assumptionAttackers.length > 0) {
-                                const weight = weights[contrary] || 1;
-                                const displayWeight = weight === '?' ? '' : weight;
-
-                                assumptionAttackers.forEach(attacker => {
-                                    const otherAttackers = assumptionAttackers.filter(a => a !== attacker).join(', ');
-                                    const edgeColor = { color: '#10b981', highlight: '#059669' };
-                                    visEdges.push({
-                                        id: `${attacker}-joint-attacks-${assumption}-via-${contrary}`,
-                                        from: attacker,
-                                        to: assumption,
-                                        label: displayWeight,
-                                        width: 2,
-                                        color: edgeColor,
-                                        arrows: 'to',
-                                        dashes: false,
-                                        title: `${attacker} jointly attacks ${assumption}\nWith: ${otherAttackers}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
-                                        attackType: 'joint',
-                                        attackingElement: attacker,
-                                        targetAssumption: assumption,
-                                        contrary: contrary,
-                                        jointWith: assumptionAttackers,
-                                        originalWidth: 2,
-                                        originalColor: edgeColor,
-                                        originalDashes: false
-                                    });
-                                });
-                            }
-                        }
-                    });
-                }
-            });
-
-            console.log(`Total fact-based attacks detected: ${factBasedAttacks.length}`);
-            if (factBasedAttacks.length > 0) {
-                console.log('Fact-based attacks:', factBasedAttacks);
-            }
-
-            // Add ⊤ (top) node for fact-based attacks
-            if (factBasedAttacks.length > 0) {
-                const topNodeColor = {
-                    border: '#5568d3',
-                    background: '#667eea',
-                    highlight: {
-                        border: '#4557c2',
-                        background: '#5568d3'
-                    }
-                };
-                visNodes.push({
-                    id: '⊤',
-                    label: '⊤',
-                    size: 25,  // Increased for labels inside nodes
-                    shape: 'ellipse',
-                    color: topNodeColor,
-                    title: 'Top element (⊤): represents fact-based attacks',
-                    font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b',
-                        size: 26  // Increased for labels inside nodes
-                    },
-                    isTop: true
-                });
-
-                // Create edges from ⊤ to attacked assumptions
-                factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
-                    const displayWeight = weight === '?' ? '' : weight;
-                    const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
-                    visEdges.push({
-                        id: `top-attacks-${assumption}-via-${contrary}`,
-                        from: '⊤',
-                        to: assumption,
-                        label: displayWeight,
-                        width: 2,
-                        color: edgeColor,
-                        arrows: 'to',
-                        title: `Fact ${contrary} attacks ${assumption}\nType: Fact-based\nWeight: ${weight}`,
-                        attackType: 'fact',
-                        attackingElement: contrary,
-                        targetAssumption: assumption,
-                        originalWidth: 2,
-                        originalColor: edgeColor,
-                        originalDashes: false
-                    });
-                });
-            }
-
-            // Track isolated assumptions (no incoming or outgoing attacks)
-            const isolatedAssumptions = [];
-            const connectedAssumptions = new Set();
-            visEdges.forEach(edge => {
-                if (edge.from !== '⊤' && assumptions.includes(edge.from)) {
-                    connectedAssumptions.add(edge.from);
-                }
-                if (assumptions.includes(edge.to)) {
-                    connectedAssumptions.add(edge.to);
-                }
-            });
-            assumptions.forEach(assumption => {
-                if (!connectedAssumptions.has(assumption)) {
-                    isolatedAssumptions.push(assumption);
-                }
-            });
-
-            // Update vis.js network
-            this.networkData.nodes.clear();
-            this.networkData.edges.clear();
-            this.networkData.nodes.add(visNodes);
-            this.networkData.edges.add(visEdges);
-
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
-
-            // Store isolated assumptions for display
-            this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
-
-            // Run layout and fit to view
-            this.runGraphLayout(true);
-
-            setTimeout(() => {
-                this.network.fit({
-                    animation: {
-                        duration: 500,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-                // Update isolated assumptions banner after layout
-                this.updateIsolatedAssumptionsOverlay();
-            }, 600);
+            const { visNodes, visEdges, isolatedNodes } = buildDirectAssumptionGraph(
+                assumptions,
+                contraries,
+                rules,
+                weights
+            );
+            this.applyGraphData(visNodes, visEdges, isolatedNodes);
 
         } catch (error) {
             console.error('Error updating assumption-level graph (direct):', error);
@@ -1023,325 +540,23 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
      * @param {string} frameworkCode - The WABA framework code
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
      */
-    async updateGraphAssumptionLevelBranching(frameworkCode, clingoManager) {
+    async updateGraphAssumptionLevelBranching(frameworkCode, clingoManager, _config) {
         if (!clingoManager.clingoReady) {
             return;
         }
 
         try {
-            // Parse framework to extract assumptions, contraries, rules, and weights
             const assumptions = ParserUtils.parseAssumptions(frameworkCode);
             const contraries = ParserUtils.parseContraries(frameworkCode);
             const rules = ParserUtils.parseRules(frameworkCode);
             const weights = ParserUtils.parseWeights(frameworkCode);
-
-            // DEBUG: Log parsed data
-            console.log('=== ASSUMPTION-LEVEL GRAPH DEBUG (BRANCHING) ===');
-            console.log('Assumptions:', assumptions);
-            console.log('Contraries:', contraries);
-            console.log('Rules:', rules);
-            console.log('Weights:', weights);
-
-            // Build vis.js nodes (one per assumption)
-            const visNodes = [];
-            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-
-            assumptions.forEach(assumption => {
-                const weight = weights[assumption] || '?';
-                const nodeColor = {
-                    border: '#5568d3',
-                    background: '#667eea',
-                    highlight: {
-                        border: '#4557c2',
-                        background: '#5568d3'
-                    }
-                };
-
-                visNodes.push({
-                    id: assumption,
-                    label: assumption,
-                    size: 25,  // Increased for labels inside nodes
-                    color: nodeColor,
-                    title: `Assumption: ${assumption}\nWeight: ${weight}`,
-                    font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b'
-                    },
-                    isAssumption: true
-                });
-            });
-
-            // Build vis.js edges (attacks between assumptions)
-            const visEdges = [];
-            const jointAttackGroups = new Map(); // Track joint attacks: target -> [{attackers: [...], contrary: ...}]
-            const factBasedAttacks = []; // Track attacks from facts (via ⊤)
-
-            console.log('=== FACT-BASED ATTACK DETECTION (BRANCHING) ===');
-            console.log('Total contraries:', contraries.length);
-            console.log('Assumptions:', assumptions);
-            console.log('Rules:', rules);
-
-            // For each contrary relationship, determine how the contrary can be supported
-            contraries.forEach(({ assumption, contrary }) => {
-                // Find rules that derive this contrary
-                const derivingRules = rules.filter(rule => rule.head === contrary);
-
-                // Check if contrary has any rules with non-empty bodies (derived attacks)
-                const hasNonFactRules = derivingRules.some(rule => rule.body && rule.body.length > 0);
-
-                if (!hasNonFactRules) {
-                    // Contrary is a fact (no rules, or only empty-body/fact rules)
-                    if (assumptions.includes(contrary)) {
-                        // Direct attack from one assumption to another (treat as derived)
-                        const weight = weights[contrary] || 1;
-                        const displayWeight = weight === '?' ? '' : weight;
-                        const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
-                        visEdges.push({
-                            id: `${contrary}-attacks-${assumption}`,
-                            from: contrary,
-                            to: assumption,
-                            label: displayWeight,
-                            width: 2,
-                            color: edgeColor,
-                            arrows: 'to',
-                            title: `${contrary} attacks ${assumption}\nType: Direct\nWeight: ${weight}`,
-                            attackingElement: contrary,
-                            targetAssumption: assumption,
-                            originalWidth: 2,
-                            originalColor: edgeColor,
-                            originalDashes: false
-                        });
-                    } else {
-                        // Fact-based attack (contrary is not an assumption and only has fact rules) - attack via ⊤
-                        const weight = weights[contrary] || 1;
-                        console.log(`FACT-BASED ATTACK DETECTED: ${contrary} (weight=${weight}) attacks ${assumption}`);
-                        factBasedAttacks.push({ assumption, contrary, weight });
-                    }
-                } else {
-                    // Contrary is derived by rule(s)
-                    derivingRules.forEach(rule => {
-                        const attackers = rule.body; // Array of atoms in the rule body
-
-                        if (attackers.length === 1) {
-                            // Simple derived attack: single attacker
-                            const attacker = attackers[0];
-                            // Only show if attacker is an assumption
-                            if (assumptions.includes(attacker)) {
-                                const weight = weights[contrary] || 1;
-                                const displayWeight = weight === '?' ? '' : weight;
-                                const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
-                                visEdges.push({
-                                    id: `${attacker}-attacks-${assumption}-via-${contrary}`,
-                                    from: attacker,
-                                    to: assumption,
-                                    label: displayWeight,
-                                    width: 2,
-                                    color: edgeColor,
-                                    arrows: 'to',
-                                    dashes: false,
-                                    title: `${attacker} attacks ${assumption}\nType: Derived (${contrary})\nWeight: ${weight}`,
-                                    attackingElement: attacker,
-                                    targetAssumption: assumption,
-                                    contrary: contrary,
-                                    originalWidth: 2,
-                                    originalColor: edgeColor,
-                                    originalDashes: false
-                                });
-                            }
-                        } else if (attackers.length > 1) {
-                            // Joint attack: multiple attackers - use branching visualization
-                            console.log(`Joint attack detected: ${attackers.join(', ')} -> ${assumption} via ${contrary}`);
-                            const assumptionAttackers = attackers.filter(a => assumptions.includes(a));
-                            console.log(`  Assumption attackers: ${assumptionAttackers.join(', ')}`);
-
-                            if (assumptionAttackers.length > 0) {
-                                // Track this as a joint attack
-                                if (!jointAttackGroups.has(assumption)) {
-                                    jointAttackGroups.set(assumption, []);
-                                }
-                                jointAttackGroups.get(assumption).push({
-                                    attackers: assumptionAttackers,
-                                    contrary: contrary,
-                                    weight: weights[contrary] || 1,
-                                    ruleId: rule.id
-                                });
-
-                                // Create junction node for this joint attack
-                                const junctionId = `junction_${rule.id}`;
-                                const junctionNode = {
-                                    id: junctionId,
-                                    label: '',
-                                    size: 25,  // Increased for labels inside nodes
-                                    shape: 'diamond',
-                                    color: {
-                                        border: '#10b981',
-                                        background: '#10b981',
-                                        highlight: {
-                                            border: '#059669',
-                                            background: '#059669'
-                                        }
-                                    },
-                                    title: `Joint attack: ${assumptionAttackers.join(', ')} → ${assumption}\nvia ${contrary}`,
-                                    font: {
-                                        color: isDark ? '#f1f5f9' : '#1e293b',
-                                        size: 25  // Increased for labels inside nodes
-                                    },
-                                    isJunction: true,
-                                    attackers: assumptionAttackers,
-                                    target: assumption,
-                                    contrary: contrary
-                                };
-                                console.log(`  Creating junction node:`, junctionNode);
-                                visNodes.push(junctionNode);
-
-                                // Create edges from each attacker to junction (dashed green)
-                                assumptionAttackers.forEach(attacker => {
-                                    const edgeColor = { color: '#10b981', highlight: '#059669' };
-                                    const edge = {
-                                        id: `${attacker}-to-junction-${junctionId}`,
-                                        from: attacker,
-                                        to: junctionId,
-                                        width: 2,
-                                        color: edgeColor,
-                                        arrows: 'to',
-                                        dashes: false,
-                                        title: `${attacker} contributes to joint attack`,
-                                        attackingElement: attacker,
-                                        targetAssumption: assumption,
-                                        contrary: contrary,
-                                        originalWidth: 2,
-                                        originalColor: edgeColor,
-                                        originalDashes: false
-                                    };
-                                    console.log(`  Creating edge to junction:`, edge);
-                                    visEdges.push(edge);
-                                });
-
-                                // Create edge from junction to target (solid green, thicker)
-                                const weight = weights[contrary] || 1;
-                                const displayWeight = weight === '?' ? '' : weight;
-                                const edgeColor = { color: '#10b981', highlight: '#059669' };
-                                const finalEdge = {
-                                    id: `${junctionId}-attacks-${assumption}`,
-                                    from: junctionId,
-                                    to: assumption,
-                                    label: displayWeight,
-                                    width: 2,
-                                    color: edgeColor,
-                                    arrows: 'to',
-                                    dashes: false,
-                                    title: `Joint attack on ${assumption}\nType: Joint Attack (${contrary})\nWeight: ${weight}`,
-                                    targetAssumption: assumption,
-                                    contrary: contrary,
-                                    originalWidth: 2,
-                                    originalColor: edgeColor,
-                                    originalDashes: false
-                                };
-                                console.log(`  Creating junction-to-target edge:`, finalEdge);
-                                visEdges.push(finalEdge);
-                            }
-                        }
-                    });
-                }
-            });
-
-            console.log('Total edges created:', visEdges.length);
-            console.log('Edges:', visEdges.map(e => `${e.from} -> ${e.to} (${e.dashes ? 'DASHED' : 'SOLID'}, color: ${e.color.color})`));
-            console.log(`Total fact-based attacks detected: ${factBasedAttacks.length}`);
-            if (factBasedAttacks.length > 0) {
-                console.log('Fact-based attacks:', factBasedAttacks);
-            }
-            console.log('================================');
-
-            // Add ⊤ (top) node for fact-based attacks
-            if (factBasedAttacks.length > 0) {
-                const topNodeColor = {
-                    border: '#5568d3',
-                    background: '#667eea',
-                    highlight: {
-                        border: '#4557c2',
-                        background: '#5568d3'
-                    }
-                };
-                visNodes.push({
-                    id: '⊤',
-                    label: '⊤',
-                    size: 25,  // Increased for labels inside nodes
-                    shape: 'ellipse',
-                    color: topNodeColor,
-                    title: 'Top element (⊤): represents fact-based attacks',
-                    font: {
-                        color: isDark ? '#f1f5f9' : '#1e293b',
-                        size: 26  // Increased for labels inside nodes
-                    },
-                    isTop: true
-                });
-
-                // Create edges from ⊤ to attacked assumptions
-                factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
-                    const displayWeight = weight === '?' ? '' : weight;
-                    const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
-                    visEdges.push({
-                        id: `top-attacks-${assumption}-via-${contrary}`,
-                        from: '⊤',
-                        to: assumption,
-                        label: displayWeight,
-                        width: 2,
-                        color: edgeColor,
-                        arrows: 'to',
-                        title: `Fact ${contrary} attacks ${assumption}\nType: Fact-based\nWeight: ${weight}`,
-                        attackType: 'fact',
-                        attackingElement: contrary,
-                        targetAssumption: assumption,
-                        originalWidth: 2,
-                        originalColor: edgeColor,
-                        originalDashes: false
-                    });
-                });
-                console.log(`Added ⊤ node with ${factBasedAttacks.length} fact-based attacks`);
-            }
-
-            // Track isolated assumptions (no incoming or outgoing attacks)
-            const isolatedAssumptions = [];
-            const connectedAssumptions = new Set();
-            visEdges.forEach(edge => {
-                if (edge.from !== '⊤' && !edge.from.startsWith('junction_') && assumptions.includes(edge.from)) {
-                    connectedAssumptions.add(edge.from);
-                }
-                if (assumptions.includes(edge.to)) {
-                    connectedAssumptions.add(edge.to);
-                }
-            });
-            assumptions.forEach(assumption => {
-                if (!connectedAssumptions.has(assumption)) {
-                    isolatedAssumptions.push(assumption);
-                }
-            });
-
-            // Update vis.js network
-            this.networkData.nodes.clear();
-            this.networkData.edges.clear();
-            this.networkData.nodes.add(visNodes);
-            this.networkData.edges.add(visEdges);
-
-            // Hide graph empty state after successful render
-            UIManager.hideGraphEmptyState();
-
-            // Store isolated assumptions for display
-            this.isolatedNodes = isolatedAssumptions.map(a => ({ id: a, assumptions: [a] }));
-
-            // Run layout and fit to view
-            this.runGraphLayout(true);
-
-            setTimeout(() => {
-                this.network.fit({
-                    animation: {
-                        duration: 500,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-                // Update isolated assumptions banner after layout
-                this.updateIsolatedAssumptionsOverlay();
-            }, 600);
+            const { visNodes, visEdges, isolatedNodes } = buildBranchingAssumptionGraph(
+                assumptions,
+                contraries,
+                rules,
+                weights
+            );
+            this.applyGraphData(visNodes, visEdges, isolatedNodes);
 
         } catch (error) {
             console.error('Error updating assumption-level graph:', error);

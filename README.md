@@ -1,17 +1,21 @@
 # WABA Playground
 
-`waba-playground` is a static frontend for the mature WABA CLI surface.
+`waba-playground` is the static browser frontend for the mature WABA surface.
 
-Release/version notes live in [CHANGELOG.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/CHANGELOG.md), which also contains the GitHub Pages version-bump checklist.
+Core references:
 
-Important deployment note: the current live GitHub Pages workflow is building from `waba-weak-constraints`, so releases need the deploy commit on that branch as well as on `main`.
+- architecture: [ARCHITECTURE.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/ARCHITECTURE.md)
+- audit baseline: [AUDIT.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/AUDIT.md)
+- testing and release gate: [TESTING.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/TESTING.md)
+- deployment flow: [DEPLOYMENT.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/DEPLOYMENT.md)
+- release notes: [CHANGELOG.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/CHANGELOG.md)
 
-The page stays GitHub-Pages compatible:
+The app remains GitHub-Pages compatible:
 
 - no backend
 - no runtime fetch from the sibling `WABA/` repo
 - committed `waba-modules.js` bundle
-- `clingo-wasm` plus static HTML/CSS/JS only
+- static HTML/CSS/JS plus `clingo-wasm`
 
 ## Supported Surface
 
@@ -50,6 +54,8 @@ The startup configuration is exploration-first:
 - enumerate mode
 - a topology demo as the initial loaded example
 
+Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, uses `plain / no-discard` so it remains a faithful classical ABA comparison case.
+
 ## Analysis Panel
 
 The analysis panel is now decision-oriented rather than witness-oriented.
@@ -84,6 +90,8 @@ This makes the panel more useful for “best course of action” or “best assu
 
 Sync fails hard on missing files. There are no placeholder fallbacks.
 
+Schema validation for the generated bundle lives in [scripts/check-sync-schema.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/check-sync-schema.js).
+
 ## Curated Examples
 
 The primary example selector is built from the curated public WABA examples:
@@ -110,20 +118,25 @@ The page is path-agnostic. `modules/wasm-config.js` resolves `dist/` assets rela
 
 ## Validation
 
-The refactor was checked with:
+Run the full release gate with:
 
-- schema checks on the generated `waba-modules.js`
-- direct `clingo` smoke runs built from the browser program composer for:
-  - `stable` on `simple_attack`
-  - `grounded` on `simple_attack`
-  - bounded `stable` on `practical_deliberation`
-  - exact `preferred` orchestration on `aspforaba_journal_example`
+```bash
+npm run validate
+```
 
-The graph layer is still driven by the same runtime predicates:
+That covers:
+
+- generated-bundle schema checks
+- eslint
+- JSDoc type-checking
+- pure-module tests
+- headless browser smoke tests
+
+The graph/output layers still consume the same semantic runtime predicates:
 
 - `in/1`
 - `out/1`
 - `supported_with_weight/2`
 - `attacks_successfully_with_weight/3`
 - `discarded_attack/3`
-- `budget_value/1` when aggregation/ranking is relevant
+- `budget_value/1` when threshold ranking is relevant

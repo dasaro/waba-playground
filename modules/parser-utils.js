@@ -58,8 +58,6 @@ export class ParserUtils {
             return parts.map(p => `head(${p}).`).join(' ');
         });
 
-        console.log('Expanded code sample:', expandedCode.substring(0, 500));
-
         // Parse head/2 predicates: head(rule_id, head_atom).
         const headRegex = /head\(([^,]+),\s*([^)]+)\)\./g;
         let match;
