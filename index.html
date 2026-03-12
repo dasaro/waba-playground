@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260312-1">
+    <link rel="stylesheet" href="style.css?v=20260312-4">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,10 +18,10 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260104-1"></script>
+    <script src="modules/prism-waba.js?v=20260312-4"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260312-1"></script>
+    <script src="modules/wasm-config.js?v=20260312-2"></script>
     <script src="clingo.web.js?v=20260101-9"></script>
 </head>
 <body>
@@ -99,12 +99,10 @@
 
                         <div class="config-item">
                             <label for="default-policy-select">Default Policy</label>
-                            <select id="default-policy-select" class="select">
-                                <option value="legacy">Legacy</option>
-                                <option value="aba">ABA</option>
-                                <option value="neutral">Neutral</option>
+                            <select id="default-policy-select" class="select" disabled>
+                                <option value="neutral" selected>Neutral</option>
                             </select>
-                            <div class="config-note">Controls the injected value for unweighted assumptions.</div>
+                            <div class="config-note">Neutral is always active in the playground. Legacy is intentionally unavailable here.</div>
                         </div>
 
                         <div class="config-item">
@@ -128,8 +126,8 @@
                         <div class="config-item">
                             <label for="constraint-select">Budget Mode</label>
                             <select id="constraint-select" class="select">
-                                <option value="none">None</option>
-                                <option value="ub" selected>Upper bound</option>
+                                <option value="none" selected>None</option>
+                                <option value="ub">Upper bound</option>
                                 <option value="lb">Lower bound</option>
                             </select>
                         </div>
@@ -137,10 +135,10 @@
                         <div class="config-item">
                             <label for="budget-intent-select">When Budget Mode = None</label>
                             <select id="budget-intent-select" class="select">
+                                <option value="explore" selected>Disabled / list minimum β</option>
                                 <option value="no_discard">Plain / no-discard</option>
-                                <option value="explore">Enumerate feasible discard patterns</option>
                             </select>
-                            <div id="budget-intent-note" class="config-note">No-discard mirrors classical ABA. Explore removes the budget filter but still computes aggregates.</div>
+                            <div id="budget-intent-note" class="config-note">With beta disabled, the playground lists extensions together with their minimum β threshold.</div>
                         </div>
 
                         <div class="config-item">
@@ -165,7 +163,7 @@
 
                         <div class="config-item">
                             <label for="budget-input" id="budget-input-label">Budget Threshold (β)</label>
-                            <input type="number" id="budget-input" class="select" value="2" min="-1000" max="10000">
+                            <input type="number" id="budget-input" class="select" value="0" min="-1000" max="10000">
                         </div>
 
                         <div class="config-item" id="num-models-container">
@@ -921,6 +919,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260312-1"></script>
+    <script type="module" src="app.js?v=20260312-4"></script>
 </body>
 </html>

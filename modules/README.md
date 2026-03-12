@@ -15,6 +15,10 @@ This directory contains the browser runtime for the static WABA playground.
   - parses answer sets
   - displays extension summaries
   - groups threshold rankings when unbounded exploration is enabled
+- [metrics-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/metrics-manager.js)
+  - groups identical `in/1` sets into unique decision alternatives
+  - ranks assumptions with a Borda-style decision score over extension levels
+  - reports robustness and leverage for “best assumption / best course of action” analysis
 - [wasm-config.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/wasm-config.js)
   - resolves `dist/` assets relative to the current page URL
 

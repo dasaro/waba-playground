@@ -1,54 +1,37 @@
 /**
- * Prism.js WABA Language Definition
- * Syntax highlighting for WABA (Weighted Assumption-Based Argumentation) files
+ * Prism.js language definition for the WABA simple editor.
  */
-
-(function (Prism) {
+(function registerWabaLanguage(Prism) {
     Prism.languages.waba = {
-        // Comments (% ...)
-        'comment': {
+        comment: {
             pattern: /%.*$/m,
             greedy: true
         },
-
-        // Rules with arrow syntax (a <- b, c)
-        'rule': {
+        rule: {
             pattern: /([a-z_][a-z0-9_]*)\s*<-/i,
             inside: {
-                'atom': /^[a-z_][a-z0-9_]*/i,
-                'arrow': /<-/
+                atom: /^[a-z_][a-z0-9_]*/i,
+                arrow: /<-/
             }
         },
-
-        // Contraries (a, c_a)
-        'contrary': {
+        contrary: {
             pattern: /\([^)]+\)/,
             inside: {
-                'punctuation': /[(),]/,
-                'atom': /[a-z_][a-z0-9_]*/i
+                punctuation: /[(),]/,
+                atom: /[a-z_][a-z0-9_]*/i
             }
         },
-
-        // Weights (atom : number)
-        'weight': {
+        weight: {
             pattern: /([a-z_][a-z0-9_]*)\s*:\s*(\d+)/i,
             inside: {
-                'atom': /^[a-z_][a-z0-9_]*/i,
-                'punctuation': /:/,
-                'number': /\d+/
+                atom: /^[a-z_][a-z0-9_]*/i,
+                punctuation: /:/,
+                number: /\d+/
             }
         },
-
-        // Atoms (lowercase identifiers)
-        'atom': /\b[a-z_][a-z0-9_]*\b/i,
-
-        // Numbers
-        'number': /\b\d+\b/,
-
-        // Punctuation
-        'punctuation': /[(){},;:]/,
-
-        // Operators
-        'operator': /<-/
+        atom: /\b[a-z_][a-z0-9_]*\b/i,
+        number: /\b\d+\b/,
+        punctuation: /[(){},;:]/,
+        operator: /<-/
     };
 }(Prism));

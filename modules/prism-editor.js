@@ -1,8 +1,6 @@
 /**
- * PrismEditor - Contenteditable wrapper with syntax highlighting
- * Provides textarea-like API with Prism.js syntax highlighting
+ * PrismEditor - contenteditable wrapper with Prism highlighting.
  */
-
 export class PrismEditor {
     constructor(textarea, language = 'waba') {
         this.textarea = textarea;
@@ -11,12 +9,10 @@ export class PrismEditor {
         this.preElement = null;
         this.codeElement = null;
         this.inputListeners = [];
-
         this.init();
     }
 
     init() {
-        // Create container structure: <div><pre><code contenteditable></code></pre></div>
         this.container = document.createElement('div');
         this.container.className = 'prism-editor-container';
 
@@ -27,71 +23,46 @@ export class PrismEditor {
         this.codeElement.className = `language-${this.language} prism-editor-code`;
         this.codeElement.contentEditable = 'true';
         this.codeElement.spellcheck = false;
+        this.codeElement.textContent = this.textarea.value;
 
-        // Copy initial value from textarea
-        const initialValue = this.textarea.value;
-        this.codeElement.textContent = initialValue;
-
-        // Apply syntax highlighting
         Prism.highlightElement(this.codeElement);
 
-        // Build structure
         this.preElement.appendChild(this.codeElement);
         this.container.appendChild(this.preElement);
-
-        // Replace textarea with container
         this.textarea.style.display = 'none';
         this.textarea.parentNode.insertBefore(this.container, this.textarea.nextSibling);
 
-        // Set up event handlers
         this.setupEventHandlers();
     }
 
     setupEventHandlers() {
-        // Handle input events
-        this.codeElement.addEventListener('input', (e) => {
-            // Update syntax highlighting
+        this.codeElement.addEventListener('input', (event) => {
             this.highlight();
-
-            // Sync back to textarea
             this.syncToTextarea();
-
-            // Trigger input event listeners
-            this.inputListeners.forEach(listener => listener(e));
+            this.inputListeners.forEach((listener) => listener(event));
         });
 
-        // Handle paste - ensure plain text only
-        this.codeElement.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        this.codeElement.addEventListener('paste', (event) => {
+            event.preventDefault();
+            const text = (event.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, text);
         });
 
-        // Prevent formatting shortcuts
-        this.codeElement.addEventListener('keydown', (e) => {
-            // Tab key: insert 4 spaces
-            if (e.key === 'Tab') {
-                e.preventDefault();
+        this.codeElement.addEventListener('keydown', (event) => {
+            if (event.key === 'Tab') {
+                event.preventDefault();
                 document.execCommand('insertText', false, '    ');
             }
 
-            // Prevent Ctrl+B, Ctrl+I, etc.
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'i' || e.key === 'u')) {
-                e.preventDefault();
+            if ((event.ctrlKey || event.metaKey) && ['b', 'i', 'u'].includes(event.key)) {
+                event.preventDefault();
             }
         });
     }
 
     highlight() {
-        // Store cursor position
-        const selection = window.getSelection();
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         const cursorOffset = this.getCursorOffset();
-
-        // Re-highlight
         Prism.highlightElement(this.codeElement);
-
-        // Restore cursor position
         if (cursorOffset !== null) {
             this.setCursorOffset(cursorOffset);
         }
@@ -99,21 +70,26 @@ export class PrismEditor {
 
     getCursorOffset() {
         const selection = window.getSelection();
-        if (selection.rangeCount === 0) return null;
+        if (!selection || selection.rangeCount === 0) {
+            return null;
+        }
 
         const range = selection.getRangeAt(0);
         const preRange = range.cloneRange();
         preRange.selectNodeContents(this.codeElement);
         preRange.setEnd(range.endContainer, range.endOffset);
-
         return preRange.toString().length;
     }
 
     setCursorOffset(offset) {
         const selection = window.getSelection();
-        const range = document.createRange();
+        if (!selection) {
+            return;
+        }
 
+        const range = document.createRange();
         let currentOffset = 0;
+
         const walk = (node) => {
             if (node.nodeType === Node.TEXT_NODE) {
                 const length = node.textContent.length;
@@ -125,9 +101,12 @@ export class PrismEditor {
                     return true;
                 }
                 currentOffset += length;
-            } else {
-                for (let child of node.childNodes) {
-                    if (walk(child)) return true;
+                return false;
+            }
+
+            for (const child of node.childNodes) {
+                if (walk(child)) {
+                    return true;
                 }
             }
             return false;
@@ -140,7 +119,6 @@ export class PrismEditor {
         this.textarea.value = this.codeElement.textContent;
     }
 
-    // Textarea-like API
     get value() {
         return this.codeElement.textContent;
     }
@@ -154,9 +132,9 @@ export class PrismEditor {
     addEventListener(event, listener) {
         if (event === 'input') {
             this.inputListeners.push(listener);
-        } else {
-            this.codeElement.addEventListener(event, listener);
+            return;
         }
+        this.codeElement.addEventListener(event, listener);
     }
 
     focus() {
@@ -168,8 +146,9 @@ export class PrismEditor {
     }
 
     destroy() {
-        // Restore textarea
         this.textarea.style.display = '';
-        this.container.remove();
+        if (this.container) {
+            this.container.remove();
+        }
     }
 }

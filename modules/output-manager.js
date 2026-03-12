@@ -2,7 +2,7 @@
  * OutputManager - Handles result display, parsing, and logging
  */
 import { PopupManager } from './popup-manager.js?v=20260101-1';
-import { MetricsManager } from './metrics-manager.js?v=20260102-1';
+import { MetricsManager } from './metrics-manager.js?v=20260312-4';
 
 export class OutputManager {
     constructor(output, stats, semiringSelect, monoidSelect, optimizeSelect, polaritySelect, getConfig = null) {
@@ -28,8 +28,9 @@ export class OutputManager {
             monoid: this.monoidSelect?.value || 'sum',
             optimization: this.optimizeSelect?.value || 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'no_discard'
+            budgetIntent: 'explore'
         });
+        this.lastRunConfig = config;
 
         // Reset active extension when displaying new results
         this.activeExtensionId = null;
@@ -88,9 +89,7 @@ export class OutputManager {
 
             // Add download and metrics buttons if there are extensions
             this.addDownloadButton();
-            if (witnessesWithCosts.every((item) => typeof item.cost === 'number' && Number.isFinite(item.cost))) {
-                this.addMetricsButton();
-            }
+            this.addMetricsButton();
             this.addRankingSummary(witnessesWithCosts, config);
         }
 
@@ -213,7 +212,7 @@ export class OutputManager {
         const button = document.createElement('button');
         button.id = 'metrics-toggle-btn';
         button.className = 'analysis-action-btn';
-        button.innerHTML = '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+        button.innerHTML = '<span class="toggle-icon">▶</span> Show Decision Analysis';
         button.addEventListener('click', () => this.toggleMetrics(button));
 
         // Add to the same button group as download button
@@ -248,8 +247,8 @@ export class OutputManager {
             const isHidden = metricsDiv.style.display === 'none';
             metricsDiv.style.display = isHidden ? 'block' : 'none';
             button.innerHTML = isHidden
-                ? '<span class="toggle-icon">▼</span> Hide Metrics'
-                : '<span class="toggle-icon">▶</span> Show Entailment & Recommendation Metrics';
+                ? '<span class="toggle-icon">▼</span> Hide Decision Analysis'
+                : '<span class="toggle-icon">▶</span> Show Decision Analysis';
             button.classList.toggle('expanded', isHidden);
         } else {
             // Compute and display metrics for the first time
@@ -263,10 +262,13 @@ export class OutputManager {
         }
 
         // Build config for metrics computation
-        const config = {
-            polarity: this.polaritySelect && this.polaritySelect.value === 'higher' ? 'strength' : 'cost',
-            monoid: this.monoidSelect ? this.monoidSelect.value : 'max'
-        };
+        const config = this.lastRunConfig || (this.getConfig ? this.getConfig() : {
+            polarity: this.polaritySelect?.value || 'higher',
+            monoid: this.monoidSelect?.value || 'sum',
+            optimization: this.optimizeSelect?.value || 'minimize',
+            budgetMode: 'none',
+            budgetIntent: 'explore'
+        });
 
         // Compute metrics with config
         const metricsData = MetricsManager.computeMetrics(this.storedWitnesses, config);
@@ -319,7 +321,7 @@ export class OutputManager {
         }
 
         // Update button text
-        button.innerHTML = '<span class="toggle-icon">▼</span> Hide Metrics';
+        button.innerHTML = '<span class="toggle-icon">▼</span> Hide Decision Analysis';
         button.classList.add('expanded');
     }
 

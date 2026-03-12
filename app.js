@@ -1,22 +1,22 @@
 // WABA Playground - Modular Application (ES6)
-// VERSION: 20260312-1 - Update on every deployment (format: YYYYMMDD-N)
+// VERSION: 20260312-4 - Update on every deployment (format: YYYYMMDD-N)
 
 import { ThemeManager } from './modules/theme-manager.js?v=20260101-1';
 import { FontManager } from './modules/font-manager.js?v=20260101-1';
 import { UIManager } from './modules/ui-manager.js?v=20260101-8';
-import { PanelManager } from './modules/panel-manager.js?v=20260101-8';
+import { PanelManager } from './modules/panel-manager.js?v=20260312-4';
 import { FileManager } from './modules/file-manager.js?v=20260101-1';
 import { ParserUtils } from './modules/parser-utils.js?v=20260101-1';
 import { GraphUtils} from './modules/graph-utils.js?v=20260101-1';
-import { GraphManager } from './modules/graph-manager.js?v=20260312-1';
+import { GraphManager } from './modules/graph-manager.js?v=20260312-2';
 import { PopupManager } from './modules/popup-manager.js?v=20260101-1';
-import { ClingoManager } from './modules/clingo-manager.js?v=20260312-1';
-import { OutputManager } from './modules/output-manager.js?v=20260312-1';
+import { ClingoManager } from './modules/clingo-manager.js?v=20260312-2';
+import { OutputManager } from './modules/output-manager.js?v=20260312-4';
 import { ExportManager } from './modules/export-manager.js?v=20260101-1';
-import { MetricsManager } from './modules/metrics-manager.js?v=20260102-1';
-import { PrismEditor } from './modules/prism-editor.js?v=20260104-1';
-import { examples } from './examples.js?v=20260312-1';
-import { wabaModules } from './waba-modules.js?v=20260312-1';
+import { MetricsManager } from './modules/metrics-manager.js?v=20260312-4';
+import { PrismEditor } from './modules/prism-editor.js?v=20260312-4';
+import { examples } from './examples.js?v=20260312-4';
+import { wabaModules } from './waba-modules.js?v=20260312-2';
 
 class WABAPlayground {
     constructor() {
@@ -479,14 +479,14 @@ class WABAPlayground {
             this.exampleSelect.appendChild(group);
         });
 
-        this.exampleSelect.value = 'simple_attack';
+        this.exampleSelect.value = 'demo_complete';
     }
 
     getCurrentConfig() {
         return {
             semiringFamily: this.semiringSelect.value,
             polarity: this.polaritySelect.value,
-            defaultPolicy: this.defaultPolicySelect.value,
+            defaultPolicy: 'neutral',
             monoid: this.monoidSelect.value,
             optimization: this.optimizeSelect.value,
             budgetMode: this.constraintSelect.value,
@@ -503,11 +503,11 @@ class WABAPlayground {
     applyConfigToUI(config) {
         this.semiringSelect.value = config.semiringFamily;
         this.polaritySelect.value = config.polarity;
-        this.defaultPolicySelect.value = config.defaultPolicy;
+        this.defaultPolicySelect.value = 'neutral';
         this.monoidSelect.value = config.monoid;
         this.optimizeSelect.value = config.optimization;
         this.constraintSelect.value = config.budgetMode;
-        this.budgetIntentSelect.value = config.budgetIntent || 'no_discard';
+        this.budgetIntentSelect.value = config.budgetIntent || 'explore';
         this.semanticsSelect.value = config.semantics;
         this.optModeSelect.value = config.optMode;
         this.budgetInput.value = String(config.beta ?? 0);
@@ -563,7 +563,7 @@ class WABAPlayground {
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
         const budgetDescription = config.budgetMode === 'none'
-            ? (config.budgetIntent === 'no_discard' ? 'plain / no-discard' : 'unbounded exploration')
+            ? (config.budgetIntent === 'no_discard' ? 'plain / no-discard' : 'beta disabled; ranking by minimum β')
             : `${config.monoid} + ${config.budgetMode}`;
         const preferredCopy = config.semantics === 'preferred'
             ? ' Exact preferred uses browser-side subset-maximal filtering over complete candidates.'
@@ -575,7 +575,9 @@ class WABAPlayground {
         `;
 
         this.budgetIntentNote.textContent = config.budgetMode === 'none'
-            ? 'Plain / no-discard mirrors classical ABA. Explore removes the budget filter but still computes aggregates and thresholds.'
+            ? (config.budgetIntent === 'no_discard'
+                ? 'Plain / no-discard is still available, but the default browser mode keeps beta disabled and ranks extensions by their minimum threshold.'
+                : 'Beta is disabled. The playground enumerates surviving extensions and reports the minimum β needed for each one.')
             : 'Budget mode is active, so the aggregate must satisfy the selected upper/lower bound against β.';
     }
 
@@ -1288,11 +1290,13 @@ class WABAPlayground {
         const budgetInput = this.budgetInput;
         const budgetLabel = document.getElementById('budget-input-label');
 
-        if (constraint === 'none' && this.budgetIntentSelect.value === 'no_discard') {
+        if (constraint === 'none') {
             budgetInput.disabled = true;
             budgetInput.style.opacity = '0.5';
             if (budgetLabel) {
-                budgetLabel.textContent = 'Budget (β - inactive in plain / no-discard mode)';
+                budgetLabel.textContent = this.budgetIntentSelect.value === 'explore'
+                    ? 'Budget (β disabled; showing minimum β per extension)'
+                    : 'Budget (β disabled in plain / no-discard mode)';
                 budgetLabel.style.opacity = '0.5';
             }
         } else {
