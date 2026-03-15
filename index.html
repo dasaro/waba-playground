@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260312-10">
+    <link rel="stylesheet" href="style.css?v=20260315-1">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,11 +18,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260312-10"></script>
+    <script src="modules/prism-waba.js?v=20260315-1"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260312-10"></script>
-    <script src="clingo.web.js?v=20260312-10"></script>
+    <script src="modules/wasm-config.js?v=20260315-1"></script>
+    <script src="clingo.web.js?v=20260315-1"></script>
 </head>
 <body>
     <div class="container">
@@ -83,7 +83,6 @@
                             <label for="semiring-select">Semiring Family</label>
                             <select id="semiring-select" class="select">
                                 <option value="godel">Gödel</option>
-                                <option value="tropical">Tropical</option>
                                 <option value="lukasiewicz">Łukasiewicz</option>
                             </select>
                         </div>
@@ -99,10 +98,22 @@
 
                         <div class="config-item">
                             <label for="default-policy-select"><span class="label-with-help">Default Policy <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <select id="default-policy-select" class="select" disabled>
-                                <option value="neutral" selected>Neutral</option>
+                            <select id="default-policy-select" class="select">
+                                <option value="legacy" selected>Legacy</option>
+                                <option value="aba">ABA</option>
+                                <option value="neutral">Neutral</option>
                             </select>
-                            <div class="config-note">Neutral is always active in the playground. Legacy is intentionally unavailable here.</div>
+                            <div class="config-note">Matches the wrapper surface. ABA recovery forces this to neutral and disables bounded controls.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="aba-recovery-toggle"><span class="label-with-help">ABA Recovery <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label class="switch-toggle" for="aba-recovery-toggle">
+                                <input type="checkbox" id="aba-recovery-toggle" aria-label="Toggle ABA recovery">
+                                <span class="switch-slider" aria-hidden="true"></span>
+                                <span class="switch-copy">Neutral defaults + no-discard</span>
+                            </label>
+                            <div class="config-note">This mirrors <code>--aba-recovery</code>: neutral defaults, no-discard, and no objective/budget/β combination.</div>
                         </div>
 
                         <div class="config-item">
@@ -133,27 +144,6 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="budget-active-toggle"><span class="label-with-help">Use β Threshold <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <label class="switch-toggle" for="budget-active-toggle">
-                                <input type="checkbox" id="budget-active-toggle" aria-label="Activate or deactivate beta filtering">
-                                <span class="switch-slider" aria-hidden="true"></span>
-                                <span id="budget-active-copy" class="switch-copy">Disabled / list minimum β</span>
-                            </label>
-                            <div id="budget-active-note" class="config-note">
-                                Turn β on to enforce the current upper or lower bound. Turn it off to enumerate extensions and report the minimum β needed for each one.
-                            </div>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="budget-intent-select"><span class="label-with-help">When Budget Mode = None <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <select id="budget-intent-select" class="select">
-                                <option value="explore" selected>Disabled / list minimum β</option>
-                                <option value="no_discard">Plain / no-discard</option>
-                            </select>
-                            <div id="budget-intent-note" class="config-note">With beta disabled, the playground lists extensions together with their minimum β threshold.</div>
-                        </div>
-
-                        <div class="config-item">
                             <label for="semantics-select">Semantics</label>
                             <select id="semantics-select" class="select">
                                 <option value="cf">Conflict-free</option>
@@ -170,6 +160,14 @@
                             <select id="opt-mode-select" class="select">
                                 <option value="ignore" selected>Enumerate all surviving extensions</option>
                                 <option value="optN">Keep only optimal extensions</option>
+                            </select>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="show-select">Show</label>
+                            <select id="show-select" class="select">
+                                <option value="projection" selected>Projection</option>
+                                <option value="standard">Standard</option>
                             </select>
                         </div>
 
@@ -204,8 +202,22 @@
                         <div class="config-item">
                             <label><span class="label-with-help">Supported Surface <span class="help-dot" aria-hidden="true">?</span></span></label>
                             <div id="supported-surface-note" class="config-note">
-                                Canonical bounded presets are <code>sum/max/count + ub</code> and <code>min + lb</code>.
-                                Exact <code>preferred</code> is computed with a browser-side subset-maximal pass.
+                                Supported semiring surface: <code>godel</code>, <code>lukasiewicz</code>, <code>lukasiewicz_low</code>.
+                                Exact <code>grounded</code> and <code>preferred</code> are computed with browser-side post-filtering over complete candidates.
+                            </div>
+                        </div>
+
+                        <div class="config-item">
+                            <label><span class="label-with-help">Implementation Note <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <div id="implementation-note" class="config-note">
+                                Empty-body weighted rules remain a documented paper/code mismatch in the live implementation.
+                            </div>
+                        </div>
+
+                        <div class="config-item">
+                            <label><span class="label-with-help">Runtime Note <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <div id="budget-intent-note" class="config-note">
+                                Budget mode is disabled, so the playground matches the wrapper no-discard surface.
                             </div>
                         </div>
                     </div>
@@ -697,34 +709,23 @@ budget(100).</code></pre>
                                     <td><strong>Gödel</strong></td>
                                     <td>min</td>
                                     <td>max</td>
-                                    <td>Fuzzy logic, weakest-link reasoning</td>
+                                    <td>Higher-is-better fuzzy reasoning</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Tropical</strong></td>
-                                    <td>+</td>
-                                    <td>min</td>
-                                    <td>Additive costs, shortest paths</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Arctic</strong></td>
-                                    <td>+</td>
-                                    <td>max</td>
-                                    <td>Reward accumulation, longest paths</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Łukasiewicz</strong></td>
+                                    <td><strong>Łukasiewicz (higher)</strong></td>
                                     <td>bounded sum</td>
                                     <td>bounded sum</td>
-                                    <td>Bounded probability-like reasoning</td>
+                                    <td>Higher-is-better bounded fuzzy reasoning</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Bottleneck</strong></td>
-                                    <td>max</td>
-                                    <td>min</td>
-                                    <td>Worst-case optimization</td>
+                                    <td><strong>Łukasiewicz (lower)</strong></td>
+                                    <td>bounded sum</td>
+                                    <td>bounded sum</td>
+                                    <td>Lower-is-better bounded fuzzy reasoning</td>
                                 </tr>
                             </tbody>
                         </table>
+                        <p class="config-note">The live browser surface mirrors only the supported wrapper semirings: <code>godel</code>, <code>lukasiewicz</code>, and <code>lukasiewicz_low</code>.</p>
                     </div>
 
                     <div class="config-section">
@@ -948,6 +949,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260312-10"></script>
+    <script type="module" src="app.js?v=20260315-1"></script>
 </body>
 </html>

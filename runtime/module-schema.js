@@ -1,7 +1,22 @@
-import { wabaModules } from '../waba-modules.js?v=20260312-10';
+import { wabaModules } from '../waba-modules.js?v=20260315-1';
 
 const REQUIRED_SECTIONS = ['core', 'semiring', 'defaults', 'monoid', 'optimize', 'constraint', 'filter', 'semantics', 'examples', 'metadata'];
-const REQUIRED_METADATA_KEYS = ['generatedFrom', 'semiringFamilies', 'polarities', 'defaults', 'monoids', 'optimizations', 'budgetModes', 'supportedSemantics', 'canonicalSemiring', 'aliases', 'supportedBudgetPairs'];
+const REQUIRED_METADATA_KEYS = [
+    'generatedFrom',
+    'semiringFamilies',
+    'polarities',
+    'supportedSemiringKeys',
+    'defaults',
+    'monoids',
+    'optimizations',
+    'objectives',
+    'budgetModes',
+    'supportedSemantics',
+    'postFilteredSemantics',
+    'canonicalSemiring',
+    'aliases',
+    'supportedBudgetPairs'
+];
 
 export function validateWabaModulesShape(modules = wabaModules) {
     for (const key of REQUIRED_SECTIONS) {

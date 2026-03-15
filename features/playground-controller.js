@@ -1,18 +1,18 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260312-10';
-import { FontManager } from '../modules/font-manager.js?v=20260312-10';
-import { UIManager } from '../modules/ui-manager.js?v=20260312-10';
-import { PanelManager } from '../modules/panel-manager.js?v=20260312-10';
-import { FileManager } from '../modules/file-manager.js?v=20260312-10';
-import { GraphManager } from '../modules/graph-manager.js?v=20260312-10';
-import { PopupManager } from '../modules/popup-manager.js?v=20260312-10';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260312-10';
-import { OutputManager } from '../modules/output-manager.js?v=20260312-10';
-import { ExportManager } from '../modules/export-manager.js?v=20260312-10';
-import { MetricsManager } from '../modules/metrics-manager.js?v=20260312-10';
-import { ConfigController } from './config-controller.js?v=20260312-10';
-import { DocsController } from './docs-controller.js?v=20260312-10';
-import { EditorController } from './editor-controller.js?v=20260312-10';
-import { ExamplesController } from './examples-controller.js?v=20260312-10';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260315-1';
+import { FontManager } from '../modules/font-manager.js?v=20260315-1';
+import { UIManager } from '../modules/ui-manager.js?v=20260315-1';
+import { PanelManager } from '../modules/panel-manager.js?v=20260315-1';
+import { FileManager } from '../modules/file-manager.js?v=20260315-1';
+import { GraphManager } from '../modules/graph-manager.js?v=20260315-1';
+import { PopupManager } from '../modules/popup-manager.js?v=20260315-1';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260315-1';
+import { OutputManager } from '../modules/output-manager.js?v=20260315-1';
+import { ExportManager } from '../modules/export-manager.js?v=20260315-1';
+import { MetricsManager } from '../modules/metrics-manager.js?v=20260315-1';
+import { ConfigController } from './config-controller.js?v=20260315-1';
+import { DocsController } from './docs-controller.js?v=20260315-1';
+import { EditorController } from './editor-controller.js?v=20260315-1';
+import { ExamplesController } from './examples-controller.js?v=20260315-1';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -124,7 +124,7 @@ export class PlaygroundController {
 
         this.initDragAndDrop();
 
-        [this.dom.semiringSelect, this.dom.polaritySelect, this.dom.defaultPolicySelect].forEach((element) => {
+        [this.dom.semiringSelect, this.dom.polaritySelect, this.dom.defaultPolicySelect, this.dom.abaRecoveryToggle].forEach((element) => {
             element.addEventListener('change', () => {
                 this.configController.syncUi();
                 this.pendingGraphUpdate = this.regenerateGraph();
@@ -135,23 +135,12 @@ export class PlaygroundController {
             this.dom.monoidSelect,
             this.dom.optimizeSelect,
             this.dom.constraintSelect,
-            this.dom.budgetIntentSelect,
             this.dom.semanticsSelect,
-            this.dom.optModeSelect
+            this.dom.optModeSelect,
+            this.dom.showSelect
         ].forEach((element) => {
             element.addEventListener('change', () => this.configController.syncUi());
         });
-
-        if (this.dom.budgetActiveToggle) {
-            this.dom.budgetActiveToggle.addEventListener('change', () => {
-                if (this.dom.budgetActiveToggle.checked) {
-                    this.configController.activateBudgetBeta();
-                } else {
-                    this.configController.deactivateBudgetBeta();
-                }
-                this.configController.syncUi();
-            });
-        }
 
         this.dom.graphModeRadios.forEach((radio) => {
             radio.addEventListener('change', () => {

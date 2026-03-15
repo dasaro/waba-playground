@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260312-10';
-import { wabaModules } from '../waba-modules.js?v=20260312-10';
+import { examples } from '../examples.js?v=20260315-1';
+import { wabaModules } from '../waba-modules.js?v=20260315-1';
 
 export class ExamplesController {
     constructor(dom, configController, editorController, outputManager) {
@@ -10,7 +10,7 @@ export class ExamplesController {
     }
 
     populate() {
-        this.configController.populateExampleSelect(examples, 'demo_complete');
+        this.configController.populateExampleSelect(examples, 'simple_attack');
     }
 
     getExampleCode(exampleKey) {

@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260312-10';
-import { MetricsManager } from './metrics-manager.js?v=20260312-10';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260312-10';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260312-10';
+import { PopupManager } from './popup-manager.js?v=20260315-1';
+import { MetricsManager } from './metrics-manager.js?v=20260315-1';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260315-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260315-1';
 
 export class OutputManager {
     constructor(dom, getConfig = null) {
@@ -66,7 +66,7 @@ export class OutputManager {
             monoid: this.monoidSelect?.value || 'sum',
             optimization: this.optimizeSelect?.value || 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore'
+            budgetIntent: 'no_discard'
         });
         this.lastRunConfig = config;
 
@@ -138,7 +138,7 @@ export class OutputManager {
             Computed in ${elapsed}s |
             Semiring: ${this.semiringSelect.options[this.semiringSelect.selectedIndex].text} |
             Monoid: ${this.monoidSelect.options[this.monoidSelect.selectedIndex].text} |
-            Mode: ${config.budgetMode === 'none' ? config.budgetIntent : config.budgetMode}
+            Mode: ${config.budgetMode === 'none' ? 'no-discard' : config.budgetMode}
         `;
     }
 
@@ -305,7 +305,7 @@ export class OutputManager {
             monoid: this.monoidSelect?.value || 'sum',
             optimization: this.optimizeSelect?.value || 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore'
+            budgetIntent: 'no_discard'
         });
 
         // Compute metrics with config
@@ -380,7 +380,7 @@ export class OutputManager {
                 monoid: this.monoidSelect?.value || 'sum',
                 optimization: this.optimizeSelect?.value || 'minimize',
                 budgetMode: 'none',
-                budgetIntent: 'explore'
+                budgetIntent: 'no_discard'
             });
             const aggregateValue = parsed.budgetValueRaw !== null
                 ? normalizeAggregateValue(parsed.budgetValueRaw)

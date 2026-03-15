@@ -10,13 +10,14 @@ test('buildProgram includes bounded modules for upper-bound configurations', () 
     const config = normalizeConfig({
         semiringFamily: 'godel',
         polarity: 'higher',
+        defaultPolicy: 'legacy',
         monoid: 'sum',
         optimization: 'minimize',
         budgetMode: 'ub',
-        budgetIntent: 'bounded',
         semantics: 'stable',
         optMode: 'optN',
-        beta: 3
+        beta: 3,
+        filterType: 'projection'
     });
 
     const program = buildProgram(FRAMEWORK, config);
@@ -29,16 +30,33 @@ test('buildProgram uses no-discard profile when budget mode is none and intent i
     const config = normalizeConfig({
         semiringFamily: 'godel',
         polarity: 'higher',
+        defaultPolicy: 'legacy',
         monoid: 'sum',
         optimization: 'minimize',
         budgetMode: 'none',
-        budgetIntent: 'no_discard',
         semantics: 'stable',
         optMode: 'ignore',
-        beta: 0
+        beta: 0,
+        filterType: 'projection'
     });
 
     const program = buildProgram(FRAMEWORK, config);
     assert.match(program, /Plain \/ no-discard profile/);
     assert.doesNotMatch(program, /active_monoid\(sum\)/);
+});
+
+test('buildProgram routes grounded through complete candidates in the browser surface', () => {
+    const config = normalizeConfig({
+        semiringFamily: 'godel',
+        polarity: 'higher',
+        defaultPolicy: 'legacy',
+        budgetMode: 'none',
+        semantics: 'grounded',
+        optMode: 'ignore',
+        filterType: 'projection'
+    });
+
+    const program = buildProgram(FRAMEWORK, config);
+    assert.match(program, /:- out\(X\), assumption\(X\), defended\(X\)\./);
+    assert.doesNotMatch(program, /subset_minimal_filter/);
 });
