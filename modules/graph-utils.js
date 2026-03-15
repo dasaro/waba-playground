@@ -177,21 +177,21 @@ export class GraphUtils {
     static getLayoutOptions(quickMode = false) {
         return {
             enabled: true,
-            timestep: 0.6,  // Increased for faster convergence
+            timestep: 0.5,
             maxVelocity: quickMode ? 100 : 50,
-            minVelocity: 1.0,  // Increased to stop earlier
+            minVelocity: 0.75,
             solver: 'barnesHut',
             barnesHut: {
                 gravitationalConstant: -2000,  // Reduced for less movement
                 centralGravity: 0.1,  // Reduced central pull
                 springLength: 250,  // Longer springs for better spread
                 springConstant: 0.04,  // Weaker springs
-                damping: 0.85,  // Increased damping for faster stabilization
+                damping: 0.7,  // Higher damping to stop movement faster
                 avoidOverlap: 0.5  // Stronger overlap avoidance
             },
             stabilization: {
                 enabled: true,
-                iterations: quickMode ? 100 : 250,  // Reduced iterations for faster convergence
+                iterations: quickMode ? 150 : 500,  // More iterations for better layout
                 updateInterval: 25,
                 onlyDynamicEdges: false,
                 fit: true
@@ -232,21 +232,16 @@ export class GraphUtils {
                 },
                 font: {
                     size: 12,
-                    align: 'middle',  // Position labels on the edge
+                    align: 'middle',
                     ...GraphUtils.getEdgeFontColor()
                 },
                 smooth: {
                     enabled: true,
-                    type: 'continuous',  // Continuous curves work well with labels and handle parallel edges
-                    forceDirection: 'none',
+                    type: 'cubicBezier',
                     roundness: 0.5
                 },
                 shadow: {
                     enabled: false
-                },
-                labelHighlightBold: true,
-                chosen: {
-                    label: true
                 }
             },
             physics: {

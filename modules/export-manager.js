@@ -2,11 +2,11 @@
  * ExportManager - PNG/PDF export with watermarks
  */
 export class ExportManager {
-    constructor(graphManager, exportPngBtn, exportPdfBtn, app) {
+    constructor(graphManager, exportPngBtn, exportPdfBtn, themeManager) {
         this.graphManager = graphManager;
         this.exportPngBtn = exportPngBtn;
         this.exportPdfBtn = exportPdfBtn;
-        this.app = app;  // App instance for exportGraphInLightMode
+        this.themeManager = themeManager;
 
         this.attachEventListeners();
     }
@@ -80,16 +80,15 @@ export class ExportManager {
         }
 
         // Export in light mode
-        this.app.exportGraphInLightMode(() => {
+        this.themeManager.exportGraphInLightMode(() => {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
 
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             watermarkedCanvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `waba-graph-${timestamp}.png`;
+                link.download = 'waba-graph.png';
                 link.click();
                 URL.revokeObjectURL(url);
             });
@@ -103,7 +102,7 @@ export class ExportManager {
         }
 
         // Export in light mode
-        this.app.exportGraphInLightMode(() => {
+        this.themeManager.exportGraphInLightMode(() => {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
 

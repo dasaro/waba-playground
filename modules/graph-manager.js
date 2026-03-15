@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260312-10';
-import { ParserUtils } from './parser-utils.js?v=20260312-10';
-import { UIManager } from './ui-manager.js?v=20260312-10';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260312-10';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260312-10';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260312-10';
+import { GraphUtils } from './graph-utils.js?v=20260315-1';
+import { ParserUtils } from './parser-utils.js?v=20260315-1';
+import { UIManager } from './ui-manager.js?v=20260315-1';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260315-1';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260315-1';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260315-1';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {

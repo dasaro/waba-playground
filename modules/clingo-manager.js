@@ -1,16 +1,16 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260312-10';
+import { wabaModules } from '../waba-modules.js?v=20260315-1';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260312-10';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260312-10';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260312-10';
+} from '../runtime/config-service.js?v=20260315-1';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260315-1';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260315-1';
 
 export class ClingoManager {
     constructor(runBtn, introStatus = null) {
@@ -84,8 +84,8 @@ export class ClingoManager {
 
         try {
             const startTime = performance.now();
-            const result = normalized.semantics === 'preferred'
-                ? await this.runExactPreferred(framework, normalized, onLog)
+            const result = normalized.semantics === 'preferred' || normalized.semantics === 'grounded'
+                ? await this.runExactSubsetSemantics(framework, normalized, onLog)
                 : await this.runDirect(framework, normalized);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
             return { result, elapsed, effectiveConfig: normalized };
@@ -103,8 +103,10 @@ export class ClingoManager {
         return result;
     }
 
-    async runExactPreferred(framework, config, onLog) {
-        onLog('Enumerating complete candidates for exact preferred semantics…', 'info');
+    async runExactSubsetSemantics(framework, config, onLog) {
+        const filterKind = config.semantics === 'grounded' ? 'subset_minimal_filter' : 'subset_maximal_filter';
+        const targetLabel = config.semantics;
+        onLog(`Enumerating complete candidates for exact ${targetLabel} semantics…`, 'info');
 
         const candidateConfig = {
             ...config,
@@ -131,10 +133,11 @@ export class ClingoManager {
             return [`candidate(${modelId}).`, ...members].join('\n');
         }).join('\n');
 
-        onLog('Filtering subset-maximal complete candidates…', 'info');
+        const filterDescription = filterKind === 'subset_minimal_filter' ? 'subset-minimal' : 'subset-maximal';
+        onLog(`Filtering ${filterDescription} complete candidates…`, 'info');
         const subsetProgram = `
 ${candidateFacts}
-${wabaModules.semantics.subset_maximal_filter}
+${wabaModules.semantics[filterKind]}
 `;
         const subsetResult = await this.runSolver(subsetProgram, 0, ['--project'], config.timeout);
         this.assertSolverResult(subsetResult);
@@ -146,11 +149,11 @@ ${wabaModules.semantics.subset_maximal_filter}
                 .map((match) => Number.parseInt(match[1], 10))
         );
 
-        let preferredWitnesses = candidateWitnesses.filter((_, index) => keepIds.has(index + 1));
+        let filteredWitnesses = candidateWitnesses.filter((_, index) => keepIds.has(index + 1));
 
         if (shouldApplyNumericPostFilter(config)) {
-            onLog('Applying numeric objective after exact preferred filtering…', 'info');
-            const ranked = preferredWitnesses.map((witness) => {
+            onLog(`Applying numeric objective after exact ${targetLabel} filtering…`, 'info');
+            const ranked = filteredWitnesses.map((witness) => {
                 const aggregate = this.getWitnessAggregateValue(witness, config.monoid);
                 return {
                     witness: {
@@ -166,22 +169,22 @@ ${wabaModules.semantics.subset_maximal_filter}
                 }
                 return compareTuples(entry.tuple, best) < 0 ? entry.tuple : best;
             }, null);
-            preferredWitnesses = ranked
+            filteredWitnesses = ranked
                 .filter((entry) => compareTuples(entry.tuple, bestTuple) === 0)
                 .map((entry) => entry.witness);
         }
 
         if (config.numModels > 0) {
-            preferredWitnesses = preferredWitnesses.slice(0, config.numModels);
+            filteredWitnesses = filteredWitnesses.slice(0, config.numModels);
         }
 
         return {
-            Result: preferredWitnesses.length > 0
+            Result: filteredWitnesses.length > 0
                 ? (config.optMode === 'optN' ? 'OPTIMUM FOUND' : 'SATISFIABLE')
                 : 'UNSATISFIABLE',
             Call: [
                 {
-                    Witnesses: preferredWitnesses
+                    Witnesses: filteredWitnesses
                 }
             ]
         };

@@ -17,13 +17,8 @@ const MANIFEST = {
     },
     semiring: {
         godel: 'semiring/godel.lp',
-        godel_low: 'semiring/godel_low.lp',
-        tropical: 'semiring/tropical.lp',
-        tropical_high: 'semiring/tropical_high.lp',
         lukasiewicz: 'semiring/lukasiewicz.lp',
-        lukasiewicz_low: 'semiring/lukasiewicz_low.lp',
-        arctic: 'semiring/arctic.lp',
-        bottleneck_cost: 'semiring/bottleneck_cost.lp'
+        lukasiewicz_low: 'semiring/lukasiewicz_low.lp'
     },
     defaults: {
         legacy: 'defaults/legacy.lp',
@@ -54,35 +49,33 @@ const MANIFEST = {
         stable: 'semantics/stable.lp',
         admissible: 'semantics/admissible.lp',
         complete: 'semantics/complete.lp',
-        grounded: 'semantics/grounded.lp',
-        subset_maximal_filter: 'semantics/subset_maximal_filter.lp'
+        subset_maximal_filter: 'semantics/subset_maximal_filter.lp',
+        subset_minimal_filter: 'semantics/subset_minimal_filter.lp'
     },
     examples: {
         simple_attack: 'examples/aspartix_test/simple_attack.lp',
-        practical_deliberation: 'examples/practical_deliberation/practical_deliberation.lp',
-        scientific_theory: 'examples/scientific_theory/scientific_theory.lp',
         aspforaba_journal_example: 'examples/reference/aspforaba_journal_example.lp',
         strong_inference_bounded_lies: 'examples/reference/strong_inference_bounded_lies.lp',
-        expanding_universe_argumentation: 'examples/reference/expanding_universe_argumentation.lp'
+        expanding_universe_argumentation: 'examples/reference/expanding_universe_argumentation.lp',
+        sem_subset_closure_counterattack: 'tests/regression/cases/sem_subset_closure_counterattack.lp'
     },
     metadata: {
         generatedFrom: 'ABA-variants/WABA',
-        semiringFamilies: ['godel', 'tropical', 'lukasiewicz'],
+        semiringFamilies: ['godel', 'lukasiewicz'],
         polarities: ['higher', 'lower'],
+        supportedSemiringKeys: ['godel', 'lukasiewicz', 'lukasiewicz_low'],
         defaults: ['legacy', 'aba', 'neutral'],
         monoids: ['sum', 'max', 'count', 'min'],
         optimizations: ['minimize', 'maximize'],
+        objectives: ['sum-min', 'sum-max', 'max-min', 'max-max', 'count-min', 'count-max', 'min-min', 'min-max'],
         budgetModes: ['none', 'ub', 'lb'],
         supportedSemantics: ['cf', 'stable', 'admissible', 'complete', 'grounded', 'preferred'],
+        postFilteredSemantics: ['grounded', 'preferred'],
         canonicalSemiring: {
-            godel: { higher: 'godel', lower: 'godel_low' },
-            tropical: { higher: 'tropical_high', lower: 'tropical' },
+            godel: { higher: 'godel' },
             lukasiewicz: { higher: 'lukasiewicz', lower: 'lukasiewicz_low' }
         },
-        aliases: {
-            arctic: { family: 'tropical', polarity: 'higher', module: 'tropical_high' },
-            bottleneck_cost: { family: 'godel', polarity: 'lower', module: 'godel_low' }
-        },
+        aliases: {},
         supportedBudgetPairs: [
             { monoid: 'sum', budgetMode: 'ub' },
             { monoid: 'max', budgetMode: 'ub' },

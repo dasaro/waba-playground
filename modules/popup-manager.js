@@ -23,73 +23,34 @@ export class PopupManager {
         document.querySelectorAll('.derivation-tooltip').forEach(t => t.remove());
 
         const tooltip = document.createElement('div');
-        tooltip.className = 'derivation-tooltip node-popup graph-tooltip';
-
-        // Build content with badges and chips
-        let content = '<div class="popup-content">';
-
-        // Header
-        content += `<div class="popup-header">
-            <span class="node-type-badge">🔗 Derivation</span>
-            <strong>${atom}</strong>
-        </div>`;
+        tooltip.className = 'derivation-tooltip';
 
         // Find the rule that derives this atom
+        let derivationHTML = `<strong>Derivation of ${atom}:</strong><br>`;
         let found = false;
 
         for (const [, rule] of parsed.rules.entries()) {
             if (rule.head === atom) {
                 found = true;
+                const bodyStr = rule.body.length > 0 ? rule.body.join(', ') : '⊤';
+                derivationHTML += `${atom} ← ${bodyStr}<br>`;
 
-                // Rule section
-                content += '<div class="popup-section">';
-                content += '<div class="popup-label">📜 Rule:</div>';
-                content += '<div class="derivation-rule">';
-                content += `<span class="element-chip target">${atom}</span>`;
-                content += '<span class="arrow">←</span>';
-
-                if (rule.body.length > 0) {
-                    content += '<div class="popup-chips">';
-                    rule.body.forEach(bodyAtom => {
-                        content += `<span class="assumption-chip">${bodyAtom}</span>`;
-                    });
-                    content += '</div>';
-                } else {
-                    content += '<span class="element-chip source">⊤</span>';
-                }
-                content += '</div></div>';
-
-                // Weights section
-                const bodyWithWeights = rule.body.filter((bodyAtom) => {
+                // Show weights if available
+                rule.body.forEach(bodyAtom => {
                     const weight = parsed.weights.get(bodyAtom);
-                    return weight !== undefined;
+                    if (weight !== undefined) {
+                        derivationHTML += `&nbsp;&nbsp;• ${bodyAtom}: ${weight}<br>`;
+                    }
                 });
-
-                if (bodyWithWeights.length > 0) {
-                    content += '<div class="popup-section">';
-                    content += '<div class="popup-label">⚖️ Weights:</div>';
-                    content += '<div class="weight-list">';
-                    bodyWithWeights.forEach(bodyAtom => {
-                        const weight = parsed.weights.get(bodyAtom);
-                        content += `<div class="weight-item">
-                            <span class="assumption-chip">${bodyAtom}</span>
-                            <span class="weight-badge">${weight}</span>
-                        </div>`;
-                    });
-                    content += '</div></div>';
-                }
                 break;
             }
         }
 
         if (!found) {
-            content += '<div class="popup-section">';
-            content += '<div class="popup-info">ℹ️ No derivation found (fact or assumption)</div>';
-            content += '</div>';
+            derivationHTML += `<em>No derivation found (fact or assumption)</em>`;
         }
 
-        content += '</div>';
-        tooltip.innerHTML = content;
+        tooltip.innerHTML = derivationHTML;
         document.body.appendChild(tooltip);
 
         // Position near the element
@@ -179,45 +140,15 @@ export class PopupManager {
 
         let content = PopupManager.renderTooltipContent(node.title);
         if (!content) {
-            content = '<div class="popup-content">';
-
-            const nodeType = node.isAssumption ? '🔷 Assumption' :
-                node.isJunction ? '⋈ Junction' :
-                    node.isTop ? '⊤ Top' : '⚪ Node';
-            content += `<div class="popup-header">
-                <span class="node-type-badge">${nodeType}</span>
-                <strong>${node.label || node.id}</strong>
-            </div>`;
-
+            content = `<strong>Node: ${node.label || node.id}</strong><br>`;
             if (node.assumptions && node.assumptions.length > 0) {
-                content += '<div class="popup-section">';
-                content += '<div class="popup-label">📋 Contains:</div>';
-                content += '<div class="popup-chips">';
-                node.assumptions.forEach((assumption) => {
-                    content += `<span class="assumption-chip">${assumption}</span>`;
-                });
-                content += '</div></div>';
+                content += `<strong>Assumptions:</strong> ${node.assumptions.join(', ')}<br>`;
             }
-
-            if (node.isIn !== undefined || node.isSupported !== undefined) {
-                content += '<div class="popup-section">';
-                content += '<div class="popup-label">Status:</div>';
-                content += '<div class="status-badges">';
-                if (node.isIn === true) {
-                    content += '<span class="status-badge in">✓ In</span>';
-                } else if (node.isIn === false) {
-                    content += '<span class="status-badge out">✗ Out</span>';
-                }
-                if (node.isSupported) {
-                    content += '<span class="status-badge supported">⬆ Supported</span>';
-                }
-                content += '</div></div>';
+            if (node.size !== undefined) {
+                content += `<strong>Size:</strong> ${node.size}<br>`;
             }
-
-            content += '</div>';
-        } else {
-            content = `<div class="popup-content">${content}</div>`;
         }
+
         popup.innerHTML = content;
         document.body.appendChild(popup);
 
@@ -290,24 +221,14 @@ export class PopupManager {
         let content = PopupManager.renderTooltipContent(edge.title);
 
         if (!content) {
-            content = '<div class="popup-content">';
-
-            const attackType = edge.attackType === 'direct' ? '⚡ Direct' :
-                edge.attackType === 'derived' ? '🔗 Derived' :
-                    edge.attackType === 'joint' ? '🤝 Joint' :
-                        edge.attackType === 'fact' ? '📌 Fact-based' :
-                            '⚔️ Attack';
-            content += `<div class="popup-header">
-                <span class="attack-type-badge">${attackType}</span>
-                <strong>Attack Details</strong>
-            </div>`;
+            content = '<strong>Attack Details</strong><br>';
 
             let displayWeight = 'N/A';
             if (edge.weight !== undefined) {
                 if (edge.weight === Infinity || edge.weight === '#sup') {
-                    displayWeight = '#sup';
+                    displayWeight = '#sup (supremum)';
                 } else if (edge.weight === -Infinity || edge.weight === '#inf') {
-                    displayWeight = '#inf';
+                    displayWeight = '#inf (infimum)';
                 } else {
                     displayWeight = edge.weight;
                 }
@@ -315,48 +236,22 @@ export class PopupManager {
                 displayWeight = edge.label;
             }
 
-            content += '<div class="popup-section">';
-            content += '<div class="popup-label">⚖️ Weight:</div>';
-            content += `<span class="weight-badge">${displayWeight}</span>`;
-            content += '</div>';
+            content += `<strong>Weight:</strong> ${displayWeight}<br>`;
 
-            content += '<div class="popup-section">';
-            content += '<div class="popup-label">🎯 Attack:</div>';
             if (edge.attackingElement && edge.attackedAssumption) {
-                content += `<div class="attack-relationship">
-                    <span class="element-chip source">${edge.attackingElement}</span>
-                    <span class="arrow">→</span>
-                    <span class="element-chip target">${edge.attackedAssumption}</span>
-                </div>`;
+                content += `<strong>Attack:</strong> ${edge.attackingElement} → ${edge.attackedAssumption}<br>`;
             } else if (edge.contrary && edge.targetAssumption) {
-                content += `<div class="attack-relationship">
-                    <span class="element-chip source">${edge.contrary}</span>
-                    <span class="arrow">→</span>
-                    <span class="element-chip target">${edge.targetAssumption}</span>
-                </div>`;
+                content += `<strong>Attack:</strong> ${edge.contrary} → ${edge.targetAssumption}<br>`;
             } else if (edge.from && edge.to) {
-                content += `<div class="attack-relationship">
-                    <span class="element-chip source">${edge.from}</span>
-                    <span class="arrow">→</span>
-                    <span class="element-chip target">${edge.to}</span>
-                </div>`;
-            }
-            content += '</div>';
-
-            if (edge.jointWith && edge.jointWith.length > 1) {
-                content += '<div class="popup-section">';
-                content += '<div class="popup-label">🤝 Joint with:</div>';
-                content += '<div class="popup-chips">';
-                edge.jointWith.filter((participant) => participant !== edge.attackingElement).forEach((participant) => {
-                    content += `<span class="participant-chip">${participant}</span>`;
-                });
-                content += '</div></div>';
+                content += `<strong>From:</strong> ${edge.from}<br>`;
+                content += `<strong>To:</strong> ${edge.to}<br>`;
             }
 
-            content += '</div>';
-        } else {
-            content = `<div class="popup-content">${content}</div>`;
+            if (edge.derivedBy && edge.derivedBy.length > 0) {
+                content += `<strong>Derived by:</strong> ${edge.derivedBy.join(', ')}<br>`;
+            }
         }
+
         popup.innerHTML = content;
         document.body.appendChild(popup);
 

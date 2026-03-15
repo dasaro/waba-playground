@@ -11,6 +11,9 @@ async function waitForClingoReady(page) {
 
 test('collapsible panels toggle cleanly', async ({ page }) => {
     await waitForClingoReady(page);
+    await expect(page.locator('#semiring-select option')).toHaveText(['Gödel', 'Łukasiewicz']);
+    await expect(page.locator('#default-policy-select option')).toHaveText(['Legacy', 'ABA', 'Neutral']);
+    await expect(page.locator('#show-select option')).toHaveText(['Projection', 'Standard']);
     await expect(page.locator('#analysis-export-png-proxy')).toBeVisible();
     await expect(page.locator('[data-panel="analysis"]')).toContainText('Decision Analysis');
 
@@ -31,6 +34,7 @@ test('curated stable and grounded runs complete without startup errors', async (
     await waitForClingoReady(page);
 
     await page.selectOption('#example-select', 'simple_attack');
+    await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
 
@@ -48,8 +52,9 @@ test('exact preferred flow renders and graph modes switch without regressions', 
     await waitForClingoReady(page);
 
     await page.selectOption('#example-select', 'aspforaba_journal_example');
+    await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
-    await expect(page.locator('.answer-header')).toHaveCount(2, { timeout: 60000 });
+    await expect(page.locator('.answer-header')).toHaveCount(1, { timeout: 60000 });
 
     await page.locator('.mode-option', { hasText: 'Assumption-Direct' }).click();
     await page.locator('.mode-option', { hasText: 'Assumption-Branching' }).click();
@@ -62,6 +67,7 @@ test('analysis panel renders decision metrics and version check passes', async (
     await waitForClingoReady(page);
 
     await page.selectOption('#example-select', 'simple_attack');
+    await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('#metrics-toggle-btn')).toBeVisible({ timeout: 60000 });
     await page.click('#metrics-toggle-btn');
@@ -70,4 +76,32 @@ test('analysis panel renders decision metrics and version check passes', async (
     await page.goto('/version-check.html');
     await expect(page.locator('#status')).toContainText('Modules loaded successfully', { timeout: 60000 });
     await expect(page.locator('#status')).toContainText('GraphManager.initFullscreen() exists');
+});
+
+test('budgeted stable surface and subset-closure admissible smoke both run on the supported browser contract', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await waitForClingoReady(page);
+
+    await page.selectOption('#example-select', 'strong_inference_bounded_lies');
+    await page.selectOption('#semantics-select', 'stable');
+    await page.selectOption('#constraint-select', 'ub');
+    await page.selectOption('#monoid-select', 'count');
+    await page.selectOption('#optimize-select', 'minimize');
+    await page.fill('#budget-input', '2');
+    await page.selectOption('#opt-mode-select', 'optN');
+    await page.selectOption('#show-select', 'projection');
+    await page.click('#run-btn');
+    await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
+
+    await page.selectOption('#example-select', 'subset_closure_counterattack');
+    await page.selectOption('#semantics-select', 'admissible');
+    await page.selectOption('#constraint-select', 'none');
+    await page.selectOption('#opt-mode-select', 'ignore');
+    await page.click('#run-btn');
+    const renderedAnswers = await page.locator('.textual-result-content').allTextContents();
+    expect(renderedAnswers.some((text) => text.includes('in(a).') && text.includes('in(e).'))).toBeTruthy();
+
+    expect(pageErrors).toEqual([]);
 });

@@ -2,11 +2,12 @@
  * @typedef {Object} RunConfig
  * @property {string} semiringFamily
  * @property {'higher'|'lower'} polarity
- * @property {'neutral'} defaultPolicy
+ * @property {'legacy'|'aba'|'neutral'} defaultPolicy
+ * @property {boolean} abaRecovery
  * @property {'sum'|'max'|'count'|'min'} monoid
  * @property {'minimize'|'maximize'} optimization
  * @property {'none'|'ub'|'lb'} budgetMode
- * @property {'explore'|'no_discard'|'bounded'} budgetIntent
+ * @property {'no_discard'|'bounded'} budgetIntent
  * @property {'cf'|'stable'|'admissible'|'complete'|'grounded'|'preferred'} semantics
  * @property {'ignore'|'optN'} optMode
  * @property {number} beta
@@ -59,14 +60,12 @@
  * @property {HTMLButtonElement} clearBtn
  * @property {HTMLSelectElement} semiringSelect
  * @property {HTMLSelectElement} defaultPolicySelect
+ * @property {HTMLInputElement} abaRecoveryToggle
  * @property {HTMLSelectElement} monoidSelect
  * @property {HTMLSelectElement} semanticsSelect
  * @property {HTMLSelectElement} exampleSelect
  * @property {HTMLInputElement} budgetInput
  * @property {HTMLElement | null} budgetInputLabel
- * @property {HTMLInputElement | null} budgetActiveToggle
- * @property {HTMLElement | null} budgetActiveCopy
- * @property {HTMLElement | null} budgetActiveNote
  * @property {HTMLInputElement} numModelsInput
  * @property {HTMLElement | null} numModelsContainer
  * @property {HTMLInputElement} timeoutInput
@@ -74,10 +73,11 @@
  * @property {HTMLSelectElement} optModeSelect
  * @property {HTMLSelectElement} constraintSelect
  * @property {HTMLSelectElement} polaritySelect
- * @property {HTMLSelectElement} budgetIntentSelect
+ * @property {HTMLSelectElement} showSelect
  * @property {HTMLElement} semiringAliasNote
  * @property {HTMLElement} supportedSurfaceNote
  * @property {HTMLElement} budgetIntentNote
+ * @property {HTMLElement} implementationNote
  * @property {HTMLInputElement[]} graphModeRadios
  * @property {HTMLSelectElement} inputMode
  * @property {HTMLElement} simpleMode

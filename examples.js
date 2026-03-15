@@ -184,52 +184,14 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
-        }
-    },
-    practical_deliberation: {
-        label: 'Practical Deliberation',
-        description: 'Curated planning example with count-bounded stable reasoning.',
-        section: 'curated',
-        source: 'module',
-        moduleKey: 'practical_deliberation',
-        preset: {
-            semiringFamily: 'tropical',
-            polarity: 'higher',
-            defaultPolicy: 'neutral',
-            monoid: 'count',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'optN',
-            beta: 2
-        }
-    },
-    scientific_theory: {
-        label: 'Scientific Theory',
-        description: 'Curated scientific theory-selection example with tropical costs.',
-        section: 'curated',
-        source: 'module',
-        moduleKey: 'scientific_theory',
-        preset: {
-            semiringFamily: 'tropical',
-            polarity: 'lower',
-            defaultPolicy: 'neutral',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'optN',
-            beta: 275
         }
     },
     aspforaba_journal_example: {
@@ -241,7 +203,7 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
@@ -253,14 +215,14 @@ export const examples = {
     },
     strong_inference_bounded_lies: {
         label: 'Strong Inference',
-        description: 'Reference example extracted from bounded temporary rejection.',
+        description: 'Reference bounded-budget stable example on the supported count + ub surface.',
         section: 'curated',
         source: 'module',
         moduleKey: 'strong_inference_bounded_lies',
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'count',
             optimization: 'minimize',
             budgetMode: 'ub',
@@ -279,12 +241,31 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'max',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
+            optMode: 'ignore',
+            beta: 0
+        }
+    },
+    subset_closure_counterattack: {
+        label: 'Subset-Closure Defense',
+        description: 'Final semantics regression case for admissible defense against a multi-seed attacker closure.',
+        section: 'curated',
+        source: 'module',
+        moduleKey: 'sem_subset_closure_counterattack',
+        preset: {
+            semiringFamily: 'godel',
+            polarity: 'higher',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'none',
+            budgetIntent: 'no_discard',
+            semantics: 'admissible',
             optMode: 'ignore',
             beta: 0
         }
@@ -298,11 +279,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
@@ -317,11 +298,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
@@ -336,11 +317,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
@@ -355,11 +336,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
@@ -374,11 +355,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0
@@ -393,11 +374,11 @@ export const examples = {
         preset: {
             semiringFamily: 'godel',
             polarity: 'higher',
-            defaultPolicy: 'neutral',
+            defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
-            budgetIntent: 'explore',
+            budgetIntent: 'no_discard',
             semantics: 'stable',
             optMode: 'ignore',
             beta: 0

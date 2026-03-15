@@ -21,19 +21,23 @@ The app remains GitHub-Pages compatible:
 
 The main UI exposes only the mature WABA contract:
 
-- semiring family: `godel`, `tropical`, `lukasiewicz`
+- semiring family: `godel`, `lukasiewicz`
 - polarity: `higher`, `lower`
-- default policy: `neutral` only in the browser UI
+- effective semiring keys: `godel`, `lukasiewicz`, `lukasiewicz_low`
+- default policy: `legacy`, `aba`, `neutral`
+- ABA recovery: `neutral` defaults + `no_discard`
 - monoid: `sum`, `max`, `count`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
 - semantics: `cf`, `stable`, `admissible`, `complete`, `grounded`, `preferred`
+- output filter: `projection`, `standard`
 - opt mode: `ignore`, `optN`
 
-Alias labels remain visible in the UI:
+Family/polarity stays in the browser UI only as a thin selector over the supported direct semiring keys:
 
-- `tropical + higher` is labeled `Arctic`
-- `godel + lower` is labeled `Bottleneck-Cost`
+- `godel + higher` -> `godel`
+- `lukasiewicz + higher` -> `lukasiewicz`
+- `lukasiewicz + lower` -> `lukasiewicz_low`
 
 Bounded presets intentionally match the mature WABA support policy:
 
@@ -42,19 +46,16 @@ Bounded presets intentionally match the mature WABA support policy:
 - `count + ub`
 - `min + lb`
 
-When `budget mode = none`, the UI distinguishes:
+When `budget mode = none`, the browser matches the wrapper's `no_discard` surface. There is no separate “minimum β exploration” mode anymore.
 
-- default `disabled / list minimum β`: omits the budget constraint and reports the minimum `budget_value/1` threshold per extension
-- optional `plain / no-discard`: loads `constraint/no_discard.lp`
+The startup configuration is wrapper-aligned:
 
-The startup configuration is exploration-first:
-
-- neutral defaults
+- legacy defaults
 - `budget mode = none`
 - enumerate mode
-- a topology demo as the initial loaded example
+- `simple_attack` as the initial loaded example
 
-Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, uses `plain / no-discard` so it remains a faithful classical ABA comparison case.
+Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, keeps `budget mode = none` so it remains a faithful classical ABA comparison case.
 
 ## Analysis Panel
 
@@ -68,24 +69,24 @@ The analysis panel is now decision-oriented rather than witness-oriented.
 
 This makes the panel more useful for “best course of action” or “best assumption” workflows, where the main question is which assumptions survive in the strongest ranked alternatives.
 
-`preferred` is exact. The browser does not use `asprin`; it performs the same plain-`clingo` multi-pass flow as the mature CLI surface:
+`grounded` and `preferred` are exact. The browser does not use `asprin`; it performs the same plain-`clingo` multi-pass flow as the mature CLI surface:
 
 1. enumerate feasible `complete` candidates
-2. filter them with `semantics/subset_maximal_filter.lp`
-3. if `optN` is requested, apply numeric objective ranking after subset-maximal filtering
+2. filter them with `semantics/subset_minimal_filter.lp` for grounded or `semantics/subset_maximal_filter.lp` for preferred
+3. if `optN` is requested in a bounded run, apply numeric objective ranking after subset filtering
 
 ## Synced Modules
 
 `npm run sync` regenerates [waba-modules.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/waba-modules.js) from the public WABA manifest only:
 
 - `core/base.lp`
-- `semiring/*.lp` in the mature public surface
+- supported semiring modules only: `godel`, `lukasiewicz`, `lukasiewicz_low`
 - `defaults/*.lp`
 - `monoid/*.lp`
 - `optimize/*.lp`
 - `constraint/{ub,lb,no_discard}.lp`
 - `filter/{standard,projection}.lp`
-- `semantics/{cf,stable,admissible,complete,grounded,subset_maximal_filter}.lp`
+- `semantics/{cf,stable,admissible,complete,subset_minimal_filter,subset_maximal_filter}.lp`
 - curated public example `.lp` files
 
 Sync fails hard on missing files. There are no placeholder fallbacks.
@@ -97,11 +98,10 @@ Schema validation for the generated bundle lives in [scripts/check-sync-schema.j
 The primary example selector is built from the curated public WABA examples:
 
 - `simple_attack`
-- `practical_deliberation`
-- `scientific_theory`
 - `aspforaba_journal_example`
 - `strong_inference_bounded_lies`
 - `expanding_universe_argumentation`
+- `sem_subset_closure_counterattack`
 
 Older topology demos remain available in a separate playground-only section for visualization checks.
 
@@ -139,4 +139,8 @@ The graph/output layers still consume the same semantic runtime predicates:
 - `supported_with_weight/2`
 - `attacks_successfully_with_weight/3`
 - `discarded_attack/3`
-- `budget_value/1` when threshold ranking is relevant
+- `budget_value/1` in bounded runs
+
+The live browser surface also inherits one documented implementation limit from the mature WABA repo:
+
+- empty-body weighted rules remain a known paper/code mismatch
