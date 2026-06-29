@@ -146,51 +146,60 @@ export function extractSimpleFields(clingoCode) {
             continue;
         }
 
-        let cleanLine = line;
-        if (!line.startsWith('%')) {
-            const commentIndex = line.indexOf('%');
-            if (commentIndex !== -1) {
-                cleanLine = line.substring(0, commentIndex).trim();
-            }
-        }
-
-        let match = cleanLine.match(/^assumption\(([^)]+)\)\.$/);
-        if (match) {
-            assumptionLines.push(match[1].trim());
+        // Full-line comments contribute nothing (description handled above).
+        if (line.startsWith('%')) {
             continue;
         }
 
-        match = cleanLine.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
-        if (match) {
-            weightLines.push(`${match[1].trim()}: ${match[2]}`);
-            continue;
-        }
+        // Strip a trailing inline comment, then split into individual statements:
+        // a single source line may hold several facts, e.g. "assumption(a). weight(a,5).".
+        const commentIndex = line.indexOf('%');
+        const cleanLine = commentIndex !== -1 ? line.substring(0, commentIndex).trim() : line;
+        const statements = cleanLine
+            .split('.')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((part) => `${part}.`);
 
-        match = cleanLine.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
-        if (match) {
-            contraryLines.push(`(${match[1].trim()}, ${match[2].trim()})`);
-            continue;
-        }
-
-        match = cleanLine.match(/^head\(([^,]+),\s*([^)]+)\)\./);
-        if (match) {
-            const ruleId = match[1];
-            const head = match[2];
-            if (processedRules.has(ruleId)) {
+        for (const stmt of statements) {
+            let match = stmt.match(/^assumption\(([^)]+)\)\.$/);
+            if (match) {
+                assumptionLines.push(match[1].trim());
                 continue;
             }
-            processedRules.add(ruleId);
 
-            const commentMatch = clingoCode.match(new RegExp(`%\\s*${ruleId}:\\s*([^\\n]+)`, 'i'));
-            if (commentMatch) {
-                ruleLines.push(`% ${commentMatch[1]}`);
+            match = stmt.match(/^weight\(([^,]+),\s*(\d+)\)\.$/);
+            if (match) {
+                weightLines.push(`${match[1].trim()}: ${match[2]}`);
+                continue;
             }
 
-            const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
-            const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
-            const bodyAtoms = bodyMatches.map((value) => value[1]);
-            const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
-            ruleLines.push(`${head} <- ${bodyStr}`);
+            match = stmt.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                contraryLines.push(`(${match[1].trim()}, ${match[2].trim()})`);
+                continue;
+            }
+
+            match = stmt.match(/^head\(([^,]+),\s*([^)]+)\)\.$/);
+            if (match) {
+                const ruleId = match[1].trim();
+                const head = match[2].trim();
+                if (processedRules.has(ruleId)) {
+                    continue;
+                }
+                processedRules.add(ruleId);
+
+                const commentMatch = clingoCode.match(new RegExp(`%\\s*${ruleId}:\\s*([^\\n]+)`, 'i'));
+                if (commentMatch) {
+                    ruleLines.push(`% ${commentMatch[1]}`);
+                }
+
+                const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
+                const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
+                const bodyAtoms = bodyMatches.map((value) => value[1]);
+                const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
+                ruleLines.push(`${head} <- ${bodyStr}`);
+            }
         }
     }
 

@@ -30,6 +30,17 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260629-3
+
+- fixed weights (and assumptions) being wiped when loading an example: the
+  Simple-mode parser (extractSimpleFields) matched one anchored statement per
+  line, so any source line holding multiple statements (e.g.
+  `assumption(rain). weight(rain, 105).`) dropped both. It now splits each line
+  into statements before matching, so multi-statement lines (and pasted
+  frameworks) round-trip their weights/assumptions/contraries/rules. Verified in
+  the browser: loading Weights-as-Probabilities now shows rain:105 / sprinkler:357
+  / cold_night:693; switching examples no longer wipes weights.
+
 ## 20260629-2
 
 - curated the example set down to five illustrative WABA examples, removing six

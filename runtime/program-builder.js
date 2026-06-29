@@ -1,5 +1,5 @@
-import { wabaModules } from '../waba-modules.js?v=20260629-2';
-import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective } from './config-service.js?v=20260629-2';
+import { wabaModules } from '../waba-modules.js?v=20260629-3';
+import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective } from './config-service.js?v=20260629-3';
 
 export function getCoreModule() {
     return wabaModules.core.base;
