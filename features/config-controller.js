@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260629-4';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260629-5';
 
 export class ConfigController {
     constructor(dom) {
@@ -37,7 +37,7 @@ export class ConfigController {
         this.dom.showSelect.value = config.filterType || 'projection';
     }
 
-    populateExampleSelect(examples, defaultKey = 'scientific_theory') {
+    populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
         this.dom.exampleSelect.innerHTML = '<option value="">-- Select Example --</option>';
 
         [

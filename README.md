@@ -53,7 +53,7 @@ The startup configuration is wrapper-aligned:
 - legacy defaults
 - `budget mode = none`
 - enumerate mode
-- `scientific_theory` as the initial loaded example (which applies its own budgeted preset)
+- `conflict_cycle` (Three-Way Standoff) as the initial loaded example (which applies its own budgeted preset)
 
 Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, keeps `budget mode = none` so it remains a faithful classical ABA comparison case.
 
@@ -95,16 +95,23 @@ Schema validation for the generated bundle lives in [scripts/check-sync-schema.j
 
 ## Curated Examples
 
-The primary example selector is built from the curated public WABA examples, each
-chosen to illustrate a distinct feature with rules and weighted assumptions:
+The curated examples are chosen to make WABA's distinctive machinery visible —
+the inconsistency budget resolving conflicts that classical ABA cannot, with
+several weighted resolutions at *different, non-zero* costs (not one trivial
+cost-0 extension):
 
-- `aspforaba_journal_example` — preferred multi-extension (classical reference)
-- `practical_deliberation` — budgeted belief revision (enumerated within a budget)
-- `scientific_theory` — budgeted weighted optimum (default; weights drive the cost)
-- `probabilistic` — weights as probabilities (tropical / most-probable proof)
+- `conflict_cycle` — **Three-Way Standoff** (default): an odd rebuttal cycle that
+  classical ABA cannot settle (UNSAT). WABA discards the cheapest rebuttal —
+  three settlements at costs 3, 5, 8 (Gödel + sum + ub, β=8).
+- `dispute_chain` — **Dispute Chain**: a longer five-claim rebuttal cycle; five
+  weighted settlements at costs 2, 4, 6, 7, 9 (Gödel + sum + ub, β=9).
+- `probabilistic` — **Weights as Probabilities**: surprisal encoding where the
+  budget β is a probability threshold; the improbable objection can be overridden
+  at its surprisal cost (tropical + sum + ub, β=800).
 
-Trivial topology fixtures and the rule-less `simple_attack` smoke example have been
-retired from the playground selector.
+Earlier examples whose weights/budget did not affect the result (classical
+reference cases, the rule-less `simple_attack` smoke, trivial topology fixtures)
+have been retired from the playground selector.
 
 ## Development
 

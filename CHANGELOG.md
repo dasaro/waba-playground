@@ -30,6 +30,27 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260629-5
+
+- replaced the curated example set with examples that actually exercise WABA's
+  distinctive machinery. The previous set was trivial: classical/preferred cases
+  where weights never mattered (cost 0), and `scientific_theory` where β equalled
+  Σ(attack weights) so the only extension discarded *every* attack. None showed a
+  genuine weighted tradeoff.
+- new set, each with several stable extensions at *different, non-zero* costs and
+  no trivial cost-0 extension (odd cycles forbid the empty extension):
+  - **Three-Way Standoff** (`conflict_cycle`, default) — an odd rebuttal cycle.
+    Classical ABA is UNSAT (a deadlock); WABA discards the cheapest rebuttal,
+    yielding three settlements at costs 3, 5, 8 (Gödel + sum + ub, β=8).
+  - **Dispute Chain** (`dispute_chain`) — a five-claim cycle; five settlements at
+    costs 2, 4, 6, 7, 9 (Gödel + sum + ub, β=9).
+  - **Weights as Probabilities** (`probabilistic`) — now budgeted (ub, β=800) so
+    the budget acts as a probability threshold: the improbable "slippery"
+    objection (surprisal 798 ≈ p 0.45) can be overridden — stances at cost 0/798.
+- default example is now `conflict_cycle`; updated the browser spec, controller
+  defaults, and README accordingly. Verified end to end: 5/5 browser tests, and a
+  headless run showing the default produces 3 settlements at costs 3/5/8.
+
 ## 20260629-4
 
 - retired the rule-less `simple_attack` smoke example from the playground selector

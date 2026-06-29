@@ -33,7 +33,7 @@ test('curated stable and grounded runs complete without startup errors', async (
 
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'scientific_theory');
+    await page.selectOption('#example-select', 'conflict_cycle');
     await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
@@ -51,7 +51,9 @@ test('exact preferred flow renders and graph modes switch without regressions', 
 
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'aspforaba_journal_example');
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await page.selectOption('#semantics-select', 'preferred');
+    await page.selectOption('#constraint-select', 'none');
     await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('.answer-header')).toHaveCount(1, { timeout: 60000 });
@@ -66,7 +68,7 @@ test('exact preferred flow renders and graph modes switch without regressions', 
 test('analysis panel renders decision metrics and version check passes', async ({ page }) => {
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'scientific_theory');
+    await page.selectOption('#example-select', 'conflict_cycle');
     await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('#metrics-toggle-btn')).toBeVisible({ timeout: 60000 });
@@ -84,7 +86,7 @@ test('budgeted stable surface and subset-closure admissible smoke both run on th
 
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'practical_deliberation');
+    await page.selectOption('#example-select', 'dispute_chain');
     await page.selectOption('#semantics-select', 'stable');
     await page.selectOption('#constraint-select', 'ub');
     await page.selectOption('#monoid-select', 'sum');
@@ -95,7 +97,7 @@ test('budgeted stable surface and subset-closure admissible smoke both run on th
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
 
-    await page.selectOption('#example-select', 'aspforaba_journal_example');
+    await page.selectOption('#example-select', 'conflict_cycle');
     await page.selectOption('#semantics-select', 'admissible');
     await page.selectOption('#constraint-select', 'none');
     await page.selectOption('#opt-mode-select', 'ignore');
