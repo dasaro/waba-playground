@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+// Auto-discovering sync: bundle the CANONICAL WABA modules into waba-modules.js.
+//
+// Scans the WABA tree (semiring/, monoid/, semantics/, examples/, ...) instead of
+// a hardcoded manifest, so adding/removing a module propagates automatically and
+// the bundle can no longer silently drift from the source of truth.
+//
+// Source of truth: ../WABA  (override with WABA_ROOT=/path/to/WABA).
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,81 +16,36 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PLAYGROUND_ROOT = path.join(__dirname, '..');
-const WABA_ROOT = path.join(PLAYGROUND_ROOT, '..', 'WABA');
+const WABA_ROOT = process.env.WABA_ROOT || path.join(PLAYGROUND_ROOT, '..', 'WABA');
 const OUTPUT_FILE = path.join(PLAYGROUND_ROOT, 'waba-modules.js');
 
-const MANIFEST = {
-    core: {
-        base: 'core/base.lp'
+const SINGLE = { core: { base: 'core/base.lp' } };
+const DIRS = {
+    semiring: 'semiring',
+    defaults: 'defaults',
+    monoid: 'monoid',
+    optimize: 'optimize',
+    constraint: 'constraint',
+    filter: 'filter',
+    semantics: 'semantics'
+};
+
+// Structural policy mirroring WABA/bin/waba (the supported CLI surface).
+// Only the *shape* lives here; the module SET is discovered from disk.
+const POLICY = {
+    semiringFamilies: ['godel', 'tropical'],
+    polarities: ['higher', 'lower'],
+    canonicalSemiring: {
+        godel: { higher: 'godel', lower: 'bottleneck_cost' },
+        tropical: { higher: 'arctic', lower: 'tropical' }
     },
-    semiring: {
-        godel: 'semiring/godel.lp',
-        lukasiewicz: 'semiring/lukasiewicz.lp',
-        lukasiewicz_low: 'semiring/lukasiewicz_low.lp'
+    aliases: {
+        godel_low: { family: 'godel', polarity: 'lower' },
+        tropical_high: { family: 'tropical', polarity: 'higher' }
     },
-    defaults: {
-        legacy: 'defaults/legacy.lp',
-        aba: 'defaults/aba.lp',
-        neutral: 'defaults/neutral.lp'
-    },
-    monoid: {
-        sum: 'monoid/sum.lp',
-        max: 'monoid/max.lp',
-        min: 'monoid/min.lp',
-        count: 'monoid/count.lp'
-    },
-    optimize: {
-        minimize: 'optimize/minimize.lp',
-        maximize: 'optimize/maximize.lp'
-    },
-    constraint: {
-        ub: 'constraint/ub.lp',
-        lb: 'constraint/lb.lp',
-        no_discard: 'constraint/no_discard.lp'
-    },
-    filter: {
-        standard: 'filter/standard.lp',
-        projection: 'filter/projection.lp'
-    },
-    semantics: {
-        cf: 'semantics/cf.lp',
-        stable: 'semantics/stable.lp',
-        admissible: 'semantics/admissible.lp',
-        complete: 'semantics/complete.lp',
-        subset_maximal_filter: 'semantics/subset_maximal_filter.lp',
-        subset_minimal_filter: 'semantics/subset_minimal_filter.lp'
-    },
-    examples: {
-        simple_attack: 'examples/aspartix_test/simple_attack.lp',
-        aspforaba_journal_example: 'examples/reference/aspforaba_journal_example.lp',
-        strong_inference_bounded_lies: 'examples/reference/strong_inference_bounded_lies.lp',
-        expanding_universe_argumentation: 'examples/reference/expanding_universe_argumentation.lp',
-        sem_subset_closure_counterattack: 'tests/regression/cases/sem_subset_closure_counterattack.lp'
-    },
-    metadata: {
-        generatedFrom: 'ABA-variants/WABA',
-        semiringFamilies: ['godel', 'lukasiewicz'],
-        polarities: ['higher', 'lower'],
-        supportedSemiringKeys: ['godel', 'lukasiewicz', 'lukasiewicz_low'],
-        defaults: ['legacy', 'aba', 'neutral'],
-        monoids: ['sum', 'max', 'count', 'min'],
-        optimizations: ['minimize', 'maximize'],
-        objectives: ['sum-min', 'sum-max', 'max-min', 'max-max', 'count-min', 'count-max', 'min-min', 'min-max'],
-        budgetModes: ['none', 'ub', 'lb'],
-        supportedSemantics: ['cf', 'stable', 'admissible', 'complete', 'grounded', 'preferred'],
-        postFilteredSemantics: ['grounded', 'preferred'],
-        canonicalSemiring: {
-            godel: { higher: 'godel' },
-            lukasiewicz: { higher: 'lukasiewicz', lower: 'lukasiewicz_low' }
-        },
-        aliases: {},
-        supportedBudgetPairs: [
-            { monoid: 'sum', budgetMode: 'ub' },
-            { monoid: 'max', budgetMode: 'ub' },
-            { monoid: 'count', budgetMode: 'ub' },
-            { monoid: 'min', budgetMode: 'lb' }
-        ]
-    }
+    supportedSemantics: ['cf', 'stable', 'admissible', 'complete', 'grounded', 'preferred'],
+    postFilteredSemantics: ['grounded', 'preferred'],
+    budgetSide: { sum: 'ub', max: 'ub', min: 'lb' }
 };
 
 function escapeTemplateLiteral(content) {
@@ -93,36 +56,55 @@ function resolveIncludes(content, basedir, visited = new Set()) {
     const includePattern = /#include\s+"([^"]+)"\.?/g;
     return content.replace(includePattern, (match, relativePath) => {
         const includePath = path.resolve(basedir, relativePath);
-        if (visited.has(includePath)) {
-            throw new Error(`Circular include detected at ${includePath}`);
-        }
-        if (!fs.existsSync(includePath)) {
-            throw new Error(`Missing include ${relativePath} referenced from ${basedir}`);
-        }
+        if (visited.has(includePath)) throw new Error(`Circular include at ${includePath}`);
+        if (!fs.existsSync(includePath)) throw new Error(`Missing include ${relativePath} from ${basedir}`);
         visited.add(includePath);
-        const includedContent = fs.readFileSync(includePath, 'utf8');
-        return resolveIncludes(includedContent, path.dirname(includePath), visited);
+        return resolveIncludes(fs.readFileSync(includePath, 'utf8'), path.dirname(includePath), visited);
     });
 }
 
 function readModule(relativePath) {
-    const absolutePath = path.join(WABA_ROOT, relativePath);
-    if (!fs.existsSync(absolutePath)) {
-        throw new Error(`Required module not found: ${relativePath}`);
-    }
-    const raw = fs.readFileSync(absolutePath, 'utf8');
-    return resolveIncludes(raw, path.dirname(absolutePath), new Set([absolutePath]));
+    const abs = path.join(WABA_ROOT, relativePath);
+    if (!fs.existsSync(abs)) throw new Error(`Required module not found: ${relativePath} (WABA_ROOT=${WABA_ROOT})`);
+    return resolveIncludes(fs.readFileSync(abs, 'utf8'), path.dirname(abs), new Set([abs]));
 }
 
-function loadSection(sectionName, entries) {
+function discoverDir(relDir) {
+    const absDir = path.join(WABA_ROOT, relDir);
+    if (!fs.existsSync(absDir)) throw new Error(`Required directory not found: ${relDir} (WABA_ROOT=${WABA_ROOT})`);
     const result = {};
-    for (const [key, relativePath] of Object.entries(entries)) {
-        result[key] = readModule(relativePath);
+    for (const file of fs.readdirSync(absDir).sort()) {
+        if (!file.endsWith('.lp')) continue;
+        result[path.basename(file, '.lp')] = readModule(path.join(relDir, file));
     }
     return result;
 }
 
-function serializeSection(sectionObject, indent = '    ') {
+function loadSingle(entries) {
+    const result = {};
+    for (const [key, rel] of Object.entries(entries)) result[key] = readModule(rel);
+    return result;
+}
+
+function discoverExamples() {
+    const root = path.join(WABA_ROOT, 'examples');
+    const result = {};
+    const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })
+            .sort((a, b) => a.name.localeCompare(b.name))) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.lp')) {
+                result[path.basename(entry.name, '.lp')] =
+                    resolveIncludes(fs.readFileSync(full, 'utf8'), path.dirname(full), new Set([full]));
+            }
+        }
+    };
+    if (fs.existsSync(root)) walk(root);
+    return result;
+}
+
+function serializeSection(sectionObject, indent = '        ') {
     return Object.entries(sectionObject)
         .map(([key, value]) => `${indent}${JSON.stringify(key)}: \`${escapeTemplateLiteral(value)}\``)
         .join(',\n');
@@ -135,54 +117,77 @@ function serializeMetadata(metadata) {
         .join('\n');
 }
 
-console.log('Syncing mature WABA modules into waba-modules.js');
+console.log(`Syncing WABA modules from ${WABA_ROOT}`);
 
-const core = loadSection('core', MANIFEST.core);
-const semiring = loadSection('semiring', MANIFEST.semiring);
-const defaults = loadSection('defaults', MANIFEST.defaults);
-const monoid = loadSection('monoid', MANIFEST.monoid);
-const optimize = loadSection('optimize', MANIFEST.optimize);
-const constraint = loadSection('constraint', MANIFEST.constraint);
-const filter = loadSection('filter', MANIFEST.filter);
-const semantics = loadSection('semantics', MANIFEST.semantics);
-const examples = loadSection('examples', MANIFEST.examples);
+const core = loadSingle(SINGLE.core);
+const sections = {};
+for (const [name, rel] of Object.entries(DIRS)) sections[name] = discoverDir(rel);
+const examples = discoverExamples();
 
-const output = `// AUTO-GENERATED by scripts/sync-modules.js
+const monoids = Object.keys(sections.monoid);
+const optimizations = Object.keys(sections.optimize).filter((k) => k === 'minimize' || k === 'maximize');
+const objectives = [];
+for (const m of monoids) for (const dir of ['min', 'max']) objectives.push(`${m}-${dir}`);
+const supportedBudgetPairs = monoids
+    .filter((m) => POLICY.budgetSide[m])
+    .map((m) => ({ monoid: m, budgetMode: POLICY.budgetSide[m] }));
+
+const metadata = {
+    generatedFrom: 'ABA-variants/WABA',
+    semiringFamilies: POLICY.semiringFamilies,
+    polarities: POLICY.polarities,
+    supportedSemiringKeys: Object.keys(sections.semiring),
+    defaults: Object.keys(sections.defaults),
+    monoids,
+    optimizations,
+    objectives,
+    budgetModes: ['none', 'ub', 'lb'],
+    supportedSemantics: POLICY.supportedSemantics,
+    postFilteredSemantics: POLICY.postFilteredSemantics,
+    canonicalSemiring: POLICY.canonicalSemiring,
+    aliases: POLICY.aliases,
+    supportedBudgetPairs
+};
+
+const output = `// AUTO-GENERATED by scripts/sync-modules.js (auto-discovering)
 // DO NOT EDIT MANUALLY
-// Last updated: ${new Date().toISOString()}
+// Source of truth: ${metadata.generatedFrom}
 
 export const wabaModules = {
     core: {
-${serializeSection(core, '        ')}
+${serializeSection(core)}
     },
     semiring: {
-${serializeSection(semiring, '        ')}
+${serializeSection(sections.semiring)}
     },
     defaults: {
-${serializeSection(defaults, '        ')}
+${serializeSection(sections.defaults)}
     },
     monoid: {
-${serializeSection(monoid, '        ')}
+${serializeSection(sections.monoid)}
     },
     optimize: {
-${serializeSection(optimize, '        ')}
+${serializeSection(sections.optimize)}
     },
     constraint: {
-${serializeSection(constraint, '        ')}
+${serializeSection(sections.constraint)}
     },
     filter: {
-${serializeSection(filter, '        ')}
+${serializeSection(sections.filter)}
     },
     semantics: {
-${serializeSection(semantics, '        ')}
+${serializeSection(sections.semantics)}
     },
     examples: {
-${serializeSection(examples, '        ')}
+${serializeSection(examples)}
     },
-    metadata: ${serializeMetadata(MANIFEST.metadata)}
+    metadata: ${serializeMetadata(metadata)}
 };
 `;
 
 fs.writeFileSync(OUTPUT_FILE, output, 'utf8');
-
 console.log(`Generated ${OUTPUT_FILE}`);
+console.log(`  semirings: ${metadata.supportedSemiringKeys.join(', ')}`);
+console.log(`  monoids:   ${metadata.monoids.join(', ')}`);
+console.log(`  objectives:${metadata.objectives.join(', ')}`);
+console.log(`  examples:  ${Object.keys(examples).length}`);

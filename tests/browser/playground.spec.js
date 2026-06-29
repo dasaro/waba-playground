@@ -11,7 +11,7 @@ async function waitForClingoReady(page) {
 
 test('collapsible panels toggle cleanly', async ({ page }) => {
     await waitForClingoReady(page);
-    await expect(page.locator('#semiring-select option')).toHaveText(['Gödel', 'Łukasiewicz']);
+    await expect(page.locator('#semiring-select option')).toHaveText(['Gödel', 'Tropical']);
     await expect(page.locator('#default-policy-select option')).toHaveText(['Legacy', 'ABA', 'Neutral']);
     await expect(page.locator('#show-select option')).toHaveText(['Projection', 'Standard']);
     await expect(page.locator('#analysis-export-png-proxy')).toBeVisible();
@@ -84,12 +84,12 @@ test('budgeted stable surface and subset-closure admissible smoke both run on th
 
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'strong_inference_bounded_lies');
+    await page.selectOption('#example-select', 'practical_deliberation');
     await page.selectOption('#semantics-select', 'stable');
     await page.selectOption('#constraint-select', 'ub');
-    await page.selectOption('#monoid-select', 'count');
+    await page.selectOption('#monoid-select', 'sum');
     await page.selectOption('#optimize-select', 'minimize');
-    await page.fill('#budget-input', '2');
+    await page.fill('#budget-input', '20');
     await page.selectOption('#opt-mode-select', 'optN');
     await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');

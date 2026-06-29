@@ -10,14 +10,13 @@ import {
     getObjectiveTuple
 } from '../../runtime/objective-utils.js';
 
-test('computeAggregateFromDiscarded handles sum/count/max/min', () => {
+test('computeAggregateFromDiscarded handles sum/max/min', () => {
     const discarded = [
         'discarded_attack(a,b,3)',
         'discarded_attack(c,d,5)'
     ];
 
     assert.equal(computeAggregateFromDiscarded(discarded, 'sum'), 8);
-    assert.equal(computeAggregateFromDiscarded(discarded, 'count'), 2);
     assert.equal(computeAggregateFromDiscarded(discarded, 'max'), 5);
     assert.equal(computeAggregateFromDiscarded(discarded, 'min'), 3);
 });

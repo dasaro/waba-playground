@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260315-1';
+import { wabaModules } from '../waba-modules.js?v=20260629-1';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -9,15 +9,18 @@ const OBJECTIVE_MAP = {
     'sum-max': { monoid: 'sum', optimization: 'maximize' },
     'max-min': { monoid: 'max', optimization: 'minimize' },
     'max-max': { monoid: 'max', optimization: 'maximize' },
-    'count-min': { monoid: 'count', optimization: 'minimize' },
-    'count-max': { monoid: 'count', optimization: 'maximize' },
     'min-min': { monoid: 'min', optimization: 'minimize' },
     'min-max': { monoid: 'min', optimization: 'maximize' }
 };
+const DEFAULT_OBJECTIVE = 'sum-min';
+// Polarity per bundle semiring module key (also the semiring allow-list in validateConfig).
 const SEMIRING_POLARITY = {
     godel: 'higher',
-    lukasiewicz: 'higher',
-    lukasiewicz_low: 'lower'
+    godel_low: 'lower',
+    tropical: 'lower',
+    tropical_high: 'higher',
+    arctic: 'higher',
+    bottleneck_cost: 'lower'
 };
 
 export function resolveSemiringModuleKey(semiringFamily, polarity) {
@@ -41,8 +44,8 @@ export function getAliasLabel(semiringFamily, polarity) {
     return match ? match[0] : null;
 }
 
-export function deriveObjectiveParts(objective = 'count-min') {
-    return OBJECTIVE_MAP[objective] || OBJECTIVE_MAP['count-min'];
+export function deriveObjectiveParts(objective = DEFAULT_OBJECTIVE) {
+    return OBJECTIVE_MAP[objective] || OBJECTIVE_MAP[DEFAULT_OBJECTIVE];
 }
 
 /**
@@ -52,10 +55,12 @@ export function deriveObjectiveParts(objective = 'count-min') {
 export function normalizeConfig(config = {}) {
     const semiringFamily = config.semiringFamily || config.semiring || 'godel';
     const requestedPolarity = config.polarity || 'higher';
-    const polarity = semiringFamily === 'godel' ? 'higher' : requestedPolarity;
+    // Both families support both polarities (godel: higher=godel/lower=bottleneck_cost;
+    // tropical: higher=arctic/lower=tropical), resolved via metadata.canonicalSemiring.
+    const polarity = requestedPolarity;
     const abaRecovery = Boolean(config.abaRecovery);
     const defaultPolicy = abaRecovery ? 'neutral' : (config.defaultPolicy || 'legacy');
-    const objective = config.objective || 'count-min';
+    const objective = config.objective || DEFAULT_OBJECTIVE;
     const objectiveParts = deriveObjectiveParts(objective);
     const monoid = config.monoid || objectiveParts.monoid;
     const optimization = config.optimization || config.optimize || objectiveParts.optimization;
@@ -131,7 +136,7 @@ export function validateConfig(config) {
 
     if ((config.budgetMode === 'ub' || config.budgetMode === 'lb')
         && !SUPPORTED_BOUNDED_PAIRS.has(`${config.monoid}:${config.budgetMode}`)) {
-        return `Unsupported supported-surface pairing: ${config.monoid} + ${config.budgetMode}. Use sum/max/count + ub or min + lb.`;
+        return `Unsupported supported-surface pairing: ${config.monoid} + ${config.budgetMode}. Use sum/max + ub or min + lb.`;
     }
 
     return null;

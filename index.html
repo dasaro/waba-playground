@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260315-1">
+    <link rel="stylesheet" href="style.css?v=20260629-1">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,11 +18,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260315-1"></script>
+    <script src="modules/prism-waba.js?v=20260629-1"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260315-1"></script>
-    <script src="clingo.web.js?v=20260315-1"></script>
+    <script src="modules/wasm-config.js?v=20260629-1"></script>
+    <script src="clingo.web.js?v=20260629-1"></script>
 </head>
 <body>
     <div class="container">
@@ -83,7 +83,7 @@
                             <label for="semiring-select">Semiring Family</label>
                             <select id="semiring-select" class="select">
                                 <option value="godel">Gödel</option>
-                                <option value="lukasiewicz">Łukasiewicz</option>
+                                <option value="tropical">Tropical</option>
                             </select>
                         </div>
 
@@ -121,7 +121,6 @@
                             <select id="monoid-select" class="select">
                                 <option value="sum">SUM</option>
                                 <option value="max">MAX</option>
-                                <option value="count">COUNT</option>
                                 <option value="min">MIN</option>
                             </select>
                         </div>
@@ -202,7 +201,7 @@
                         <div class="config-item">
                             <label><span class="label-with-help">Supported Surface <span class="help-dot" aria-hidden="true">?</span></span></label>
                             <div id="supported-surface-note" class="config-note">
-                                Supported semiring surface: <code>godel</code>, <code>lukasiewicz</code>, <code>lukasiewicz_low</code>.
+                                Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code> (<code>godel_low</code>), <code>arctic</code> (<code>tropical_high</code>), <code>tropical</code>.
                                 Exact <code>grounded</code> and <code>preferred</code> are computed with browser-side post-filtering over complete candidates.
                             </div>
                         </div>
@@ -712,20 +711,26 @@ budget(100).</code></pre>
                                     <td>Higher-is-better fuzzy reasoning</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Łukasiewicz (higher)</strong></td>
-                                    <td>bounded sum</td>
-                                    <td>bounded sum</td>
-                                    <td>Higher-is-better bounded fuzzy reasoning</td>
+                                    <td><strong>Bottleneck-cost</strong> (Gödel lower)</td>
+                                    <td>max</td>
+                                    <td>min</td>
+                                    <td>Lower-is-better worst-case cost</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Łukasiewicz (lower)</strong></td>
-                                    <td>bounded sum</td>
-                                    <td>bounded sum</td>
-                                    <td>Lower-is-better bounded fuzzy reasoning</td>
+                                    <td><strong>Arctic</strong> (Tropical higher)</td>
+                                    <td>+</td>
+                                    <td>max</td>
+                                    <td>Higher-is-better accumulated reward</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tropical</strong> (Tropical lower)</td>
+                                    <td>+</td>
+                                    <td>min</td>
+                                    <td>Lower-is-better additive cost / shortest path</td>
                                 </tr>
                             </tbody>
                         </table>
-                        <p class="config-note">The live browser surface mirrors only the supported wrapper semirings: <code>godel</code>, <code>lukasiewicz</code>, and <code>lukasiewicz_low</code>.</p>
+                        <p class="config-note">Four clean algebras across two families: Gödel (<code>godel</code> / <code>bottleneck_cost</code>) and Tropical (<code>arctic</code> / <code>tropical</code>); <code>godel_low</code> and <code>tropical_high</code> are polarity-dual aliases.</p>
                     </div>
 
                     <div class="config-section">
@@ -755,11 +760,6 @@ budget(100).</code></pre>
                                     <td><strong>MIN</strong></td>
                                     <td>min(weights)</td>
                                     <td>Best single attack cost</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>COUNT</strong></td>
-                                    <td>count(attacks)</td>
-                                    <td>Number of discarded attacks</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -949,6 +949,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260315-1"></script>
+    <script type="module" src="app.js?v=20260629-1"></script>
 </body>
 </html>

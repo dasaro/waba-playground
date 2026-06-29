@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260315-1';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260629-1';
 
 export class ConfigController {
     constructor(dom) {
@@ -68,16 +68,16 @@ export class ConfigController {
         const semantics = this.dom.semanticsSelect.value;
         const abaRecovery = this.dom.abaRecoveryToggle.checked;
 
-        if (semiringFamily === 'godel') {
-            this.dom.polaritySelect.value = 'higher';
-            this.dom.polaritySelect.querySelector('option[value="lower"]').disabled = true;
-            this.dom.semiringAliasNote.textContent = 'Supported surface: higher-only, mapped directly to godel.';
-        } else {
-            this.dom.polaritySelect.querySelector('option[value="lower"]').disabled = false;
-            this.dom.semiringAliasNote.textContent = this.dom.polaritySelect.value === 'lower'
-                ? 'Lower polarity maps directly to lukasiewicz_low.'
-                : 'Higher polarity maps directly to lukasiewicz.';
-        }
+        // Both families expose both polarities (godel: higher=godel / lower=bottleneck_cost;
+        // tropical: higher=arctic / lower=tropical), resolved via the bundle's canonicalSemiring.
+        this.dom.polaritySelect.querySelector('option[value="lower"]').disabled = false;
+        const ALIAS_MAP = {
+            godel: { higher: 'godel', lower: 'bottleneck_cost (godel_low)' },
+            tropical: { higher: 'arctic (tropical_high)', lower: 'tropical' }
+        };
+        const polarity = this.dom.polaritySelect.value;
+        const mapped = (ALIAS_MAP[semiringFamily] || ALIAS_MAP.godel)[polarity];
+        this.dom.semiringAliasNote.textContent = `${polarity} polarity maps to ${mapped}.`;
 
         if (abaRecovery) {
             this.dom.defaultPolicySelect.value = 'neutral';
@@ -86,7 +86,7 @@ export class ConfigController {
         this.dom.defaultPolicySelect.disabled = abaRecovery;
 
         if (budgetMode === 'ub') {
-            ['sum', 'max', 'count'].forEach((value) => {
+            ['sum', 'max'].forEach((value) => {
                 this.dom.monoidSelect.querySelector(`option[value="${value}"]`).disabled = false;
             });
             this.dom.monoidSelect.querySelector('option[value="min"]').disabled = true;
@@ -94,7 +94,7 @@ export class ConfigController {
                 this.dom.monoidSelect.value = 'sum';
             }
         } else if (budgetMode === 'lb') {
-            ['sum', 'max', 'count'].forEach((value) => {
+            ['sum', 'max'].forEach((value) => {
                 this.dom.monoidSelect.querySelector(`option[value="${value}"]`).disabled = true;
             });
             this.dom.monoidSelect.querySelector('option[value="min"]').disabled = false;
@@ -139,8 +139,8 @@ export class ConfigController {
             : '';
 
         this.dom.supportedSurfaceNote.innerHTML = `
-            Supported semiring surface: <code>godel</code>, <code>lukasiewicz</code>, <code>lukasiewicz_low</code>.
-            Canonical bounded presets are <code>sum/max/count + ub</code> and <code>min + lb</code>.
+            Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code> (families G&ouml;del / Tropical).
+            Canonical bounded presets are <code>sum/max + ub</code> and <code>min + lb</code>.
             Current profile: <code>${profile}</code>.${postFilterCopy}
         `;
 

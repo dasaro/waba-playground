@@ -57,10 +57,6 @@ export function computeAggregateFromDiscarded(discardedAttacks, monoid) {
         .filter(Boolean)
         .map((match) => normalizeAggregateValue(match[1]));
 
-    if (monoid === 'count') {
-        return weights.length;
-    }
-
     if (monoid === 'sum') {
         return weights.reduce((total, value) => {
             if (value === POS_INF) {
@@ -96,7 +92,7 @@ export function computeAggregateFromDiscarded(discardedAttacks, monoid) {
 export function getObjectiveTuple(config, aggregateValue) {
     const { monoid, optimization } = config;
 
-    if (monoid === 'sum' || monoid === 'count') {
+    if (monoid === 'sum') {
         return [0, 0, optimization === 'minimize' ? aggregateValue : -aggregateValue];
     }
 

@@ -4,7 +4,7 @@
  * @property {'higher'|'lower'} polarity
  * @property {'legacy'|'aba'|'neutral'} defaultPolicy
  * @property {boolean} abaRecovery
- * @property {'sum'|'max'|'count'|'min'} monoid
+ * @property {'sum'|'max'|'min'} monoid
  * @property {'minimize'|'maximize'} optimization
  * @property {'none'|'ub'|'lb'} budgetMode
  * @property {'no_discard'|'bounded'} budgetIntent

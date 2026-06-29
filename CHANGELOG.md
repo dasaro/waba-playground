@@ -30,6 +30,14 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260629-1
+
+- synced the bundle to the fixed WABA core (semiring soundness fixes: empty-body multiplicative identity, arctic/tropical_high non-flat guard, min+ub empty-discard)
+- replaced the stale hand-maintained sync manifest with an auto-discovering `scripts/sync-modules.js` (scans the WABA tree; can no longer silently drift)
+- surface change: removed the Łukasiewicz family and the COUNT monoid; exposed the four clean algebras across two families — Gödel (`godel` / `bottleneck_cost`) and Tropical (`arctic` / `tropical`), both polarities selectable
+- reconciled the runtime/UI to the new surface: `config-service.js` (objective map, semiring allow-list/polarities, `sum-min` default), `index.html` dropdowns + doc tables, `config-controller.js` family-aware polarity, `examples.js` (curated examples now practical_deliberation / scientific_theory / probabilistic), `core/types.js`, and the unit/browser tests
+- re-ran the full lint, type-check, unit, schema, and browser validation gate
+
 ## 20260312-10
 
 - restored the Analysis & Export panel as a visibly populated section on first load instead of leaving it blank until a solver run

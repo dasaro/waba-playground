@@ -213,59 +213,59 @@ export const examples = {
             beta: 0
         }
     },
-    strong_inference_bounded_lies: {
-        label: 'Strong Inference',
-        description: 'Reference bounded-budget stable example on the supported count + ub surface.',
+    practical_deliberation: {
+        label: 'Practical Deliberation',
+        description: 'Budgeted stable reasoning: minimize total revision cost (arctic + sum + ub).',
         section: 'curated',
         source: 'module',
-        moduleKey: 'strong_inference_bounded_lies',
+        moduleKey: 'practical_deliberation',
         preset: {
-            semiringFamily: 'godel',
+            semiringFamily: 'tropical',
             polarity: 'higher',
             defaultPolicy: 'legacy',
-            monoid: 'count',
+            monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'ub',
             budgetIntent: 'bounded',
             semantics: 'stable',
             optMode: 'optN',
-            beta: 2
+            beta: 20
         }
     },
-    expanding_universe_argumentation: {
-        label: 'Expanding Universe',
-        description: 'Reference scientific-discovery example with non-trivial derivation chains.',
+    scientific_theory: {
+        label: 'Scientific Theory',
+        description: 'Rule-heavy framework: minimize total discarded cost (tropical + sum + ub).',
         section: 'curated',
         source: 'module',
-        moduleKey: 'expanding_universe_argumentation',
+        moduleKey: 'scientific_theory',
         preset: {
-            semiringFamily: 'godel',
-            polarity: 'higher',
+            semiringFamily: 'tropical',
+            polarity: 'lower',
             defaultPolicy: 'legacy',
-            monoid: 'max',
+            monoid: 'sum',
             optimization: 'minimize',
-            budgetMode: 'none',
-            budgetIntent: 'no_discard',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
             semantics: 'stable',
-            optMode: 'ignore',
-            beta: 0
+            optMode: 'optN',
+            beta: 275
         }
     },
-    subset_closure_counterattack: {
-        label: 'Subset-Closure Defense',
-        description: 'Final semantics regression case for admissible defense against a multi-seed attacker closure.',
+    probabilistic: {
+        label: 'Weights as Probabilities',
+        description: 'Surprisal encoding: tropical computes the most-probable proof (decode p = e^-w/1000).',
         section: 'curated',
         source: 'module',
-        moduleKey: 'sem_subset_closure_counterattack',
+        moduleKey: 'probabilistic',
         preset: {
-            semiringFamily: 'godel',
-            polarity: 'higher',
+            semiringFamily: 'tropical',
+            polarity: 'lower',
             defaultPolicy: 'legacy',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'none',
             budgetIntent: 'no_discard',
-            semantics: 'admissible',
+            semantics: 'stable',
             optMode: 'ignore',
             beta: 0
         }

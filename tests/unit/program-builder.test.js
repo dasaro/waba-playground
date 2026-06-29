@@ -57,6 +57,8 @@ test('buildProgram routes grounded through complete candidates in the browser su
     });
 
     const program = buildProgram(FRAMEWORK, config);
-    assert.match(program, /:- out\(X\), assumption\(X\), defended\(X\)\./);
+    // grounded routes through the complete semantics, whose completeness constraint is
+    // ":- out(X), assumption(X), not attacked_by_undefeated(X)." in the current WABA.
+    assert.match(program, /:- out\(X\), assumption\(X\), not attacked_by_undefeated\(X\)\./);
     assert.doesNotMatch(program, /subset_minimal_filter/);
 });
