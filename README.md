@@ -53,7 +53,7 @@ The startup configuration is wrapper-aligned:
 - legacy defaults
 - `budget mode = none`
 - enumerate mode
-- `simple_attack` as the initial loaded example
+- `scientific_theory` as the initial loaded example (which applies its own budgeted preset)
 
 Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, keeps `budget mode = none` so it remains a faithful classical ABA comparison case.
 
@@ -95,15 +95,16 @@ Schema validation for the generated bundle lives in [scripts/check-sync-schema.j
 
 ## Curated Examples
 
-The primary example selector is built from the curated public WABA examples:
+The primary example selector is built from the curated public WABA examples, each
+chosen to illustrate a distinct feature with rules and weighted assumptions:
 
-- `simple_attack`
-- `aspforaba_journal_example`
-- `strong_inference_bounded_lies`
-- `expanding_universe_argumentation`
-- `sem_subset_closure_counterattack`
+- `aspforaba_journal_example` — preferred multi-extension (classical reference)
+- `practical_deliberation` — budgeted belief revision (enumerated within a budget)
+- `scientific_theory` — budgeted weighted optimum (default; weights drive the cost)
+- `probabilistic` — weights as probabilities (tropical / most-probable proof)
 
-Older topology demos remain available in a separate playground-only section for visualization checks.
+Trivial topology fixtures and the rule-less `simple_attack` smoke example have been
+retired from the playground selector.
 
 ## Development
 

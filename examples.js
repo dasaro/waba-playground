@@ -4,25 +4,6 @@
 // preferred multi-extension, budgeted optimum, budgeted enumeration, probabilities).
 
 export const examples = {
-    simple_attack: {
-        label: 'Simple Attack',
-        description: 'Classical smoke run from the mature WABA surface.',
-        section: 'curated',
-        source: 'module',
-        moduleKey: 'simple_attack',
-        preset: {
-            semiringFamily: 'godel',
-            polarity: 'higher',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'none',
-            budgetIntent: 'no_discard',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 0
-        }
-    },
     aspforaba_journal_example: {
         label: 'Reference Preferred',
         description: 'Exact preferred semantics against the public ASPforABA comparison case.',

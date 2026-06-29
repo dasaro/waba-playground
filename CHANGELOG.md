@@ -30,6 +30,19 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260629-4
+
+- retired the rule-less `simple_attack` smoke example from the playground selector
+  (it had no rules and only uniform weights — trivial as a curated example). The
+  four remaining curated examples all have rules and weighted assumptions:
+  Reference Preferred, Practical Deliberation, Scientific Theory, Weights as
+  Probabilities, each loading its appropriate semiring/monoid/budget/semantics
+  config on selection (uploaded frameworks keep the user's config).
+- changed the default loaded example to `scientific_theory` (rules + weighted
+  assumptions + a budget where the weights drive the result).
+- fixed two stale references in the browser test that pointed at removed examples
+  (`simple_attack`, `subset_closure_counterattack`); refreshed README example list.
+
 ## 20260629-3
 
 - fixed weights (and assumptions) being wiped when loading an example: the
