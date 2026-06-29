@@ -1,10 +1,10 @@
-import { GraphUtils } from './graph-utils.js?v=20260629-1';
+import { GraphUtils } from './graph-utils.js?v=20260629-2';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
     buildJunctionTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260629-1';
+} from './graph-tooltip-builder.js?v=20260629-2';
 
 function assumptionNodeColor() {
     return GraphUtils.createNodeColor('assumption');

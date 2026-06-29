@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260629-1';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260629-2';
 
 export class ConfigController {
     constructor(dom) {
@@ -56,7 +56,10 @@ export class ConfigController {
                     group.appendChild(option);
                 });
 
-            this.dom.exampleSelect.appendChild(group);
+            // Skip empty groups (e.g. no demos) so no blank optgroup is shown.
+            if (group.children.length > 0) {
+                this.dom.exampleSelect.appendChild(group);
+            }
         });
 
         this.dom.exampleSelect.value = defaultKey;
@@ -152,7 +155,7 @@ export class ConfigController {
 
         if (this.dom.implementationNote) {
             this.dom.implementationNote.textContent =
-                'Empty-body weighted rules remain a documented paper/code mismatch in the live implementation.';
+                'Runs the mature WABA modules (semiring × monoid × budget × semantics) directly via clingo-WASM.';
         }
     }
 

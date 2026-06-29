@@ -30,6 +30,20 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260629-2
+
+- curated the example set down to five illustrative WABA examples, removing six
+  trivial topology "visualization fixtures" (no_discard, weights unused, cost 0)
+- fixed Practical Deliberation: under sum-min it degenerated to the empty
+  (cost-0) extension; switched to budgeted enumeration (ub, β=20) so it shows the
+  11 ways to retain defaults by overriding disruptions within the budget
+- the five kept examples each illustrate a distinct feature: classical recovery
+  (Simple Attack), preferred multi-extension (Reference Preferred), budgeted
+  optimum with real cost (Scientific Theory), budgeted enumeration (Practical
+  Deliberation), and weights-as-probabilities (Weights as Probabilities)
+- skip empty example optgroups; corrected the stale empty-body "mismatch" note
+  (that issue is fixed in the synced bundle)
+
 ## 20260629-1
 
 - synced the bundle to the fixed WABA core (semiring soundness fixes: empty-body multiplicative identity, arctic/tropical_high non-flat guard, min+ub empty-discard)
