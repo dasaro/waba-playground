@@ -30,6 +30,19 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-5
+
+- re-synced the bundle from the refactored WABA core, propagating all recent core
+  work to the live playground: centralized monoid aggregate, the arctic infinity
+  fixes, the Łukasiewicz semiring, the fold of support/undefeated propagation into
+  the 2-skeleton (_idempotent/_additive) structure, and the **flatness guard**
+  (non-flat frameworks — an assumption that is also a rule head — are now rejected;
+  weighted WABA is defined for flat ABA only). The inlined refactored godel verifies
+  to the same 3/5/8 on the conflict cycle; all browser tests pass.
+- sync: skip `_`-prefixed include fragments (semiring/_phase.lp, _idempotent.lp,
+  _additive.lp) so they are inlined into the real shims rather than appearing as
+  bogus standalone semirings in the bundle / supportedSemiringKeys.
+
 ## 20260630-4
 
 - **Mode-aware graph legend.** The legend now matches the active graph mode. The

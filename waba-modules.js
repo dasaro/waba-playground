@@ -34,6 +34,18 @@ has_body(R) :- body(R,_).
 derived_atom(X) :- is_head(X), not assumption(X).
 
 %% ====================
+%% FLATNESS GUARD
+%% ====================
+%% WABA's weighted/budgeted semantics is defined for FLAT ABA frameworks: no
+%% assumption may be the head of a rule. (The weight of an assumption is then
+%% intrinsic, not extension-dependent; this matches the established ABA theory the
+%% semantics rest on, and weighted non-flat ABA has no settled semantics.)
+%% A non-flat assumption is flagged here and the framework is rejected outright,
+%% rather than silently producing ill-defined weights.
+non_flat_assumption(X) :- assumption(X), is_head(X).
+:- non_flat_assumption(_).
+
+%% ====================
 %% CORE LOGIC
 %% ====================
 
@@ -82,242 +94,22 @@ budget(beta).
 `
     },
     semiring: {
-        "arctic": `%% Arctic (Max-Plus) Semiring for Weight Propagation
-%% Semiring: (ℤ ∪ {±∞}, max, +, #inf, 0)
-%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
-%% - Disjunction/⊕ (OR): max (strongest alternative)
-%% - Conjunction/⊗ (AND): + (accumulate rewards)
-%% - Additive identity: #inf (identity for max operation)
-%% - Multiplicative identity: 0 (identity for + operation)
-%% - Interpretation: weights are rewards/benefits, higher is better
-%%
-%% SEMANTICS: Reward Accumulation / Longest Path
-%% ==============================================
-%% The Arctic semiring is the DUAL of the Tropical semiring:
-%% - Tropical: (+, min) for cost minimization / shortest path
-%% - Arctic: (+, max) for reward maximization / longest path
-%%
-%% Key applications:
-%% - Scoring arguments by accumulated support/evidence
-%% - Finding strongest evidence chains (sum of supporting weights)
-%% - Benefit/reward optimization (opposite of cost minimization)
-%% - Longest path problems in graphs
-%%
-%% Comparison to Tropical:
-%% - Tropical: weights are costs (lower is better), minimize sum
-%% - Arctic: weights are rewards (higher is better), maximize sum
-%%
-%% Note: "Arctic" comes from tropical algebra (hot=min, cold=max)
+        "arctic": `%% Arctic / max-plus semiring (additive family; negation-dual of tropical).
+%% Semiring: (ℤ ∪ {-∞}, ⊕=max, ⊗=+, 0̄=#inf, 1̄=0) — strength polarity.
+%% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
+%% Weights are rewards/benefits, higher is better (longest path).
 
 active_semiring(arctic).
-%% Default weight policy selection for unweighted assumptions.
-%%
-%% Semiring modules provide semiring_default_weight(policy, value).
-%% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
-
-default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
-
+oplus(max).
+oplus_identity(#inf).
+otimes_identity(0).
+affordability_polarity(strength).
 
 semiring_default_weight(legacy,0).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,0).
 
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: NEUTRALITY
-%% ========================================
-%%
-%% Unweighted atoms receive the MULTIPLICATIVE IDENTITY (0):
-%% - For addition: 0 + x = x (neutral, doesn't affect accumulation)
-%% - Default weight of 0 means "no reward contributed"
-%%
-%% IMPORTANT: This differs from Tropical semiring!
-%% - Tropical uses #sup as default (infinitely expensive to discard)
-%% - Arctic uses 0 as default (neutral contribution, easily discarded)
-%%
-%% For Arctic semiring:
-%% - Multiplicative identity = 0 (neutral for addition)
-%% - Meaning: Unweighted assumptions contribute zero reward
-%% - Discard cost with max monoid: max(0, ...) = other weights (not dominating)
-%% - Discard cost with sum monoid: sum + 0 = sum (neutral)
-%%
-%% This creates different semantics than Tropical:
-%% - Tropical: Unweighted assumptions are "hard to discard" (#sup)
-%% - Arctic: Unweighted assumptions are "neutral" (0 reward)
-%%
-%% If you want unweighted assumptions to be "hard to discard" in Arctic,
-%% the monoid should assign #sup as default (monoid/*.lp files handle this).
-
-%% Assumptions with explicit weights
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
-
-%% Assumptions without explicit weights: Use multiplicative identity (0)
-%% For Arctic semiring, unweighted assumptions get 0 (neutral reward)
-%% Rationale: Neutral contribution to reward accumulation
-%% - In conjunction (+): 0 + x = x (doesn't affect sum)
-%% - In disjunction (max): max(0, x) = x for x > 0 (neutral for positive rewards)
-%%
-%% NOTE: This is the MULTIPLICATIVE identity (neutral for conjunction).
-%% For "hard to discard" semantics, monoids assign #sup as default weight.
-supported_with_weight(X,W) :- assumption(X), in(X), not weight(X,_), not head(_,X), default_assumption_weight(W).
-
-%% Step 1: Compute weight for each rule derivation using conjunction (addition)
-%% For rule R deriving X: sum weights of all body elements (accumulate rewards)
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
-
-%% Special handling for #sup and #inf: clingo's #sum aggregate has limitations
-%% - #sum ignores #sup values (with warning)
-%% - #inf is handled correctly
-%% We detect infinite values before aggregation to preserve them
-
-%% Helper: detect if any body element has #sup weight (infinite reward)
-body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
-
-%% Helper: detect if any body element has #inf weight (infinitely negative)
-body_has_inf_weight(R) :- body(R,B), supported_with_weight(B,#inf).
-
-%% If any body has #sup, derivation weight is #sup (infinite reward propagates)
-rule_derivation_weight(R,X,#sup) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    body_has_sup_weight(R).
-
-%% If any body has #inf (and no #sup), derivation weight is #inf
-rule_derivation_weight(R,X,#inf) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    not body_has_sup_weight(R),
-    body_has_inf_weight(R).
-
-%% Otherwise, sum finite weights (standard case)
-rule_derivation_weight(R,X,W) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    not body_has_sup_weight(R),
-    not body_has_inf_weight(R),
-    W = #sum{ V,B : body(R,B), supported_with_weight(B,V) }.
-
-%% Handle rules with empty bodies (facts): Use 0 (multiplicative identity for +)
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = 0. This keeps the empty body TRANSPARENT in + (0+x=x); over the
-%% supported (nonnegative) weight surface a standalone fact then carries 0 reward.
-%%
-%% (Earlier this used #inf, the ADDITIVE identity. #inf is dropped/absorbed by the
-%% reward-accumulating +, so conclusions derived through a fact were corrupted.
-%% Classical ABA recovery is preserved via constraint/no_discard.lp.)
-rule_derivation_weight(R,X,0) :-
-    head(R,X),
-    supported(X),
-    not body(R,_),
-    not weight(X,_).  % weighted facts keep their explicit weight (override)
-
-%% Step 2: Combine multiple derivations using disjunction (maximum)
-%% The weight of X is the maximum across all its rule derivations
-%% AND any explicit weight (OR semantics: explicit weight is another "derivation")
-%% Interpretation: Multiple derivation paths → take strongest/highest reward path
-supported_with_weight(X,W) :-
-    supported(X),
-    head(_,X),  % X is derived (not just an assumption)
-    W = #max{ V : rule_derivation_weight(_,X,V) ;
-              V : weight(X,V) }.
-
-%% ========================================================================
-%% UNDEFEATED WEIGHT COMPUTATION (for Budget-Aware Admissibility Defense)
-%% ========================================================================
-
-%% Base cases
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-undefeated_weight(X,W) :- assumption(X), not defeated(X), weight(X,W), not head(_,X).
-
-%% Rule derivation with Arctic conjunction (addition)
-undefeated_rule_weight(R,X,W) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    W = #sum{ V,B : body(R,B), undefeated_weight(B,V) }.
-
-%% Disjunction (max)
-undefeated_weight(X,W) :-
-    derived_from_undefeated(X),
-    head(_,X),
-    not assumption(X),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) }.
-
-%% NON-FLAT: Assumptions that are also rule heads
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    weight(X,_),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) ;
-              V : weight(X,V) }.
-
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    not weight(X,_),
-    default_assumption_weight(D),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) ;
-              D : true }.
-
-%% Polarity: Strength (higher is better)
-%% Classical ABA: beta=#sup (can't meet threshold) or beta=0 (backward compatibility)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != #sup, B != 0, W < B.
-`,
-        "bottleneck_cost": `%% Bottleneck-Cost Semiring for Weight Propagation
-%% Semiring: (ℤ ∪ {±∞}, min, max, #sup, #inf)
-%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
-%% - Disjunction/⊕ (OR): min (cheapest alternative)
-%% - Conjunction/⊗ (AND): max (bottleneck / worst component)
-%% - Additive identity: #sup (identity for min operation)
-%% - Multiplicative identity: #inf (identity for max operation)
-%% - Interpretation: weights are costs/penalties, LOWER is better
-%%
-%% SEMANTICS: Bottleneck Cost / Maximum Penalty
-%% ============================================
-%% The bottleneck-cost semiring models scenarios where:
-%% - A chain's cost is determined by its WORST/highest-cost component (max for conjunction)
-%% - Among alternatives, choose the CHEAPEST path (min for disjunction)
-%% - Applications: Bottleneck problems, worst-case cost, maximum penalty
-%%
-%% Key insight: This is the DUAL of standard min/max bottleneck:
-%% - Standard bottleneck (min/max): Maximize minimum capacity
-%% - Bottleneck-cost (max/min): Minimize maximum cost
-%%
-%% Examples:
-%% - Quality control: Reject batch if ANY component exceeds defect threshold (max)
-%% - Security: System vulnerability = worst component vulnerability (max)
-%% - Logistics: Route cost = bottleneck (slowest/most expensive segment)
-
-active_semiring(bottleneck_cost).
 %% Default weight policy selection for unweighted assumptions.
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
@@ -337,226 +129,129 @@ default_assumption_weight(W) :-
 
 :- active_default_policy(P), not semiring_default_weight(P, _).
 
+%% ============================================================================
+%% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
+%% ============================================================================
+%% Used by tropical (⊕=min, 0̄=#sup) and arctic (⊕=max, 0̄=#inf). ⊗ is fixed to
+%% the integer sum.
+%%
+%% clingo #sum silently DROPS #sup and #inf, so the two infinities are handled
+%% explicitly. For ⊗=+, the additive annihilator is the ⊕-identity 0̄ (x + 0̄ = 0̄):
+%%   - any body element = 0̄ (annihilator)            -> result 0̄   (precedence)
+%%   - else any body element = the opposite infinity  -> result that infinity
+%%   - else                                            -> finite #sum
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%%
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
+
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
+
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
+
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
+
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
+
+
+otimes_annihilator(A) :- oplus_identity(A).
+opposite_infinity(#inf) :- oplus_identity(#sup).
+opposite_infinity(#sup) :- oplus_identity(#inf).
+
+add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
+add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
+
+%% Annihilator wins (a ⊗ 0̄ = 0̄).
+rule_deriv(P, R, X, A) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    add_body_has_annih(P, R), otimes_annihilator(A).
+%% No annihilator, but the opposite infinity saturates.
+rule_deriv(P, R, X, O) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+%% Finite case: plain integer sum (no infinities present).
+rule_deriv(P, R, X, W) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
+
+`,
+        "bottleneck_cost": `%% Bottleneck-cost semiring (idempotent family; order-dual of godel).
+%% Semiring: (ℤ ∪ {±∞}, ⊕=min, ⊗=max, 0̄=#sup, 1̄=#inf) — cost polarity.
+%% Conjunction = worst step (max); disjunction = cheapest alternative (min).
+%% An argument costs as much as its single worst step (worst-case path).
+
+active_semiring(bottleneck_cost).
+
+oplus(min).
+otimes(max).
+oplus_identity(#sup).
+otimes_identity(#inf).
+affordability_polarity(cost).
 
 semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#inf).
 
-%% =============================================
-%% CLASSICAL ABA RECOVERY (No Discarding)
-%% =============================================
-%%
-%% To recover plain unweighted ABA behavior with this semiring:
-%%
-%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
-%%   δ = #sup     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
-%%
-%% LOWER BOUND REGIME (MIN monoid):
-%%   δ = #inf     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
-%%   Alternative: δ = #sup with special constraint rejection
-%%
-%% CURRENT IMPLEMENTATION: δ = #sup (see line ~60 below)
-%% This enables ABA recovery for UB monoids with β = 0.
-%% For LB monoids, use δ = #inf by setting all assumption weights explicitly.
-%%
-%% Comparison to Tropical:
-%% - Tropical (+/min): Minimize SUM of costs (total cost matters)
-%% - Bottleneck-cost (max/min): Minimize MAX of costs (worst-case matters)
-
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: INFIMUM
-%% ========================================
-%%
-%% Unweighted atoms receive the INFIMUM (minimum value in range):
-%% - For bottleneck-cost semantics: #inf = infinitely GOOD (zero cost)
-%% - Meaning: Unweighted assumptions impose no cost/penalty
-%%
-%% IMPORTANT: This differs from Tropical and Arctic!
-%% - Tropical: #sup default (infinitely expensive, hard to discard)
-%% - Bottleneck-cost: #inf default (zero cost, easy to discard)
-%%
-%% For Bottleneck-cost semiring:
-%% - Multiplicative identity = #inf (neutral for max)
-%% - Meaning: Unweighted assumptions contribute zero cost
-%% - In conjunction (max): max(#inf, x) = x (no cost added)
-%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap path)
-%%
-%% This creates "optimistic" semantics:
-%% - Unweighted assumptions are assumed to be "free" (zero cost)
-%% - Only explicit weights impose costs
-%%
-%% If you want unweighted assumptions to be "hard to discard", the monoid
-%% should assign #sup as default weight (monoid/*.lp files handle this).
-
-%% Assumptions with explicit weights
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
-
-%% Assumptions without explicit weights: Use multiplicative identity (#inf)
-%% For Bottleneck-cost semiring, unweighted assumptions get #inf (zero cost)
-%% Rationale: Neutral contribution to bottleneck cost
-%% - In conjunction (max): max(#inf, x) = x (doesn't affect bottleneck)
-%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap)
-%%
-%% NOTE: This is the MULTIPLICATIVE identity (neutral for conjunction).
-%% For "hard to discard" semantics, monoids assign #sup as default weight.
-%%
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-
-%% Step 1: Compute weight for each rule derivation using conjunction (maximum)
-%% For rule R deriving X: take MAXIMUM weight among all body elements (bottleneck)
-%% Interpretation: Chain is only as good as its WORST (highest-cost) component
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
-rule_derivation_weight(R,X,W) :-
-    head(R,X),
-    supported(X),
-    body(R,_),  % Only for rules with bodies
-    triggered_by_in(R),  % Only triggered rules
-    W = #max{ V,B : body(R,B), supported_with_weight(B,V) }.
-
-%% Handle rules with empty bodies (facts): Use #inf (multiplicative identity for max)
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = #inf. This keeps the empty body TRANSPARENT in max (max(#inf,x)=x), so a
-%% fact used inside a longer rule body does not affect the bottleneck of the chain.
-%%
-%% (Earlier this used #sup, the ADDITIVE identity. But #sup is the max-ANNIHILATOR
-%% (max(#sup,x)=#sup), so any conclusion derived through a fact collapsed to #sup,
-%% poisoning every conjunctive chain through a fact. Classical ABA recovery is
-%% preserved via constraint/no_discard.lp.)
-rule_derivation_weight(R,X,#inf) :-
-    head(R,X),
-    supported(X),
-    not body(R,_),
-    not weight(X,_).  % weighted facts keep their explicit weight (override)
-
-%% Step 2: Combine multiple derivations using disjunction (minimum)
-%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
-%% - Multiple rule derivations are combined via ⊕
-%% - Explicit weight is another "path" to support, combined via ⊕
-%% - For Bottleneck-cost semiring: ⊕ = min (choose cheapest/lowest-cost path)
-%%
-%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
-%% The actual weight is their DISJUNCTION, not conjunction or override.
-%%
-%% Example: If X has explicit weight 50 and is also derived with weight 30,
-%%          then supported_with_weight(X, min(50, 30)) = supported_with_weight(X, 30)
-%%          (the cheaper path is chosen)
-supported_with_weight(X,W) :-
-    supported(X),
-    head(_,X),  % X is derived (not just an assumption)
-    not assumption(X),  % X is not an assumption
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
-
-%% NON-FLAT-WABA: Derived assumption with explicit weight
-%% Combine rule-derived weight with explicit weight via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    weight(X,_),  % Has explicit weight
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
-
-%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
-%% Combine rule-derived weight with default assumption weight (#inf) via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),  % Assumption is selected
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    not weight(X,_),  % No explicit weight
-    default_assumption_weight(D),
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              D : true }.  % Direct assumption path selected by the active default policy
-
-%% ========================================================================
-%% UNDEFEATED WEIGHT COMPUTATION (for Budget-Aware Admissibility Defense)
-%% ========================================================================
-
-%% Base cases
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-undefeated_weight(X,W) :- assumption(X), not defeated(X), weight(X,W), not head(_,X).
-
-%% Rule derivation with Bottleneck conjunction (max - worst component)
-undefeated_rule_weight(R,X,W) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    W = #max{ V,B : body(R,B), undefeated_weight(B,V) }.
-
-%% Disjunction (min - cheapest path)
-undefeated_weight(X,W) :-
-    derived_from_undefeated(X),
-    head(_,X),
-    not assumption(X),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) }.
-
-%% NON-FLAT: Assumptions that are also rule heads
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    weight(X,_),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              V : weight(X,V) }.
-
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    not weight(X,_),
-    default_assumption_weight(D),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              D : true }.
-
-%% Polarity: Cost (lower is better)
-%% Special case: beta=0 means classical ABA (all attacks unaffordable)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != 0, W > B.
-`,
-        "godel": `%% Gödel Semiring for Weight Propagation (Fuzzy Logic) - GROUNDING OPTIMIZED
-%% Semiring: (ℤ ∪ {±∞}, max, min, #inf, #sup)
-%% - Domain: All integers plus infinities
-%% - Disjunction/⊕ (OR, multiple derivations): max (strongest alternative)
-%% - Conjunction/⊗ (AND, body elements): min (weakest link)
-%% - Additive identity: #inf (identity for max operation)
-%% - Multiplicative identity: #sup (identity for min operation)
-%% - Interpretation: weights are truth degrees, higher is better
-%%
-%% OPTIMIZATIONS APPLIED:
-%% - Use not is_head(X) instead of not head(_,X)
-%% - Use not has_body(R) instead of not body(R,_)
-%% - Use rule(R) consistently for rule domains
-%% - Remove redundant supported(X) checks
-%%
-%% In Gödel fuzzy logic:
-%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
-%% - Conjunction takes the minimum (weakest link in a chain)
-%% - Disjunction takes the maximum (strongest of multiple proofs)
-%% - Unweighted atoms get #sup (maximum truth, hardest to discard)
-
-active_semiring(godel).
 %% Default weight policy selection for unweighted assumptions.
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
@@ -576,428 +271,248 @@ default_assumption_weight(W) :-
 
 :- active_default_policy(P), not semiring_default_weight(P, _).
 
+%% ============================================================================
+%% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
+%% ============================================================================
+%% Used by godel (⊗=min, ⊕=max) and bottleneck_cost (⊗=max, ⊕=min), the two
+%% bounded-distributive-lattice algebras. ⊗ is selected by otimes(min|max).
+%%
+%% No infinity guards are needed: clingo #min/#max drop the off-identity infinity
+%% exactly as the lattice requires (#max drops #inf = max-identity; #min drops
+%% #sup = min-identity), and keep the annihilating infinity (#max keeps #sup,
+%% #min keeps #inf).
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%%
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
+
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
+
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
+
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
+
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
+
+
+rule_deriv(P, R, X, W) :-
+    otimes(min), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #min{ V,B : body(R,B), pweight(P,B,V) }.
+
+rule_deriv(P, R, X, W) :-
+    otimes(max), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #max{ V,B : body(R,B), pweight(P,B,V) }.
+
+`,
+        "godel": `%% Gödel / Fuzzy semiring (idempotent family).
+%% Semiring: (ℤ ∪ {±∞}, ⊕=max, ⊗=min, 0̄=#inf, 1̄=#sup) — strength polarity.
+%% Conjunction = weakest link (min); disjunction = strongest alternative (max).
+%% Weights are truth degrees / confidences, higher is better (original WABA).
+
+active_semiring(godel).
+
+oplus(max).
+otimes(min).
+oplus_identity(#inf).
+otimes_identity(#sup).
+affordability_polarity(strength).
 
 semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#sup).
 
-%% =============================================
-%% CLASSICAL ABA RECOVERY (No Discarding)
-%% =============================================
+%% Default weight policy selection for unweighted assumptions.
 %%
-%% To recover plain unweighted ABA behavior with this semiring:
-%%
-%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
-%%   δ = #sup     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
-%%              (line 41: \`:- discarded_attack(_,_,#sup), budget(B), B != #sup.\`)
-%%
-%% LOWER BOUND REGIME (MIN monoid):
-%%   Option 1 (recommended):
-%%     δ = #inf   (default weight)
-%%     β = 0      (budget value)
-%%     Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
-%%   Option 2:
-%%     δ = #sup   (default weight)
-%%     β = any    (any finite budget)
-%%     Mechanism: constraint/lb.lp explicitly rejects discarding #sup attacks
-%%                (line 43: \`:- discarded_attack(_,_,#sup).\`)
-%%
-%% CURRENT IMPLEMENTATION: δ = #sup (see line ~45 below)
-%% This enables ABA recovery for all monoids with appropriate budget settings.
+%% Semiring modules provide semiring_default_weight(policy, value).
+%% Callers may optionally load one explicit policy module from defaults/.
+%% If none is loaded, legacy behavior is preserved.
 
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: SUPREMUM
-%% ========================================
-%%
-%% Unweighted atoms receive the SUPREMUM (maximum value in range):
-%% - Matches standard ABA: assumptions accepted by default ("innocent until proven guilty")
-%% - "Hardest to discard": attacks from unweighted atoms are maximally expensive
-%% - Budget semantics: requires budget ≥ #sup to discard such attacks
-%%
-%% For Gödel semiring:
-%% - Supremum = #sup (positive infinity, fully true, maximum truth degree)
-%% - Meaning: Unweighted assumptions have maximum truth value
-%% - Discard cost with max monoid: max(#sup, ...) = #sup (infinitely expensive)
-%% - Discard cost with min monoid: not compatible (see compatibility theory)
-%% - Discard cost with sum monoid: sum += #sup → #sup (infinitely expensive)
-%%
-%% Explicit weights REPLACE the supremum default (via mutually exclusive rules).
-%% DEFAULT WEIGHTS for unweighted atoms are now defined in monoid/*.lp files,
-%% since the monoid determines what "hard to discard" means.
-%%
+configured_default_policy :- explicit_default_policy(_).
 
-%% Assumptions with explicit weights
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-%% OPTIMIZED: Use not is_head(X) instead of not head(_,X)
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not is_head(X).
+:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
-%% Assumptions without explicit weights: Use supremum (maximum truth value)
-%% For Gödel semiring, unweighted assumptions get #sup (maximum truth degree)
-%% Rationale: Unweighted assumptions are "hardest to discard" (default acceptance)
-%% - Matches standard ABA semantics: assumptions accepted by default
-%% - #sup = positive infinity (supremum, maximum value)
-%% - In conjunction (min): min(#sup, x) = x (doesn't affect derivations)
-%% - In disjunction (max): max(#sup, x) = #sup (dominates, represents maximum truth)
-%%
-%% NOTE: Uses #sup (positive infinity) as the supremum value.
-%% Constraints must handle #sup specially for budget checking.
-%%
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-%% OPTIMIZED: Use not is_head(X) instead of not head(_,X)
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),
-    not weight(X,_),
-    not is_head(X),
-    default_assumption_weight(W).
+active_default_policy(P) :- explicit_default_policy(P).
+active_default_policy(legacy) :- not configured_default_policy.
 
-%% Step 1: Compute weight for each rule derivation using conjunction (minimum)
-%% For rule R deriving X: take minimum weight among all body elements
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
-%% OPTIMIZED: Use rule(R) instead of head(R,X), remove redundant supported(X) check
-rule_derivation_weight(R,X,W) :-
-    rule(R),
-    head(R,X),
-    has_body(R),  % Only for rules with bodies
-    triggered_by_in(R),  % Only triggered rules (prevents #sup from unsupported bodies)
-    W = #min{ V,B : body(R,B), supported_with_weight(B,V) }.
+default_assumption_weight(W) :-
+    active_default_policy(P),
+    semiring_default_weight(P, W).
 
-%% Handle rules with empty bodies (facts): Use #sup (multiplicative identity for min).
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = #sup. This makes the empty body TRANSPARENT in min (min(#sup,x)=x), so
-%% an UNWEIGHTED fact is maximally certain and does not affect a longer chain.
-%%
-%% Guarded by \`not weight(X,_)\`: an explicitly weighted fact (e.g. \`risk(high) <- T\`
-%% with weight(risk(high),7)) keeps its own weight. Without the guard, the ⊕ = max
-%% combine below would let #sup dominate the explicit weight (max(#sup,7)=#sup),
-%% silently discarding authored weights on facts.
-%%
-%% (Earlier this used #inf, the ADDITIVE identity and min-ANNIHILATOR (min(#inf,x)=#inf),
-%% which poisoned every conjunctive chain through a fact.)
-%%
-%% OPTIMIZED: Use not has_body(R) instead of not body(R,_), use rule(R)
-rule_derivation_weight(R,X,#sup) :-
-    rule(R),
-    head(R,X),
-    not has_body(R),
-    not weight(X,_).
+:- active_default_policy(P), not semiring_default_weight(P, _).
 
-%% Step 2: Combine multiple derivations using disjunction (maximum)
-%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
-%% - Multiple rule derivations are combined via ⊕
-%% - Explicit weight is another "path" to support, combined via ⊕
-%% - For Gödel semiring: ⊕ = max (choose strongest/highest truth path)
+%% ============================================================================
+%% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
+%% ============================================================================
+%% Used by godel (⊗=min, ⊕=max) and bottleneck_cost (⊗=max, ⊕=min), the two
+%% bounded-distributive-lattice algebras. ⊗ is selected by otimes(min|max).
 %%
-%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
-%% The actual weight is their DISJUNCTION, not conjunction or override.
+%% No infinity guards are needed: clingo #min/#max drop the off-identity infinity
+%% exactly as the lattice requires (#max drops #inf = max-identity; #min drops
+%% #sup = min-identity), and keep the annihilating infinity (#max keeps #sup,
+%% #min keeps #inf).
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
 %%
-%% Example: If X has explicit weight 50 and is also derived with weight 80,
-%%          then supported_with_weight(X, max(50, 80)) = supported_with_weight(X, 80)
-%%          (the stronger path is chosen)
-%% OPTIMIZED: Use derived_atom(X) instead of head(_,X), not assumption(X)
-supported_with_weight(X,W) :-
-    derived_atom(X),
-    supported(X),
-    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Gödel)
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
-%% NON-FLAT-WABA: Derived assumption with explicit weight
-%% Combine rule-derived weight with explicit weight via DISJUNCTION (max)
-%% OPTIMIZED: Use is_head(X) instead of head(_,X)
-supported_with_weight(X,W) :-
-    assumption(X),
-    supported(X),
-    is_head(X),  % Assumption is also derived
-    weight(X,_),  % Has explicit weight
-    W = #max{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = max for Gödel)
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
 
-%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
-%% For Gödel: max(derived, #sup) = #sup always (default dominates)
-%% NOTE: Clingo ignores #sup in aggregates, so we assign it explicitly
-%% OPTIMIZED: Use is_head(X) instead of head(_,X)
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),  % Assumption is selected
-    supported(X),
-    is_head(X),  % Assumption is also derived
-    not weight(X,_),
-    default_assumption_weight(W).
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
 
-undefeated_weight(X,W) :- assumption(X), not defeated(X), default_assumption_weight(W).
-undefeated_weight(X,W) :- derived_from_undefeated(X), weight(X,W).
-undefeated_weight(X,W) :- derived_from_undefeated(X), head(R,X), W = #min{ V,B : body(R,B), undefeated_weight(B,V) }.
-%% Polarity: Strength (higher is better)
-%% Classical ABA: beta=#sup (can't meet threshold) or beta=0 (backward compatibility)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != #sup, B != 0, W < B.
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
+
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
+
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
+
+
+rule_deriv(P, R, X, W) :-
+    otimes(min), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #min{ V,B : body(R,B), pweight(P,B,V) }.
+
+rule_deriv(P, R, X, W) :-
+    otimes(max), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #max{ V,B : body(R,B), pweight(P,B,V) }.
+
 `,
         "godel_low": `%% ALIAS — not a separate algebra.
 %% \`godel_low\` is the lower-is-better (cost) polarity dual of \`godel\` (max,min).
 %% That dual is exactly the (min, max) bottleneck-cost algebra, so this file is a
 %% thin alias for semiring/bottleneck_cost.lp. Kept so that \`--semiring godel_low\`
 %% and raw \`clingo ... semiring/godel_low.lp ...\` runs keep resolving.
-%% Bottleneck-Cost Semiring for Weight Propagation
-%% Semiring: (ℤ ∪ {±∞}, min, max, #sup, #inf)
-%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
-%% - Disjunction/⊕ (OR): min (cheapest alternative)
-%% - Conjunction/⊗ (AND): max (bottleneck / worst component)
-%% - Additive identity: #sup (identity for min operation)
-%% - Multiplicative identity: #inf (identity for max operation)
-%% - Interpretation: weights are costs/penalties, LOWER is better
-%%
-%% SEMANTICS: Bottleneck Cost / Maximum Penalty
-%% ============================================
-%% The bottleneck-cost semiring models scenarios where:
-%% - A chain's cost is determined by its WORST/highest-cost component (max for conjunction)
-%% - Among alternatives, choose the CHEAPEST path (min for disjunction)
-%% - Applications: Bottleneck problems, worst-case cost, maximum penalty
-%%
-%% Key insight: This is the DUAL of standard min/max bottleneck:
-%% - Standard bottleneck (min/max): Maximize minimum capacity
-%% - Bottleneck-cost (max/min): Minimize maximum cost
-%%
-%% Examples:
-%% - Quality control: Reject batch if ANY component exceeds defect threshold (max)
-%% - Security: System vulnerability = worst component vulnerability (max)
-%% - Logistics: Route cost = bottleneck (slowest/most expensive segment)
+%% Bottleneck-cost semiring (idempotent family; order-dual of godel).
+%% Semiring: (ℤ ∪ {±∞}, ⊕=min, ⊗=max, 0̄=#sup, 1̄=#inf) — cost polarity.
+%% Conjunction = worst step (max); disjunction = cheapest alternative (min).
+%% An argument costs as much as its single worst step (worst-case path).
 
 active_semiring(bottleneck_cost).
-%% Default weight policy selection for unweighted assumptions.
-%%
-%% Semiring modules provide semiring_default_weight(policy, value).
-%% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
-
-default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
-
+oplus(min).
+otimes(max).
+oplus_identity(#sup).
+otimes_identity(#inf).
+affordability_polarity(cost).
 
 semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#inf).
 
-%% =============================================
-%% CLASSICAL ABA RECOVERY (No Discarding)
-%% =============================================
-%%
-%% To recover plain unweighted ABA behavior with this semiring:
-%%
-%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
-%%   δ = #sup     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
-%%
-%% LOWER BOUND REGIME (MIN monoid):
-%%   δ = #inf     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
-%%   Alternative: δ = #sup with special constraint rejection
-%%
-%% CURRENT IMPLEMENTATION: δ = #sup (see line ~60 below)
-%% This enables ABA recovery for UB monoids with β = 0.
-%% For LB monoids, use δ = #inf by setting all assumption weights explicitly.
-%%
-%% Comparison to Tropical:
-%% - Tropical (+/min): Minimize SUM of costs (total cost matters)
-%% - Bottleneck-cost (max/min): Minimize MAX of costs (worst-case matters)
-
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: INFIMUM
-%% ========================================
-%%
-%% Unweighted atoms receive the INFIMUM (minimum value in range):
-%% - For bottleneck-cost semantics: #inf = infinitely GOOD (zero cost)
-%% - Meaning: Unweighted assumptions impose no cost/penalty
-%%
-%% IMPORTANT: This differs from Tropical and Arctic!
-%% - Tropical: #sup default (infinitely expensive, hard to discard)
-%% - Bottleneck-cost: #inf default (zero cost, easy to discard)
-%%
-%% For Bottleneck-cost semiring:
-%% - Multiplicative identity = #inf (neutral for max)
-%% - Meaning: Unweighted assumptions contribute zero cost
-%% - In conjunction (max): max(#inf, x) = x (no cost added)
-%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap path)
-%%
-%% This creates "optimistic" semantics:
-%% - Unweighted assumptions are assumed to be "free" (zero cost)
-%% - Only explicit weights impose costs
-%%
-%% If you want unweighted assumptions to be "hard to discard", the monoid
-%% should assign #sup as default weight (monoid/*.lp files handle this).
-
-%% Assumptions with explicit weights
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
-
-%% Assumptions without explicit weights: Use multiplicative identity (#inf)
-%% For Bottleneck-cost semiring, unweighted assumptions get #inf (zero cost)
-%% Rationale: Neutral contribution to bottleneck cost
-%% - In conjunction (max): max(#inf, x) = x (doesn't affect bottleneck)
-%% - In disjunction (min): min(#inf, x) = #inf (infinitely cheap)
-%%
-%% NOTE: This is the MULTIPLICATIVE identity (neutral for conjunction).
-%% For "hard to discard" semantics, monoids assign #sup as default weight.
-%%
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-
-%% Step 1: Compute weight for each rule derivation using conjunction (maximum)
-%% For rule R deriving X: take MAXIMUM weight among all body elements (bottleneck)
-%% Interpretation: Chain is only as good as its WORST (highest-cost) component
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
-rule_derivation_weight(R,X,W) :-
-    head(R,X),
-    supported(X),
-    body(R,_),  % Only for rules with bodies
-    triggered_by_in(R),  % Only triggered rules
-    W = #max{ V,B : body(R,B), supported_with_weight(B,V) }.
-
-%% Handle rules with empty bodies (facts): Use #inf (multiplicative identity for max)
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = #inf. This keeps the empty body TRANSPARENT in max (max(#inf,x)=x), so a
-%% fact used inside a longer rule body does not affect the bottleneck of the chain.
-%%
-%% (Earlier this used #sup, the ADDITIVE identity. But #sup is the max-ANNIHILATOR
-%% (max(#sup,x)=#sup), so any conclusion derived through a fact collapsed to #sup,
-%% poisoning every conjunctive chain through a fact. Classical ABA recovery is
-%% preserved via constraint/no_discard.lp.)
-rule_derivation_weight(R,X,#inf) :-
-    head(R,X),
-    supported(X),
-    not body(R,_),
-    not weight(X,_).  % weighted facts keep their explicit weight (override)
-
-%% Step 2: Combine multiple derivations using disjunction (minimum)
-%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
-%% - Multiple rule derivations are combined via ⊕
-%% - Explicit weight is another "path" to support, combined via ⊕
-%% - For Bottleneck-cost semiring: ⊕ = min (choose cheapest/lowest-cost path)
-%%
-%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
-%% The actual weight is their DISJUNCTION, not conjunction or override.
-%%
-%% Example: If X has explicit weight 50 and is also derived with weight 30,
-%%          then supported_with_weight(X, min(50, 30)) = supported_with_weight(X, 30)
-%%          (the cheaper path is chosen)
-supported_with_weight(X,W) :-
-    supported(X),
-    head(_,X),  % X is derived (not just an assumption)
-    not assumption(X),  % X is not an assumption
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
-
-%% NON-FLAT-WABA: Derived assumption with explicit weight
-%% Combine rule-derived weight with explicit weight via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    weight(X,_),  % Has explicit weight
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Bottleneck-cost)
-
-%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
-%% Combine rule-derived weight with default assumption weight (#inf) via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),  % Assumption is selected
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    not weight(X,_),  % No explicit weight
-    default_assumption_weight(D),
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              D : true }.  % Direct assumption path selected by the active default policy
-
-%% ========================================================================
-%% UNDEFEATED WEIGHT COMPUTATION (for Budget-Aware Admissibility Defense)
-%% ========================================================================
-
-%% Base cases
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-undefeated_weight(X,W) :- assumption(X), not defeated(X), weight(X,W), not head(_,X).
-
-%% Rule derivation with Bottleneck conjunction (max - worst component)
-undefeated_rule_weight(R,X,W) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    W = #max{ V,B : body(R,B), undefeated_weight(B,V) }.
-
-%% Disjunction (min - cheapest path)
-undefeated_weight(X,W) :-
-    derived_from_undefeated(X),
-    head(_,X),
-    not assumption(X),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) }.
-
-%% NON-FLAT: Assumptions that are also rule heads
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    weight(X,_),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              V : weight(X,V) }.
-
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    not weight(X,_),
-    default_assumption_weight(D),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              D : true }.
-
-%% Polarity: Cost (lower is better)
-%% Special case: beta=0 means classical ABA (all attacks unaffordable)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != 0, W > B.
-
-`,
-        "tropical": `%% Tropical Semiring for Weight Propagation
-%% Semiring: (ℤ ∪ {±∞}, min, +, #sup, 0)
-%% - Domain: All integers plus infinities
-%% - Disjunction/⊕ (OR, multiple derivations): min (choose best path)
-%% - Conjunction/⊗ (AND, body elements): + (accumulate costs)
-%% - Additive identity: #sup (identity for min operation)
-%% - Multiplicative identity: 0 (identity for addition)
-%% - Interpretation: weights are costs, lower is better
-%%
-%% This is the tropical semiring used for shortest path problems.
-
-active_semiring(tropical).
 %% Default weight policy selection for unweighted assumptions.
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
@@ -1017,267 +532,390 @@ default_assumption_weight(W) :-
 
 :- active_default_policy(P), not semiring_default_weight(P, _).
 
+%% ============================================================================
+%% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
+%% ============================================================================
+%% Used by godel (⊗=min, ⊕=max) and bottleneck_cost (⊗=max, ⊕=min), the two
+%% bounded-distributive-lattice algebras. ⊗ is selected by otimes(min|max).
+%%
+%% No infinity guards are needed: clingo #min/#max drop the off-identity infinity
+%% exactly as the lattice requires (#max drops #inf = max-identity; #min drops
+%% #sup = min-identity), and keep the annihilating infinity (#max keeps #sup,
+%% #min keeps #inf).
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%%
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
+
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
+
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
+
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
+
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
+
+
+rule_deriv(P, R, X, W) :-
+    otimes(min), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #min{ V,B : body(R,B), pweight(P,B,V) }.
+
+rule_deriv(P, R, X, W) :-
+    otimes(max), rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    W = #max{ V,B : body(R,B), pweight(P,B,V) }.
+
+
+`,
+        "lukasiewicz": `%% Łukasiewicz / bounded-sum semiring (outside the godel/tropical 2×2).
+%% Semiring: ({0..k}, ⊕=max, ⊗=max(0, a+b-k), 0̄=0, 1̄=k) — strength polarity.
+%% n-ary ⊗: max(0, (Σ wi) - (n-1)*k). Unlike Gödel's weakest-link, a chain of weak
+%% premises ERODES certainty toward 0. The only ⊗ that is not min, max or plain +,
+%% so it shares _phase.lp's propagation skeleton but supplies its own rule_deriv/4.
+%% Weights live on the integer grid {0..k} (#const k, default 1000); override -c k=N.
+
+#const k = 1000.
+
+active_semiring(lukasiewicz).
+
+oplus(max).
+oplus_identity(0).
+otimes_identity(k).
+affordability_polarity(strength).
+
+semiring_default_weight(legacy,k).
+semiring_default_weight(aba,k).
+semiring_default_weight(neutral,k).
+
+%% Default weight policy selection for unweighted assumptions.
+%%
+%% Semiring modules provide semiring_default_weight(policy, value).
+%% Callers may optionally load one explicit policy module from defaults/.
+%% If none is loaded, legacy behavior is preserved.
+
+configured_default_policy :- explicit_default_policy(_).
+
+:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
+
+active_default_policy(P) :- explicit_default_policy(P).
+active_default_policy(legacy) :- not configured_default_policy.
+
+default_assumption_weight(W) :-
+    active_default_policy(P),
+    semiring_default_weight(P, W).
+
+:- active_default_policy(P), not semiring_default_weight(P, _).
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%%
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
+
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
+
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
+
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
+
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
+
+
+%% Bounded-sum ⊗ (both phases). #sum drops #sup/#inf, so saturate them first:
+%% #inf -> 0 (the bounded-sum annihilator, precedence), #sup -> k (grid top).
+luk_body_has_sup(P, R) :- body(R, B), pweight(P, B, #sup).
+luk_body_has_inf(P, R) :- body(R, B), pweight(P, B, #inf).
+
+rule_deriv(P, R, X, 0) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    luk_body_has_inf(P, R).
+rule_deriv(P, R, X, k) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not luk_body_has_inf(P, R), luk_body_has_sup(P, R).
+rule_deriv(P, R, X, M) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not luk_body_has_inf(P, R), not luk_body_has_sup(P, R),
+    S = #sum{ V,B : body(R,B), pweight(P,B,V) },
+    N = #count{ B : body(R,B) },
+    M = #max{ 0 ; S-(N-1)*k }.
+`,
+        "tropical": `%% Tropical / min-plus semiring (additive family).
+%% Semiring: (ℤ ∪ {+∞}, ⊕=min, ⊗=+, 0̄=#sup, 1̄=0) — cost polarity.
+%% Conjunction = accumulate cost (sum); disjunction = cheapest proof (min).
+%% Weights are costs, lower is better (shortest path).
+
+active_semiring(tropical).
+
+oplus(min).
+oplus_identity(#sup).
+otimes_identity(0).
+affordability_polarity(cost).
 
 semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,0).
 
-%% =============================================
-%% CLASSICAL ABA RECOVERY (No Discarding)
-%% =============================================
+%% Default weight policy selection for unweighted assumptions.
 %%
-%% To recover plain unweighted ABA behavior with this semiring:
+%% Semiring modules provide semiring_default_weight(policy, value).
+%% Callers may optionally load one explicit policy module from defaults/.
+%% If none is loaded, legacy behavior is preserved.
+
+configured_default_policy :- explicit_default_policy(_).
+
+:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
+
+active_default_policy(P) :- explicit_default_policy(P).
+active_default_policy(legacy) :- not configured_default_policy.
+
+default_assumption_weight(W) :-
+    active_default_policy(P),
+    semiring_default_weight(P, W).
+
+:- active_default_policy(P), not semiring_default_weight(P, _).
+
+%% ============================================================================
+%% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
+%% ============================================================================
+%% Used by tropical (⊕=min, 0̄=#sup) and arctic (⊕=max, 0̄=#inf). ⊗ is fixed to
+%% the integer sum.
 %%
-%% UPPER BOUND REGIME (MAX, SUM, COUNT, LEX monoids):
-%%   δ = #sup     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: constraint/ub.lp explicitly rejects discarding #sup-weighted attacks
+%% clingo #sum silently DROPS #sup and #inf, so the two infinities are handled
+%% explicitly. For ⊗=+, the additive annihilator is the ⊕-identity 0̄ (x + 0̄ = 0̄):
+%%   - any body element = 0̄ (annihilator)            -> result 0̄   (precedence)
+%%   - else any body element = the opposite infinity  -> result that infinity
+%%   - else                                            -> finite #sum
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
 %%
-%% LOWER BOUND REGIME (MIN monoid):
-%%   δ = #inf     (default weight for unweighted assumptions)
-%%   β = 0        (budget value)
-%%   Mechanism: MIN(#inf) = #inf < 0, rejected by constraint/lb.lp
-%%   Alternative: δ = #sup with special constraint rejection
-%%
-%% CURRENT IMPLEMENTATION: δ = #sup (see line ~52 below)
-%% This enables ABA recovery for UB monoids with β = 0.
-%% For LB monoids, use δ = #inf by setting all assumption weights explicitly.
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: SUPREMUM
-%% ========================================
-%%
-%% Unweighted atoms receive the SUPREMUM (maximum value in range):
-%% - Matches standard ABA: assumptions accepted by default ("innocent until proven guilty")
-%% - "Hardest to discard": attacks from unweighted atoms are maximally expensive
-%% - Budget semantics: attacks with cost #sup (∞) CANNOT be discarded
-%%
-%% For Tropical:
-%% - Supremum = #sup (∞, infinite cost)
-%% - Meaning: Unweighted assumptions have infinite cost (unbounded)
-%% - Discard cost with max monoid: max(#sup, ...) = #sup (impossible to discard!)
-%% - Discard cost with min monoid: min(#sup, ...) = other values (doesn't contribute)
-%% - Discard cost with sum monoid: sum + #sup = #sup (impossible to discard!)
-%%
-%% Note: This makes unweighted attacks IMPOSSIBLE to discard (not just expensive).
-%% Only attacks with explicit finite costs can be discarded within budget constraints.
-%%
-%% Explicit weights REPLACE the supremum default (via mutually exclusive rules).
-%% DEFAULT WEIGHTS for unweighted atoms are now defined in monoid/*.lp files,
-%% since the monoid determines what "hard to discard" means.
-%%
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
 
-%% Assumptions with explicit weights
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
 
-%% Assumptions without explicit weights: Use supremum (infinite cost)
-%% For Tropical semiring, unweighted assumptions get #sup (infinite cost)
-%% Rationale: Unweighted assumptions are "hardest to discard" (default acceptance)
-%% - #sup = positive infinity (infinite cost)
-%% - Matches standard ABA: assumptions accepted by default
-%% - In conjunction (+): #sup + x = #sup (infinite cost propagates)
-%% - In disjunction (min): min(#sup, x) = x (doesn't dominate)
-%%
-%% NOTE: Uses #sup (positive infinity) as supremum.
-%% Constraints must handle #sup specially for budget checking.
-%%
-%% FLAT-WABA: assumption is not a rule head
-%% NON-FLAT-WABA: if assumption is also a rule head, weight is computed below via rule derivation
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
 
-%% Step 1: Compute weight for each rule derivation using conjunction (addition)
-%% For rule R deriving X: sum the weights of all body elements
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
-%%
-%% Special handling for #sup: clingo's #sum aggregate ignores #sup values
-%% If ANY body element has weight #sup, result is #sup (infinite cost propagates)
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
 
-%% Helper: detect if any body element has #sup weight
-body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
 
-%% If any body has #sup, derivation weight is #sup (infinite cost)
-rule_derivation_weight(R,X,#sup) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    body_has_sup_weight(R).
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% Otherwise, sum finite weights (no #sup values present)
-rule_derivation_weight(R,X,W) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    not body_has_sup_weight(R),
-    W = #sum{ V,B : body(R,B), supported_with_weight(B,V) }.
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
 
-%% Handle rules with empty bodies (facts): Use 0 (multiplicative identity for +)
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = 0. This keeps the empty body TRANSPARENT in + (0+x=x), so a fact used
-%% inside a longer rule body contributes nothing to the accumulated cost.
-%%
-%% (Earlier this used #sup, the ADDITIVE identity. But #sup is the +-ANNIHILATOR
-%% (x+#sup=#sup), so any conclusion derived through a fact collapsed to #sup,
-%% poisoning every conjunctive chain through a fact. Classical ABA recovery is
-%% preserved via constraint/no_discard.lp, which forbids discarding regardless of weight.)
-rule_derivation_weight(R,X,0) :-
-    head(R,X),
-    supported(X),
-    not body(R,_),
-    not weight(X,_).  % weighted facts keep their explicit weight (override)
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
-%% Step 2: Combine multiple derivations using disjunction (minimum)
-%% IMPORTANT: Use DISJUNCTION OPERATOR (⊕) to combine weights from different paths:
-%% - Multiple rule derivations are combined via ⊕
-%% - Explicit weight is another "path" to support, combined via ⊕
-%% - For Tropical semiring: ⊕ = min (choose best/cheapest path)
-%%
-%% SEMANTICS: Explicit weight + derived weight represent ALTERNATIVE support paths.
-%% The actual weight is their DISJUNCTION, not conjunction or override.
-%%
-%% Example: If X has explicit weight 50 and is also derived with weight 30,
-%%          then supported_with_weight(X, min(50, 30)) = supported_with_weight(X, 30)
-%%          (the cheaper path is chosen)
-supported_with_weight(X,W) :-
-    supported(X),
-    head(_,X),  % X is derived (not just an assumption)
-    not assumption(X),  % X is not an assumption
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Tropical)
 
-%% NON-FLAT-WABA: Derived assumption with explicit weight
-%% Combine rule-derived weight with explicit weight via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    weight(X,_),  % Has explicit weight
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              V : weight(X,V) }.  % DISJUNCTION (⊕ = min for Tropical)
+otimes_annihilator(A) :- oplus_identity(A).
+opposite_infinity(#inf) :- oplus_identity(#sup).
+opposite_infinity(#sup) :- oplus_identity(#inf).
 
-%% NON-FLAT-WABA: Derived assumption WITHOUT explicit weight, but is IN
-%% Combine rule-derived weight with default assumption weight (#sup) via DISJUNCTION (min)
-supported_with_weight(X,W) :-
-    assumption(X),
-    in(X),  % Assumption is selected
-    supported(X),
-    head(_,X),  % Assumption is also derived
-    not weight(X,_),  % No explicit weight
-    default_assumption_weight(D),
-    W = #min{ V,R : rule_derivation_weight(R,X,V) ;
-              D : true }.  % Direct assumption path selected by the active default policy
+add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
+add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
 
-%% ========================================================================
-%% UNDEFEATED WEIGHT COMPUTATION (for Budget-Aware Admissibility Defense)
-%% ========================================================================
-%%
-%% Mirrors supported_with_weight logic but for derived_from_undefeated elements.
-%% Used to compute potential attack weights for defense checking.
+%% Annihilator wins (a ⊗ 0̄ = 0̄).
+rule_deriv(P, R, X, A) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    add_body_has_annih(P, R), otimes_annihilator(A).
+%% No annihilator, but the opposite infinity saturates.
+rule_deriv(P, R, X, O) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+%% Finite case: plain integer sum (no infinities present).
+rule_deriv(P, R, X, W) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 
-%% Base case: Undefeated assumptions without explicit weights get #sup
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-
-%% FLAT-WABA: Undefeated assumptions with explicit weights (not rule heads)
-undefeated_weight(X,W) :- assumption(X), not defeated(X), weight(X,W), not head(_,X).
-
-%% Helper: detect if any body element has #sup weight in undefeated derivation
-undefeated_body_has_sup(R) :- body(R,B), undefeated_weight(B,#sup).
-
-%% Rule derivation weight for undefeated: sum body weights (with #sup propagation)
-undefeated_rule_weight(R,X,#sup) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    undefeated_body_has_sup(R).
-
-undefeated_rule_weight(R,X,W) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    not undefeated_body_has_sup(R),
-    W = #sum{ V,B : body(R,B), undefeated_weight(B,V), V != #sup }.
-
-%% Regular derived element: take minimum across all derivations (disjunction)
-undefeated_weight(X,W) :-
-    derived_from_undefeated(X),
-    head(_,X),
-    not assumption(X),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) }.
-
-%% NON-FLAT-WABA: Assumption that is also a rule head, WITH explicit weight
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    weight(X,_),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              V : weight(X,V) }.
-
-%% NON-FLAT-WABA: Assumption that is also a rule head, WITHOUT explicit weight
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    not weight(X,_),
-    default_assumption_weight(D),
-    W = #min{ V,R : undefeated_rule_weight(R,X,V) ;
-              D : true }.
-
-%% Polarity: Cost (lower is better)
-%% Special case: beta=0 means classical ABA (all attacks unaffordable)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != 0, W > B.
 `,
         "tropical_high": `%% ALIAS — not a separate algebra.
 %% \`tropical_high\` is the higher-is-better (reward) polarity dual of \`tropical\` (min,+).
 %% That dual is exactly the (max, +) arctic algebra, so this file is a thin alias for
 %% semiring/arctic.lp. Kept so that \`--semiring tropical_high\` and raw
 %% \`clingo ... semiring/tropical_high.lp ...\` runs keep resolving.
-%% Arctic (Max-Plus) Semiring for Weight Propagation
-%% Semiring: (ℤ ∪ {±∞}, max, +, #inf, 0)
-%% - Domain: ℤ ∪ {±∞} (integers plus positive/negative infinity)
-%% - Disjunction/⊕ (OR): max (strongest alternative)
-%% - Conjunction/⊗ (AND): + (accumulate rewards)
-%% - Additive identity: #inf (identity for max operation)
-%% - Multiplicative identity: 0 (identity for + operation)
-%% - Interpretation: weights are rewards/benefits, higher is better
-%%
-%% SEMANTICS: Reward Accumulation / Longest Path
-%% ==============================================
-%% The Arctic semiring is the DUAL of the Tropical semiring:
-%% - Tropical: (+, min) for cost minimization / shortest path
-%% - Arctic: (+, max) for reward maximization / longest path
-%%
-%% Key applications:
-%% - Scoring arguments by accumulated support/evidence
-%% - Finding strongest evidence chains (sum of supporting weights)
-%% - Benefit/reward optimization (opposite of cost minimization)
-%% - Longest path problems in graphs
-%%
-%% Comparison to Tropical:
-%% - Tropical: weights are costs (lower is better), minimize sum
-%% - Arctic: weights are rewards (higher is better), maximize sum
-%%
-%% Note: "Arctic" comes from tropical algebra (hot=min, cold=max)
+%% Arctic / max-plus semiring (additive family; negation-dual of tropical).
+%% Semiring: (ℤ ∪ {-∞}, ⊕=max, ⊗=+, 0̄=#inf, 1̄=0) — strength polarity.
+%% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
+%% Weights are rewards/benefits, higher is better (longest path).
 
 active_semiring(arctic).
+
+oplus(max).
+oplus_identity(#inf).
+otimes_identity(0).
+affordability_polarity(strength).
+
+semiring_default_weight(legacy,0).
+semiring_default_weight(aba,#sup).
+semiring_default_weight(neutral,0).
+
 %% Default weight policy selection for unweighted assumptions.
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
@@ -1297,168 +935,111 @@ default_assumption_weight(W) :-
 
 :- active_default_policy(P), not semiring_default_weight(P, _).
 
-
-semiring_default_weight(legacy,0).
-semiring_default_weight(aba,#sup).
-semiring_default_weight(neutral,0).
-
-%% ========================================
-%% DEFAULT WEIGHT PRINCIPLE: NEUTRALITY
-%% ========================================
+%% ============================================================================
+%% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
+%% ============================================================================
+%% Used by tropical (⊕=min, 0̄=#sup) and arctic (⊕=max, 0̄=#inf). ⊗ is fixed to
+%% the integer sum.
 %%
-%% Unweighted atoms receive the MULTIPLICATIVE IDENTITY (0):
-%% - For addition: 0 + x = x (neutral, doesn't affect accumulation)
-%% - Default weight of 0 means "no reward contributed"
+%% clingo #sum silently DROPS #sup and #inf, so the two infinities are handled
+%% explicitly. For ⊗=+, the additive annihilator is the ⊕-identity 0̄ (x + 0̄ = 0̄):
+%%   - any body element = 0̄ (annihilator)            -> result 0̄   (precedence)
+%%   - else any body element = the opposite infinity  -> result that infinity
+%%   - else                                            -> finite #sum
+
+%% ============================================================================
+%% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
+%% ============================================================================
+%% Folds the support-phase and undefeated-phase weight propagations into ONE
+%% parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
+%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
+%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
+%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
 %%
-%% IMPORTANT: This differs from Tropical semiring!
-%% - Tropical uses #sup as default (infinitely expensive to discard)
-%% - Arctic uses 0 as default (neutral contribution, easily discarded)
-%%
-%% For Arctic semiring:
-%% - Multiplicative identity = 0 (neutral for addition)
-%% - Meaning: Unweighted assumptions contribute zero reward
-%% - Discard cost with max monoid: max(0, ...) = other weights (not dominating)
-%% - Discard cost with sum monoid: sum + 0 = sum (neutral)
-%%
-%% This creates different semantics than Tropical:
-%% - Tropical: Unweighted assumptions are "hard to discard" (#sup)
-%% - Arctic: Unweighted assumptions are "neutral" (0 reward)
-%%
-%% If you want unweighted assumptions to be "hard to discard" in Arctic,
-%% the monoid should assign #sup as default (monoid/*.lp files handle this).
+%% A concrete algebra is fixed by a thin shim that declares:
+%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
+%%   affordability_polarity(strength|cost)
+%% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
-%% Assumptions with explicit weights
-supported_with_weight(X,W) :- assumption(X), in(X), weight(X,W), not head(_,X).
+%% ---- phase bridges -----------------------------------------------------------
+phase(support).
+phase(undefeated).
 
-%% Assumptions without explicit weights: Use multiplicative identity (0)
-%% For Arctic semiring, unweighted assumptions get 0 (neutral reward)
-%% Rationale: Neutral contribution to reward accumulation
-%% - In conjunction (+): 0 + x = x (doesn't affect sum)
-%% - In disjunction (max): max(0, x) = x for x > 0 (neutral for positive rewards)
-%%
-%% NOTE: This is the MULTIPLICATIVE identity (neutral for conjunction).
-%% For "hard to discard" semantics, monoids assign #sup as default weight.
-supported_with_weight(X,W) :- assumption(X), in(X), not weight(X,_), not head(_,X), default_assumption_weight(W).
+phase_active(support, X)       :- supported(X).
+phase_active(undefeated, X)    :- derived_from_undefeated(X).
+phase_triggered(support, R)    :- triggered_by_in(R).
+phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
+%% "selected" = the assumption is committed in this phase (in / not-defeated). The
+%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
+%% phase is inert (no extra grounding) unless a defense semantics is loaded.
+phase_selected(support, X)     :- in(X).
+phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
 
-%% Step 1: Compute weight for each rule derivation using conjunction (addition)
-%% For rule R deriving X: sum weights of all body elements (accumulate rewards)
-%% IMPORTANT: Only compute weight for TRIGGERED rules (all body elements supported)
+%% ---- direct (own) weight: explicit weight, else policy default ---------------
+%% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
+%% for non-flat / derived atoms — matches the previous per-semiring gating). The
+%% policy default applies to unweighted assumptions that are selected.
+direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
 
-%% Special handling for #sup and #inf: clingo's #sum aggregate has limitations
-%% - #sum ignores #sup values (with warning)
-%% - #inf is handled correctly
-%% We detect infinite values before aggregation to preserve them
+%% ---- assumptions: weight is just the direct weight --------------------------
+%% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
+%% assumption is never a rule head — its weight is intrinsic, with no rule-derived
+%% alternative to combine.
+pweight(P, X, W) :- assumption(X), direct_weight(P, X, W).
 
-%% Helper: detect if any body element has #sup weight (infinite reward)
-body_has_sup_weight(R) :- body(R,B), supported_with_weight(B,#sup).
+%% ---- empty-body rule (fact) = empty conjunction = ⊗-identity 1̄ ---------------
+%% Guarded by \`not weight(X,_)\` so an explicitly weighted fact keeps its weight.
+rule_deriv(P, R, X, I) :-
+    phase_active(P, X), rule(R), head(R, X), not has_body(R), not weight(X, _),
+    otimes_identity(I).
 
-%% Helper: detect if any body element has #inf weight (infinitely negative)
-body_has_inf_weight(R) :- body(R,B), supported_with_weight(B,#inf).
+%% ---- derived atoms: combine alternative derivations + explicit weight via ⊕ --
+%% clingo #max keeps #sup / drops #inf and #min keeps #inf / drops #sup, which is
+%% exactly the ⊕ identity (max-identity #inf, min-identity #sup), so no special
+%% infinity handling is needed for the combine itself.
+pweight(P, X, W) :-
+    oplus(max), derived_atom(X), phase_active(P, X),
+    W = #max{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
+pweight(P, X, W) :-
+    oplus(min), derived_atom(X), phase_active(P, X),
+    W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% If any body has #sup, derivation weight is #sup (infinite reward propagates)
-rule_derivation_weight(R,X,#sup) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    body_has_sup_weight(R).
+%% ---- expose the two phases under their conventional names --------------------
+supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
 
-%% If any body has #inf (and no #sup), derivation weight is #inf
-rule_derivation_weight(R,X,#inf) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    not body_has_sup_weight(R),
-    body_has_inf_weight(R).
+%% ---- attack affordability for defense semantics (polarity-parameterized) -----
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
+unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
-%% Otherwise, sum finite weights (standard case)
-rule_derivation_weight(R,X,W) :-
-    head(R,X),
-    supported(X),
-    body(R,_),
-    triggered_by_in(R),
-    not body_has_sup_weight(R),
-    not body_has_inf_weight(R),
-    W = #sum{ V,B : body(R,B), supported_with_weight(B,V) }.
 
-%% Handle rules with empty bodies (facts): Use 0 (multiplicative identity for +)
-%% An empty body is an empty CONJUNCTION, so it must equal the multiplicative (⊗)
-%% identity = 0. This keeps the empty body TRANSPARENT in + (0+x=x); over the
-%% supported (nonnegative) weight surface a standalone fact then carries 0 reward.
-%%
-%% (Earlier this used #inf, the ADDITIVE identity. #inf is dropped/absorbed by the
-%% reward-accumulating +, so conclusions derived through a fact were corrupted.
-%% Classical ABA recovery is preserved via constraint/no_discard.lp.)
-rule_derivation_weight(R,X,0) :-
-    head(R,X),
-    supported(X),
-    not body(R,_),
-    not weight(X,_).  % weighted facts keep their explicit weight (override)
+otimes_annihilator(A) :- oplus_identity(A).
+opposite_infinity(#inf) :- oplus_identity(#sup).
+opposite_infinity(#sup) :- oplus_identity(#inf).
 
-%% Step 2: Combine multiple derivations using disjunction (maximum)
-%% The weight of X is the maximum across all its rule derivations
-%% AND any explicit weight (OR semantics: explicit weight is another "derivation")
-%% Interpretation: Multiple derivation paths → take strongest/highest reward path
-supported_with_weight(X,W) :-
-    supported(X),
-    head(_,X),  % X is derived (not just an assumption)
-    W = #max{ V : rule_derivation_weight(_,X,V) ;
-              V : weight(X,V) }.
+add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
+add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
 
-%% ========================================================================
-%% UNDEFEATED WEIGHT COMPUTATION (for Budget-Aware Admissibility Defense)
-%% ========================================================================
+%% Annihilator wins (a ⊗ 0̄ = 0̄).
+rule_deriv(P, R, X, A) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    add_body_has_annih(P, R), otimes_annihilator(A).
+%% No annihilator, but the opposite infinity saturates.
+rule_deriv(P, R, X, O) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+%% Finite case: plain integer sum (no infinities present).
+rule_deriv(P, R, X, W) :-
+    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
+    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 
-%% Base cases
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    not weight(X,_),
-    not head(_,X),
-    default_assumption_weight(W).
-undefeated_weight(X,W) :- assumption(X), not defeated(X), weight(X,W), not head(_,X).
-
-%% Rule derivation with Arctic conjunction (addition)
-undefeated_rule_weight(R,X,W) :-
-    head(R,X),
-    derived_from_undefeated(X),
-    body(R,_),
-    triggered_by_undefeated(R),
-    W = #sum{ V,B : body(R,B), undefeated_weight(B,V) }.
-
-%% Disjunction (max)
-undefeated_weight(X,W) :-
-    derived_from_undefeated(X),
-    head(_,X),
-    not assumption(X),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) }.
-
-%% NON-FLAT: Assumptions that are also rule heads
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    weight(X,_),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) ;
-              V : weight(X,V) }.
-
-undefeated_weight(X,W) :-
-    assumption(X),
-    not defeated(X),
-    derived_from_undefeated(X),
-    head(_,X),
-    not weight(X,_),
-    default_assumption_weight(D),
-    W = #max{ V,R : undefeated_rule_weight(R,X,V) ;
-              D : true }.
-
-%% Polarity: Strength (higher is better)
-%% Classical ABA: beta=#sup (can't meet threshold) or beta=0 (backward compatibility)
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B = 0, W != #inf.
-unaffordable_attack(W,B) :- undefeated_weight(_,W), budget(B), B != #sup, B != 0, W < B.
 
 `
     },
@@ -1499,18 +1080,30 @@ explicit_default_policy(neutral).
 %% Identity on the empty set: #inf.
 
 active_monoid(max).
+
+%% Canonical aggregate over the discarded-attack multiset (single source of truth).
+%% Consumed by constraint/ub.lp, constraint/lb.lp and optimize/{minimize,maximize}.lp.
+budget_value(C) :- C = #max{ W : discarded_attack(_,_,W) }.
 `,
         "min": `%% Min monoid family.
 %% Aggregate: minimum discarded attack weight.
 %% Identity on the empty set: #sup.
 
 active_monoid(min).
+
+%% Canonical aggregate over the discarded-attack multiset (single source of truth).
+%% Consumed by constraint/ub.lp, constraint/lb.lp and optimize/{minimize,maximize}.lp.
+budget_value(C) :- C = #min{ W : discarded_attack(_,_,W) }.
 `,
         "sum": `%% Sum monoid family.
 %% Aggregate: sum of discarded attack weights.
 %% Identity on the empty set: 0.
 
 active_monoid(sum).
+
+%% Canonical aggregate over the discarded-attack multiset (single source of truth).
+%% Consumed by constraint/ub.lp, constraint/lb.lp and optimize/{minimize,maximize}.lp.
+budget_value(C) :- C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
 `
     },
     optimize: {
@@ -1522,15 +1115,17 @@ active_optimization(maximize).
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
+%% Sum: maximize the discarded multiset directly (fast path).
 #maximize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
 
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M != #sup. [-1@1]
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [-M@0]
+%% Max/Min: maximize budget_value/1 (the active monoid aggregate from monoid/<m>.lp).
+:~ active_monoid(max), budget_value(M), M = #inf. [1@2]
+:~ active_monoid(max), budget_value(M), M != #sup. [-1@1]
+:~ active_monoid(max), budget_value(M), M != #sup, M != #inf. [-M@0]
 
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M != #inf. [-1@1]
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [-M@0]
+:~ active_monoid(min), budget_value(M), M = #inf. [1@2]
+:~ active_monoid(min), budget_value(M), M != #inf. [-1@1]
+:~ active_monoid(min), budget_value(M), M != #sup, M != #inf. [-M@0]
 `,
         "minimize": `%% Generic minimization objective over the active monoid family.
 
@@ -1540,15 +1135,18 @@ active_optimization(minimize).
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
+%% Sum: minimize the discarded multiset directly (fast path; no single aggregate term).
 #minimize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
 
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M = #sup. [1@2]
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M = #inf. [0@1]
-:~ active_monoid(max), M = #max { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
+%% Max/Min: minimize budget_value/1 (the active monoid aggregate from monoid/<m>.lp).
+%% #sup/#inf are ordered above/below finite costs via separate priority levels.
+:~ active_monoid(max), budget_value(M), M = #sup. [1@2]
+:~ active_monoid(max), budget_value(M), M = #inf. [0@1]
+:~ active_monoid(max), budget_value(M), M != #sup, M != #inf. [M@0]
 
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M = #inf. [1@2]
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M = #sup. [0@1]
-:~ active_monoid(min), M = #min { W : discarded_attack(_,_,W) }, M != #sup, M != #inf. [M@0]
+:~ active_monoid(min), budget_value(M), M = #inf. [1@2]
+:~ active_monoid(min), budget_value(M), M = #sup. [0@1]
+:~ active_monoid(min), budget_value(M), M != #sup, M != #inf. [M@0]
 `
     },
     constraint: {
@@ -1560,9 +1158,7 @@ active_constraint(lb).
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
-budget_value(C) :- active_monoid(sum), C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
-budget_value(C) :- active_monoid(max), C = #max{ W : discarded_attack(_,_,W) }.
-budget_value(C) :- active_monoid(min), C = #min{ W : discarded_attack(_,_,W) }.
+%% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
 
 %% An empty discard set spends nothing; it does not "meet" a positive lower bound,
 %% but it must remain FEASIBLE (the no-discard extension always exists). Without this
@@ -1600,9 +1196,7 @@ active_constraint(ub).
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
-budget_value(C) :- active_monoid(sum), C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
-budget_value(C) :- active_monoid(max), C = #max{ W : discarded_attack(_,_,W) }.
-budget_value(C) :- active_monoid(min), C = #min{ W : discarded_attack(_,_,W) }.
+%% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
 
 %% An empty discard set spends nothing, so it trivially respects any upper bound.
 %% Without this guard the min monoid breaks: #min{} over no discards = #sup, which
@@ -2187,6 +1781,7 @@ contrary(assume_auxiliary_h1, excessive_complexity).
             "bottleneck_cost",
             "godel",
             "godel_low",
+            "lukasiewicz",
             "tropical",
             "tropical_high"
         ],

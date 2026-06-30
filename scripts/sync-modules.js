@@ -75,6 +75,10 @@ function discoverDir(relDir) {
     const result = {};
     for (const file of fs.readdirSync(absDir).sort()) {
         if (!file.endsWith('.lp')) continue;
+        // Skip `_`-prefixed include fragments (e.g. semiring/_phase.lp,
+        // _idempotent.lp, _additive.lp): they are inlined into the real modules
+        // via resolveIncludes, not standalone selectable modules.
+        if (file.startsWith('_')) continue;
         result[path.basename(file, '.lp')] = readModule(path.join(relDir, file));
     }
     return result;
