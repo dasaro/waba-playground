@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260630-9';
+import { wabaModules } from '../waba-modules.js?v=20260630-10';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -24,18 +24,24 @@ const SEMIRING_POLARITY = {
 };
 
 export function resolveSemiringModuleKey(semiringFamily, polarity) {
+    // A canonical family (godel/tropical) MUST be resolved by polarity FIRST: both
+    // family names are themselves valid module keys, so short-circuiting on
+    // wabaModules.semiring[semiringFamily] would ignore polarity entirely
+    // (godel+lower would wrongly stay godel instead of bottleneck_cost, and
+    // tropical+higher would stay tropical instead of arctic).
+    const familyEntry = wabaModules.metadata.canonicalSemiring[semiringFamily];
+    if (familyEntry) {
+        const moduleKey = familyEntry[polarity];
+        if (!moduleKey || !wabaModules.semiring[moduleKey]) {
+            throw new Error(`No semiring module for ${semiringFamily} with ${polarity} polarity.`);
+        }
+        return moduleKey;
+    }
+    // Otherwise the family is already a concrete module key (e.g. a direct 'arctic').
     if (wabaModules.semiring[semiringFamily]) {
         return semiringFamily;
     }
-    const familyEntry = wabaModules.metadata.canonicalSemiring[semiringFamily];
-    if (!familyEntry) {
-        throw new Error(`Unknown semiring family "${semiringFamily}".`);
-    }
-    const moduleKey = familyEntry[polarity];
-    if (!moduleKey || !wabaModules.semiring[moduleKey]) {
-        throw new Error(`No semiring module for ${semiringFamily} with ${polarity} polarity.`);
-    }
-    return moduleKey;
+    throw new Error(`Unknown semiring family "${semiringFamily}".`);
 }
 
 export function getAliasLabel(semiringFamily, polarity) {

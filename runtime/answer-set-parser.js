@@ -1,4 +1,33 @@
 /**
+ * Split a comma-separated argument list on top-level commas only, respecting
+ * parenthesis nesting so that nested-term commas (e.g. `p(x,y)`) are not split.
+ * @param {string} str the inner contents of a term (without the outer parens)
+ * @returns {string[]} trimmed top-level segments
+ */
+export function splitTopLevelArgs(str) {
+    const segments = [];
+    let depth = 0;
+    let current = '';
+    for (let i = 0; i < str.length; i += 1) {
+        const ch = str[i];
+        if (ch === '(') {
+            depth += 1;
+            current += ch;
+        } else if (ch === ')') {
+            depth -= 1;
+            current += ch;
+        } else if (ch === ',' && depth === 0) {
+            segments.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    segments.push(current.trim());
+    return segments;
+}
+
+/**
  * @param {string[]} predicates
  * @returns {import('../core/types.js').ParsedExtension}
  */

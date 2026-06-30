@@ -1,11 +1,30 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260630-9';
-import { MetricsManager } from './metrics-manager.js?v=20260630-9';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-9';
-import { ParserUtils } from './parser-utils.js?v=20260630-9';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-9';
+import { PopupManager } from './popup-manager.js?v=20260630-10';
+import { MetricsManager } from './metrics-manager.js?v=20260630-10';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260630-10';
+import { ParserUtils } from './parser-utils.js?v=20260630-10';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-10';
+
+/**
+ * Split a `discarded_attack(from, target, weight)` predicate string into its
+ * three top-level arguments, respecting nested-term parens so atoms like
+ * `p(x,y)` are not mis-split on their inner comma.
+ * @param {string} predicate
+ * @returns {{from: string, target: string, weight: string} | null}
+ */
+function parseDiscardedAttackArgs(predicate) {
+    const match = predicate.match(/^discarded_attack\((.*)\)$/s);
+    if (!match) {
+        return null;
+    }
+    const args = splitTopLevelArgs(match[1]);
+    if (args.length !== 3) {
+        return null;
+    }
+    return { from: args[0], target: args[1], weight: args[2] };
+}
 
 export class OutputManager {
     constructor(dom, getConfig = null) {
@@ -98,8 +117,18 @@ export class OutputManager {
         this.log(`\n${result.Result}`, 'info');
 
         if (!isSuccessful || witnesses.length === 0) {
-            this.log('⚠️ No extensions found', 'warning');
-            this.log('Try adjusting the budget or framework constraints', 'info');
+            // Non-flat frameworks are rejected by the core (UNSAT), which otherwise
+            // surfaces as a bare "no extensions". Detect it and explain.
+            const nonFlat = [...this.frameworkAssumptions].filter((assumption) =>
+                [...this.frameworkRules.values()].some((rule) => rule.head === assumption));
+            if (nonFlat.length > 0) {
+                const plural = nonFlat.length > 1;
+                this.log(`⚠️ No extensions: this framework is NOT flat — the assumption${plural ? 's' : ''} ${nonFlat.join(', ')} appear${plural ? '' : 's'} as a rule head.`, 'warning');
+                this.log('Weighted ABA is defined for FLAT frameworks only: an assumption must never be derivable by a rule. Remove the rule(s) deriving the assumption(s) above (or rename them to ordinary atoms).', 'info');
+            } else {
+                this.log('⚠️ No extensions found', 'warning');
+                this.log('Try adjusting the budget or framework constraints', 'info');
+            }
         } else {
             const witnessesWithCosts = witnesses.map((witness) => {
                 const predicates = witness.Value || [];
@@ -231,9 +260,9 @@ export class OutputManager {
             // Discarded attacks
             if (parsed.discarded && parsed.discarded.length > 0) {
                 const discardedPredicates = parsed.discarded.map(attack => {
-                    const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-                    if (match) {
-                        return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                    const args = parseDiscardedAttackArgs(attack);
+                    if (args) {
+                        return `discarded_attack(${args.from}, ${args.target}, ${args.weight})`;
                     }
                     return attack;
                 }).join('. ') + '.';
@@ -467,9 +496,11 @@ export class OutputManager {
             contentHTML += '<span class="section-label">Discarded Attacks:</span>';
             contentHTML += '<div class="attacks-list">';
             parsed.discarded.forEach(attack => {
-                const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-                if (match) {
-                    const [, attackingElement, targetAssumption, weight] = match;
+                const args = parseDiscardedAttackArgs(attack);
+                if (args) {
+                    const attackingElement = args.from;
+                    const targetAssumption = args.target;
+                    const weight = args.weight;
 
                     // Find assumptions that support the attacking element (contrary)
                     const supportingAssumptions = this.findSupportingAssumptions(attackingElement, parsed);
@@ -477,10 +508,10 @@ export class OutputManager {
                     // Format as "a1, a2, ..., an ⊬ c [target] (w: weight)"
                     if (supportingAssumptions.length > 0) {
                         const assumptions = supportingAssumptions.join(', ');
-                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
                     } else {
                         // Non-derived attack (no supporting assumptions)
-                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${weight})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
                     }
                 }
             });
@@ -549,9 +580,9 @@ export class OutputManager {
         // Discarded attacks
         if (parsed.discarded && parsed.discarded.length > 0) {
             const discardedPredicates = parsed.discarded.map(attack => {
-                const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-                if (match) {
-                    return `discarded_attack(${match[1]}, ${match[2]}, ${match[3]})`;
+                const args = parseDiscardedAttackArgs(attack);
+                if (args) {
+                    return `discarded_attack(${args.from}, ${args.target}, ${args.weight})`;
                 }
                 return attack;
             }).join('. ') + '.';
@@ -588,15 +619,14 @@ export class OutputManager {
         const extensionData = {
             inAssumptions: parsed.in,
             discardedAttacks: parsed.discarded.map(attack => {
-                const match = attack.match(/discarded_attack\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-                if (match) {
-                    const [, from, to, weight] = match;
+                const args = parseDiscardedAttackArgs(attack);
+                if (args) {
                     // Map to the format needed for filtering
                     return {
-                        source: from,
-                        target: to,
-                        via: to, // The attacked assumption
-                        weight: weight
+                        source: args.from,
+                        target: args.target,
+                        via: args.target, // The attacked assumption
+                        weight: args.weight
                     };
                 }
                 return null;

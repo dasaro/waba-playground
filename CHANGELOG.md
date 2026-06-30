@@ -30,6 +30,38 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-10
+
+GUI audit pass (multi-agent audit, fixes applied + independently re-verified):
+
+- **fix [high]: the Polarity selector was half-dead — "lower" was silently ignored.**
+  `resolveSemiringModuleKey` short-circuited on `wabaModules.semiring[semiringFamily]`,
+  but `godel`/`tropical` are themselves valid module keys, so it returned the family
+  name before consulting `canonicalSemiring` — `godel+lower` stayed **godel** instead
+  of **bottleneck_cost**, and `tropical+higher` stayed **tropical** instead of
+  **arctic**. Bottleneck-cost and Arctic were therefore unreachable from the UI, and
+  the `bottleneck_worstcase` / `arctic_grounds` curated examples were actually running
+  as godel/tropical. Fixed by resolving canonical families by polarity FIRST (concrete
+  keys passed directly still resolve to themselves). Verified end-to-end:
+  `bottleneck_worstcase` now reads costs 5/6/8 (bottleneck), not 2/3/4 (godel).
+- **fix [high]: Simple-mode typing rebuilt the graph (and ran clingo in standard mode)
+  on every keystroke.** Debounced the framework-changed callback (300 ms) in
+  editor-controller; the description update stays immediate.
+- **fix [high]: non-flat frameworks showed a bare "No extensions found".** The core
+  rejects non-flat ABA (an assumption that is a rule head) as UNSAT; the Results panel
+  now detects it and explains which assumption is non-flat and why (flat-only).
+- **fix: discarded-attack weights rendered raw `#sup`/`#inf`** — now shown as
+  `+inf`/`-inf` via `displayValue` (#29); and the fragile `discarded_attack(...)`
+  regexes were replaced with a nested-paren-safe `splitTopLevelArgs` parser so atoms
+  like `p(x,y)` are no longer mis-split (#30).
+
+Deferred (documented for a focused follow-up): expose Łukasiewicz in the UI; guard the
+defence semantics (admissible/complete/grounded/preferred) against discarding budget
+modes where they are unsound; disable inert Monoid/Optimization/Opt-Mode controls when
+Budget Mode = None; async graph-rebuild generation guard + stale-results clearing on
+error; PrismEditor caret-preservation; standard-mode set-node over-highlight; doc
+(README/ARCHITECTURE) surface drift.
+
 ## 20260630-9
 
 - **fix: assumption-graph never showed in/out assumptions or active attacks.** Two

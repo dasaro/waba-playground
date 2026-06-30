@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260630-9';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260630-9';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260630-10';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260630-10';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
@@ -66,6 +66,24 @@ export class EditorController {
     }
 
     attachSimpleInputHandlers(onFrameworkChanged) {
+        // Debounce the (expensive) framework-changed callback — it rebuilds the graph
+        // and, in standard mode, runs clingo — so typing in a Simple-mode field does
+        // not trigger a full rebuild on every keystroke.
+        let rebuildTimer = null;
+        const scheduleRebuild = () => {
+            if (!onFrameworkChanged) {
+                return;
+            }
+            if (rebuildTimer) {
+                clearTimeout(rebuildTimer);
+            }
+            rebuildTimer = setTimeout(() => {
+                rebuildTimer = null;
+                if (this.dom.inputMode.value === 'simple') {
+                    onFrameworkChanged();
+                }
+            }, 300);
+        };
         [this.assumptionsInput, this.rulesInput, this.contrariesInput, this.weightsInput].forEach((input) => {
             input.addEventListener('input', () => {
                 if (this.dom.inputMode.value !== 'simple') {
@@ -73,9 +91,7 @@ export class EditorController {
                 }
                 this.store.setState({ originalWabaContent: null });
                 this.updateSimpleDescription();
-                if (onFrameworkChanged) {
-                    onFrameworkChanged();
-                }
+                scheduleRebuild();
             });
         });
     }
