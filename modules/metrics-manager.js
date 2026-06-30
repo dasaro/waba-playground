@@ -556,8 +556,8 @@ export class MetricsManager {
             const row = [
                 `"${metric.atom}"`,
                 this.formatNumber(metric.decisionScore),
-                this.formatPercent(metric.robustness),
-                this.formatPercent(metric.acceptanceRate),
+                this.formatPercent(metric.robustness).replace('%', ''),
+                this.formatPercent(metric.acceptanceRate).replace('%', ''),
                 metric.bestLevel ?? '',
                 metric.levelAdvantage ?? '',
                 metric.objectiveGap !== null ? this.formatNumber(metric.objectiveGap) : ''

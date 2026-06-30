@@ -1613,7 +1613,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     gap: var(--space-xs);
 }
 
-.graph-container:fullscreen {
+.graph-panel:fullscreen {
     padding: var(--space-lg);
     background: var(--bg-primary);
 }
@@ -1901,10 +1901,13 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
    Fullscreen Mode
    =================================== */
 
-#graph-container:fullscreen,
-#graph-container:-webkit-full-screen,
-#graph-container:-moz-full-screen,
-#graph-container:-ms-fullscreen {
+/* The element placed into fullscreen is the .graph-panel section (see
+   GraphManager.initFullscreen). The old rules targeted a non-existent
+   #graph-container, so fullscreen left the canvas tiny in a blank panel. */
+.graph-panel:fullscreen,
+.graph-panel:-webkit-full-screen,
+.graph-panel:-moz-full-screen,
+.graph-panel:-ms-fullscreen {
     display: flex;
     flex-direction: column;
     width: 100vw !important;
@@ -1913,28 +1916,43 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     background: var(--bg-primary);
 }
 
-#graph-container:fullscreen #cy,
-#graph-container:-webkit-full-screen #cy,
-#graph-container:-moz-full-screen #cy,
-#graph-container:-ms-fullscreen #cy {
+/* Let the collapsible panel body grow so the canvas can fill the screen. */
+.graph-panel:fullscreen .panel-content,
+.graph-panel:-webkit-full-screen .panel-content,
+.graph-panel:-moz-full-screen .panel-content,
+.graph-panel:-ms-fullscreen .panel-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.graph-panel:fullscreen #cy,
+.graph-panel:-webkit-full-screen #cy,
+.graph-panel:-moz-full-screen #cy,
+.graph-panel:-ms-fullscreen #cy {
     flex: 1;
     width: 100% !important;
-    min-height: unset !important;
-    /* Don't set explicit height - let flex: 1 handle vertical sizing */
-    /* vis.js will be explicitly resized via setSize() in JavaScript */
+    height: auto !important;
+    min-height: 0 !important;
+    /* vis.js is explicitly resized via setSize() on fullscreenchange. */
 }
 
-#graph-container:fullscreen .graph-header,
-#graph-container:-webkit-full-screen .graph-header,
-#graph-container:-moz-full-screen .graph-header,
-#graph-container:-ms-fullscreen .graph-header {
-    flex-shrink: 0; /* Prevent header from shrinking */
+.graph-panel:fullscreen .panel-header,
+.graph-panel:fullscreen .graph-header,
+.graph-panel:-webkit-full-screen .panel-header,
+.graph-panel:-webkit-full-screen .graph-header,
+.graph-panel:-moz-full-screen .panel-header,
+.graph-panel:-moz-full-screen .graph-header,
+.graph-panel:-ms-fullscreen .panel-header,
+.graph-panel:-ms-fullscreen .graph-header {
+    flex-shrink: 0; /* Prevent header/toolbar from shrinking */
 }
 
-#graph-container:fullscreen .isolated-assumptions-banner,
-#graph-container:-webkit-full-screen .isolated-assumptions-banner,
-#graph-container:-moz-full-screen .isolated-assumptions-banner,
-#graph-container:-ms-fullscreen .isolated-assumptions-banner {
+.graph-panel:fullscreen .isolated-assumptions-banner,
+.graph-panel:-webkit-full-screen .isolated-assumptions-banner,
+.graph-panel:-moz-full-screen .isolated-assumptions-banner,
+.graph-panel:-ms-fullscreen .isolated-assumptions-banner {
     flex-shrink: 0; /* Prevent banner from shrinking */
 }
 

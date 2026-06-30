@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260629-5';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260630-1';
 
 export class ConfigController {
     constructor(dom) {
@@ -35,6 +35,9 @@ export class ConfigController {
         this.dom.optModeSelect.value = config.optMode;
         this.dom.budgetInput.value = String(config.beta ?? 0);
         this.dom.showSelect.value = config.filterType || 'projection';
+        // A freshly applied config supersedes any held ABA-recovery snapshot.
+        this._savedDefaultPolicy = undefined;
+        this._savedBudgetMode = undefined;
     }
 
     populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
@@ -67,7 +70,7 @@ export class ConfigController {
 
     syncUi() {
         const semiringFamily = this.dom.semiringSelect.value;
-        const budgetMode = this.dom.constraintSelect.value;
+        let budgetMode = this.dom.constraintSelect.value;
         const semantics = this.dom.semanticsSelect.value;
         const abaRecovery = this.dom.abaRecoveryToggle.checked;
 
@@ -83,9 +86,23 @@ export class ConfigController {
         this.dom.semiringAliasNote.textContent = `${polarity} polarity maps to ${mapped}.`;
 
         if (abaRecovery) {
+            // Snapshot the user's selections once, then force the ABA-recovery profile.
+            if (this._savedDefaultPolicy === undefined) {
+                this._savedDefaultPolicy = this.dom.defaultPolicySelect.value;
+                this._savedBudgetMode = this.dom.constraintSelect.value;
+            }
             this.dom.defaultPolicySelect.value = 'neutral';
             this.dom.constraintSelect.value = 'none';
+        } else if (this._savedDefaultPolicy !== undefined) {
+            // Restore what the user had before ABA recovery was switched on.
+            this.dom.defaultPolicySelect.value = this._savedDefaultPolicy;
+            this.dom.constraintSelect.value = this._savedBudgetMode;
+            this._savedDefaultPolicy = undefined;
+            this._savedBudgetMode = undefined;
         }
+        // Re-read after the block so the monoid/budget enable logic below runs
+        // against the current budget mode (restored or forced), not the stale read.
+        budgetMode = this.dom.constraintSelect.value;
         this.dom.defaultPolicySelect.disabled = abaRecovery;
 
         if (budgetMode === 'ub') {

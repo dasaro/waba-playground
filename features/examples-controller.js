@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260629-5';
-import { wabaModules } from '../waba-modules.js?v=20260629-5';
+import { examples } from '../examples.js?v=20260630-1';
+import { wabaModules } from '../waba-modules.js?v=20260630-1';
 
 export class ExamplesController {
     constructor(dom, configController, editorController, outputManager) {

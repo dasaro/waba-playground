@@ -78,6 +78,10 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
 
         return [{
             id: node.id,
+            // Preserve the pre-highlight color once so resetGraphColors can restore it
+            // (the guard keeps the original across re-highlights without a reset).
+            originalColor: node.originalColor || node.color,
+            originalBorderWidth: node.originalBorderWidth || node.borderWidth || 2,
             color: {
                 border: '#10b981',
                 background: '#34d399',
@@ -91,10 +95,19 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
     });
 
     const edgeUpdates = edges.map((edge) => {
+        // Preserve pre-highlight edge styling once so the reset can restore it.
+        const preserved = {
+            originalColor: edge.originalColor || edge.color,
+            originalWidth: edge.originalWidth || edge.width || 2,
+            originalDashes: edge.originalDashes !== undefined ? edge.originalDashes : (edge.dashes || false),
+            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
+        };
+
         const discarded = discardedAttacks.find((attack) => edgeMatches(edge, attack.source, attack.via));
         if (discarded) {
             return {
                 id: edge.id,
+                ...preserved,
                 color: { color: '#9ca3af', highlight: '#6b7280' },
                 width: 3,
                 dashes: [8, 4],
@@ -106,15 +119,17 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         if (successful) {
             return {
                 id: edge.id,
+                ...preserved,
                 color: { color: '#ef4444', highlight: '#dc2626' },
                 width: 2,
                 dashes: false
             };
         }
 
-        const originalColor = edge.originalColor || edge.color || '#9ca3af';
+        const originalColor = preserved.originalColor || '#9ca3af';
         return {
             id: edge.id,
+            ...preserved,
             color: {
                 color: colorToRGBA(originalColor, 0.2),
                 highlight: colorToRGBA(originalColor, 0.4)

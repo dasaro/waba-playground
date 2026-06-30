@@ -105,8 +105,25 @@ export class ExportManager {
         this.themeManager.exportGraphInLightMode(() => {
             const sourceCanvas = this.graphManager.network.canvas.frame.canvas;
             const watermarkedCanvas = this.addWatermark(sourceCanvas);
-
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+
+            // Produce an actual PDF (jsPDF is loaded in index.html). Previously this
+            // button silently downloaded a PNG.
+            const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+            if (jsPDFCtor) {
+                const width = watermarkedCanvas.width;
+                const height = watermarkedCanvas.height;
+                const pdf = new jsPDFCtor({
+                    orientation: width >= height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [width, height]
+                });
+                pdf.addImage(watermarkedCanvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, width, height);
+                pdf.save(`waba-graph-${timestamp}.pdf`);
+                return;
+            }
+
+            // Fallback: jsPDF unavailable -> high-resolution PNG.
             watermarkedCanvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -114,7 +131,7 @@ export class ExportManager {
                 link.download = `waba-graph-${timestamp}.png`;
                 link.click();
                 URL.revokeObjectURL(url);
-            }, 'image/png', 1.0);  // Quality 1.0 for high-resolution export
+            }, 'image/png', 1.0);
         });
     }
 }

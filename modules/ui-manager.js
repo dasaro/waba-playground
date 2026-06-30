@@ -71,16 +71,29 @@ export class UIManager {
         const overlay = document.getElementById('loading-overlay');
         const loadingText = document.getElementById('loading-text');
         const loadingSubtext = document.getElementById('loading-subtext');
+        const loadingElapsed = document.getElementById('loading-elapsed');
 
         if (overlay) {
             if (loadingText) loadingText.textContent = text;
             if (loadingSubtext) loadingSubtext.textContent = subtext;
             overlay.removeAttribute('hidden');
         }
+
+        // Drive the elapsed counter (it was static "Elapsed: 0.0s" before).
+        if (loadingElapsed) {
+            const start = Date.now();
+            loadingElapsed.textContent = 'Elapsed: 0.0s';
+            clearInterval(UIManager._elapsedTimer);
+            UIManager._elapsedTimer = setInterval(() => {
+                loadingElapsed.textContent = `Elapsed: ${((Date.now() - start) / 1000).toFixed(1)}s`;
+            }, 100);
+        }
     }
 
     static hideLoadingOverlay() {
         const overlay = document.getElementById('loading-overlay');
+        clearInterval(UIManager._elapsedTimer);
+        UIManager._elapsedTimer = null;
         if (overlay) {
             overlay.setAttribute('hidden', '');
         }

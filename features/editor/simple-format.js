@@ -194,9 +194,21 @@ export function extractSimpleFields(clingoCode) {
                     ruleLines.push(`% ${commentMatch[1]}`);
                 }
 
-                const bodyRegex = new RegExp(`body\\(${ruleId},\\s*([^)]+)\\)`, 'g');
-                const bodyMatches = [...clingoCode.matchAll(bodyRegex)];
-                const bodyAtoms = bodyMatches.map((value) => value[1]);
+                const bodyRegex = new RegExp(`body\\(\\s*${ruleId}\\s*,\\s*([^)]*)\\)`, 'g');
+                const bodyAtoms = [];
+                for (const bodyMatch of clingoCode.matchAll(bodyRegex)) {
+                    // Handle both separate `body(r,X).` facts and the compact pool
+                    // form `body(r, a; r, b; r, c)` that buildClingoFromSimpleFields
+                    // emits: split on ';', and within each segment the atom is the
+                    // part after the rule id (a bare first segment is just the atom).
+                    bodyMatch[1].split(';').forEach((segment) => {
+                        const parts = segment.split(',').map((part) => part.trim()).filter(Boolean);
+                        const atom = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+                        if (atom && atom !== ruleId) {
+                            bodyAtoms.push(atom);
+                        }
+                    });
+                }
                 const bodyStr = bodyAtoms.length > 0 ? bodyAtoms.join(', ') : '';
                 ruleLines.push(`${head} <- ${bodyStr}`);
             }

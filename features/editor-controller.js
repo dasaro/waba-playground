@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260629-5';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260629-5';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260630-1';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260630-1';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
@@ -161,8 +161,11 @@ export class EditorController {
         this.populateSimpleModeFromClingo(clingoCode);
     }
 
-    loadParsedWaba(parsed, originalWabaContent) {
-        this.store.setState({ originalWabaContent });
+    loadParsedWaba(parsed) {
+        // A .waba file is shorthand, NOT valid ASP, so it must never be injected
+        // into the Advanced (ASP) editor. Keep originalWabaContent null so a
+        // Simple->Advanced switch regenerates valid ASP from the fields instead.
+        this.store.setState({ originalWabaContent: null });
         this.populateSimpleFields({
             description: '',
             assumptions: parsed.assumptions.join('\n'),

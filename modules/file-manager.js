@@ -126,10 +126,11 @@ export class FileManager {
                 return;
             }
 
-            // Parse contraries
+            // Parse contraries (emit the parenthesized form the Simple editor uses,
+            // so the exported .waba re-imports correctly)
             match = line.match(/^contrary\(([^,]+),\s*([^)]+)\)\.$/);
             if (match) {
-                contraries.push(`${match[1]}: ${match[2]}`);
+                contraries.push(`(${match[1].trim()}, ${match[2].trim()})`);
                 return;
             }
 
@@ -146,15 +147,23 @@ export class FileManager {
                 return;
             }
 
-            // Parse body
-            match = line.match(/^body\(([^,]+),\s*([^)]+)\)\.$/);
+            // Parse body (handles both separate body(r,X). facts and the compact
+            // pool form body(r, a; r, b; r, c) that the Simple editor emits)
+            match = line.match(/^body\(([^,]+),\s*([^)]*)\)\.$/);
             if (match) {
-                const ruleId = match[1];
-                const bodyAtom = match[2];
+                const ruleId = match[1].trim();
+                const bodyAtoms = [];
+                match[2].split(';').forEach((segment) => {
+                    const parts = segment.split(',').map((part) => part.trim()).filter(Boolean);
+                    const atom = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+                    if (atom && atom !== ruleId) {
+                        bodyAtoms.push(atom);
+                    }
+                });
                 if (!rules.has(ruleId)) {
-                    rules.set(ruleId, { head: null, body: [bodyAtom] });
+                    rules.set(ruleId, { head: null, body: bodyAtoms });
                 } else {
-                    rules.get(ruleId).body.push(bodyAtom);
+                    rules.get(ruleId).body.push(...bodyAtoms);
                 }
                 return;
             }
@@ -172,7 +181,7 @@ export class FileManager {
             rules.forEach((rule) => {
                 if (rule.head) {
                     const bodyStr = rule.body.length > 0 ? rule.body.join(', ') : '';
-                    content += `${rule.head} ← ${bodyStr}\n`;
+                    content += `${rule.head} <- ${bodyStr}\n`;
                 }
             });
             content += '\n';
@@ -261,10 +270,12 @@ export class FileManager {
             // Skip empty lines and comments (% is ASP/WABA standard)
             if (!line || line.startsWith('%')) continue;
 
-            // Check for rule: "a <- b,d" or "d <- c"
-            const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*<-\s*(.*)$/i);
+            // Check for rule: "a <- b,d" (ASCII) or "a ← b,d" (Unicode arrow, as
+            // written by convertLpToWaba). Normalize to ASCII so the Simple editor
+            // and buildClingoFromSimpleFields can parse it back.
+            const ruleMatch = line.match(/^([a-z_][a-z0-9_]*)\s*(?:<-|←)\s*(.*)$/i);
             if (ruleMatch) {
-                rules.push(line);
+                rules.push(`${ruleMatch[1]} <- ${ruleMatch[2].trim()}`);
                 continue;
             }
 
@@ -275,10 +286,19 @@ export class FileManager {
                 continue;
             }
 
-            // Check for contrary (has colon + atom): "a: attack_element" format
+            // Check for contrary in the parenthesized form "(a, c)" (what the Simple
+            // editor / generateWabaFormat write). Normalize to "(a, c)".
+            const contraryParenMatch = line.match(/^\(\s*([a-z_][a-z0-9_]*)\s*,\s*([a-z_][a-z0-9_]*)\s*\)$/i);
+            if (contraryParenMatch) {
+                contraries.push(`(${contraryParenMatch[1]}, ${contraryParenMatch[2]})`);
+                continue;
+            }
+
+            // Check for contrary in the colon form "a: attack_element". Normalize to
+            // "(a, c)" so it round-trips through the Simple editor into ASP.
             const contraryMatch = line.match(/^([a-z_][a-z0-9_]*)\s*:\s*([a-z_][a-z0-9_]*)$/i);
             if (contraryMatch) {
-                contraries.push(line);
+                contraries.push(`(${contraryMatch[1]}, ${contraryMatch[2]})`);
                 continue;
             }
 

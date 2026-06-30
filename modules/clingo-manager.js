@@ -1,16 +1,16 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260629-5';
+import { wabaModules } from '../waba-modules.js?v=20260630-1';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260629-5';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260629-5';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260629-5';
+} from '../runtime/config-service.js?v=20260630-1';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260630-1';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260630-1';
 
 export class ClingoManager {
     constructor(runBtn, introStatus = null) {
@@ -209,7 +209,10 @@ ${wabaModules.semantics[filterKind]}
             throw new Error('Clingo returned an invalid result.');
         }
         if (result.Result === 'ERROR' || result.Result === 'UNKNOWN') {
-            throw new Error(`Clingo returned ${result.Result}.`);
+            const detail = Array.isArray(result.Error)
+                ? result.Error.join('; ')
+                : (typeof result.Error === 'string' ? result.Error : '');
+            throw new Error(`Clingo returned ${result.Result}${detail ? `: ${detail}` : ''}.`);
         }
     }
 

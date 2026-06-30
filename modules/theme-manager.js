@@ -1,7 +1,7 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
-import { GraphUtils } from './graph-utils.js?v=20260629-5';
+import { GraphUtils } from './graph-utils.js?v=20260630-1';
 
 export class ThemeManager {
     constructor(themeToggleBtn, themeIcon, network, networkData) {
@@ -55,14 +55,20 @@ export class ThemeManager {
     }
 
     updateGraphTheme() {
-        if (!this.network) return;
+        // network/networkData may be live getter functions (before the graph is
+        // initialized) or the resolved vis.js objects (after init). Resolve either
+        // form and bail if the graph isn't ready yet — e.g. a theme toggle while
+        // Clingo-WASM is still loading.
+        const network = typeof this.network === 'function' ? this.network() : this.network;
+        const networkData = typeof this.networkData === 'function' ? this.networkData() : this.networkData;
+        if (!network || !networkData || !networkData.edges || !networkData.nodes) return;
 
         // Get current theme-appropriate font settings from GraphUtils
         const edgeFontSettings = GraphUtils.getEdgeFontColor();
         const nodeFontColor = GraphUtils.getFontColor();
 
         // Update edge font colors (for weight labels)
-        const edges = this.networkData.edges.get();
+        const edges = networkData.edges.get();
         const edgeUpdates = edges.map(edge => ({
             id: edge.id,
             font: {
@@ -71,10 +77,10 @@ export class ThemeManager {
             }
         }));
 
-        this.networkData.edges.update(edgeUpdates);
+        networkData.edges.update(edgeUpdates);
 
         // Update node font colors
-        const nodes = this.networkData.nodes.get();
+        const nodes = networkData.nodes.get();
         const nodeUpdates = nodes.map(node => ({
             id: node.id,
             font: {
@@ -83,10 +89,10 @@ export class ThemeManager {
             }
         }));
 
-        this.networkData.nodes.update(nodeUpdates);
+        networkData.nodes.update(nodeUpdates);
 
         // Redraw without physics
-        this.network.setOptions({ physics: { enabled: false } });
-        this.network.redraw();
+        network.setOptions({ physics: { enabled: false } });
+        network.redraw();
     }
 }

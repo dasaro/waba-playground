@@ -30,6 +30,43 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-1
+
+GUI bug-fix pass (multi-agent audit across ~10 UI dimensions; 35 bugs confirmed,
+23 fixed here — all 10 high-severity plus 13 medium/low). Highlights:
+
+- **Config (high):** the ABA-recovery toggle overwrote Default Policy + Budget
+  Mode and never restored them, leaving the Budget Threshold permanently greyed
+  out after a single on→off toggle. Now snapshots and restores the user's
+  selections (and re-reads budget mode so the monoid/budget enable logic is right).
+- **Simple↔Advanced editor (high):** rules with 2+ premises were corrupted on
+  every mode switch — `extractSimpleFields` swallowed the compact pool
+  `body(r1, a; r1, b; r1, c)` as one atom and a second pass produced spurious
+  `body(r1, r1)`. Now parses the pool form correctly (regression test added).
+- **`.waba` files (high):** export→re-import silently dropped all contraries
+  (`(a, c)` vs `a: c`) and all rules (Unicode `←` vs ASCII `<-`); and loading a
+  `.waba` then switching to Advanced injected raw shorthand into the ASP editor,
+  wiping the fields on the way back. Unified the format (parenthesized contraries,
+  ASCII arrow, compact-body aware) and stopped treating `.waba` text as ASP.
+- **Cost badge (high):** maximize runs showed a negative cost (clingo reports a
+  negated objective for `#maximize`); the sign is now flipped for display.
+- **Graph fullscreen (high):** the CSS targeted a non-existent `#graph-container`,
+  so fullscreen left the graph tiny in a blank panel. Now targets `.graph-panel`
+  and flexes the panel body so the canvas fills the screen.
+- **Medium/low:** theme toggle during Clingo load no longer throws (resolves the
+  network getter/object either way); `runWABA` is now re-entrancy-guarded
+  (Ctrl+Enter spam / double-run); deselecting an extension restores node/edge
+  colors (originals are now preserved); an unsupported file upload no longer wipes
+  the previous run before validation; "Clear Output" restores the empty-state
+  placeholder; "Export PDF" now produces a real PDF (jsPDF) instead of a PNG; the
+  loading overlay's "Elapsed" counter actually ticks; Clingo ERROR/UNKNOWN now
+  surfaces the underlying detail; derived-atom chips get a color fallback; and the
+  metrics CSV no longer embeds `%` in numeric columns.
+
+Remaining lower-priority items (debounce of per-keystroke solver runs, caret
+preservation, projection-mode derivation roots, atom HTML-escaping, a few parser
+edge cases) are documented for a follow-up.
+
 ## 20260629-5
 
 - replaced the curated example set with examples that actually exercise WABA's

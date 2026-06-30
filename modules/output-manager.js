@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260629-5';
-import { MetricsManager } from './metrics-manager.js?v=20260629-5';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260629-5';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260629-5';
+import { PopupManager } from './popup-manager.js?v=20260630-1';
+import { MetricsManager } from './metrics-manager.js?v=20260630-1';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-1';
 
 export class OutputManager {
     constructor(dom, getConfig = null) {
@@ -87,7 +87,7 @@ export class OutputManager {
                     : computeAggregateFromDiscarded(parsed.discarded, config.monoid);
                 const cost = (config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
                     ? null
-                    : this.extractDisplayCost(witness, aggregateValue, config.monoid);
+                    : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization);
 
                 return {
                     witness,
@@ -474,7 +474,7 @@ export class OutputManager {
                 const weight = parsed.weights.get(atom);
                 const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color); font-size: 0.85em;">(w: ${weight})</span>` : '';
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                contentHTML += `<span class="chip" style="background: var(--info-color); border-color: var(--info-color); cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</span>`;
+                contentHTML += `<span class="chip" style="background: var(--info-color, #3b82f6); border-color: var(--info-color, #3b82f6); cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</span>`;
             });
             contentHTML += '</div></div>';
         }
@@ -678,14 +678,15 @@ export class OutputManager {
         return parseAnswerSet(predicates);
     }
 
-    extractDisplayCost(witness, aggregateValue, _monoid) {
+    extractDisplayCost(witness, aggregateValue, _monoid, optimization) {
         if (witness.Optimization !== undefined) {
             const opt = witness.Optimization;
-            if (Array.isArray(opt) && opt.length > 0) {
-                const lastValue = opt[opt.length - 1];
-                return displayValue(lastValue);
-            }
-            return displayValue(opt);
+            const raw = Array.isArray(opt) ? (opt.length > 0 ? opt[opt.length - 1] : null) : opt;
+            // clingo compiles #maximize into #minimize{-W}, so it reports a negated
+            // objective for maximize runs. Flip the sign back so the badge shows the
+            // actual (positive) reward instead of a negative number.
+            const signed = (optimization === 'maximize' && typeof raw === 'number') ? -raw : raw;
+            return displayValue(signed);
         }
 
         if (aggregateValue !== null && aggregateValue !== undefined) {
@@ -777,9 +778,11 @@ export class OutputManager {
         // Clear analysis panel section
         this.renderAnalysisHome();
 
-        // Show output empty state after clearing
-        if (window.showOutputEmptyState) {
-            window.showOutputEmptyState();
+        // Restore the output empty-state placeholder after clearing (the old
+        // window.showOutputEmptyState global never existed, so the panel was left blank).
+        const emptyState = this.dom.document.getElementById('output-empty-state');
+        if (emptyState) {
+            emptyState.removeAttribute('hidden');
         }
         // Note: Don't clear isolatedNodes here - they're populated by updateGraph()
         // and needed for displayResults()

@@ -1,18 +1,18 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260629-5';
-import { FontManager } from '../modules/font-manager.js?v=20260629-5';
-import { UIManager } from '../modules/ui-manager.js?v=20260629-5';
-import { PanelManager } from '../modules/panel-manager.js?v=20260629-5';
-import { FileManager } from '../modules/file-manager.js?v=20260629-5';
-import { GraphManager } from '../modules/graph-manager.js?v=20260629-5';
-import { PopupManager } from '../modules/popup-manager.js?v=20260629-5';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260629-5';
-import { OutputManager } from '../modules/output-manager.js?v=20260629-5';
-import { ExportManager } from '../modules/export-manager.js?v=20260629-5';
-import { MetricsManager } from '../modules/metrics-manager.js?v=20260629-5';
-import { ConfigController } from './config-controller.js?v=20260629-5';
-import { DocsController } from './docs-controller.js?v=20260629-5';
-import { EditorController } from './editor-controller.js?v=20260629-5';
-import { ExamplesController } from './examples-controller.js?v=20260629-5';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260630-1';
+import { FontManager } from '../modules/font-manager.js?v=20260630-1';
+import { UIManager } from '../modules/ui-manager.js?v=20260630-1';
+import { PanelManager } from '../modules/panel-manager.js?v=20260630-1';
+import { FileManager } from '../modules/file-manager.js?v=20260630-1';
+import { GraphManager } from '../modules/graph-manager.js?v=20260630-1';
+import { PopupManager } from '../modules/popup-manager.js?v=20260630-1';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260630-1';
+import { OutputManager } from '../modules/output-manager.js?v=20260630-1';
+import { ExportManager } from '../modules/export-manager.js?v=20260630-1';
+import { MetricsManager } from '../modules/metrics-manager.js?v=20260630-1';
+import { ConfigController } from './config-controller.js?v=20260630-1';
+import { DocsController } from './docs-controller.js?v=20260630-1';
+import { EditorController } from './editor-controller.js?v=20260630-1';
+import { ExamplesController } from './examples-controller.js?v=20260630-1';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -210,17 +210,18 @@ export class PlaygroundController {
 
         try {
             const content = await file.text();
-            this.clearPreviousRun();
 
             if (extension === 'lp') {
+                this.clearPreviousRun();
                 this.dom.inputMode.value = 'advanced';
                 this.editorController.loadClingoCode(content, null);
                 this.pendingGraphUpdate = this.updateGraph(content);
                 await this.pendingGraphUpdate;
                 this.outputManager.log(`📁 Loaded .lp file: ${fileName}`, 'info');
             } else if (extension === 'waba') {
+                this.clearPreviousRun();
                 const parsed = this.fileManager.parseWabaFile(content);
-                this.editorController.loadParsedWaba(parsed, content);
+                this.editorController.loadParsedWaba(parsed);
                 this.pendingGraphUpdate = this.updateGraph(this.editorController.getFrameworkCode());
                 await this.pendingGraphUpdate;
                 this.outputManager.log(`📁 Loaded .waba file: ${fileName}`, 'info');
@@ -237,6 +238,10 @@ export class PlaygroundController {
     }
 
     async runWABA() {
+        if (this.isRunning) {
+            return;
+        }
+        this.isRunning = true;
         UIManager.showLoadingOverlay('Running WABA...', 'Computing extensions and visualizing results');
 
         try {
@@ -272,6 +277,7 @@ export class PlaygroundController {
             console.error('Error in runWABA:', error);
             this.outputManager.log(`❌ Error: ${error.message}`, 'error');
         } finally {
+            this.isRunning = false;
             UIManager.hideLoadingOverlay();
         }
     }
