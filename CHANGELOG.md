@@ -30,6 +30,26 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-9
+
+- **fix: assumption-graph never showed in/out assumptions or active attacks.** Two
+  gaps in extension highlighting (`modules/graph-highlighting.js`):
+  - **In/out node colouring was dead in the assumption views** (both projection and
+    standard): the matcher keyed off `node.assumptions`, an array only set-mode nodes
+    have — an assumption-mode node *is* a single assumption (`node.id`), so `hasIn`
+    was always false and no node was ever coloured. Now assumption nodes are coloured
+    by membership: **IN → green, OUT → grey**; ⊤/junction nodes are left untouched.
+  - **Active attacks were invisible in projection mode** (the default): they were
+    matched from `attacks_successfully_with_weight`, which projection's `#show`
+    doesn't emit, so every non-discarded edge fell through to the faded "Inactive"
+    style. Active is now also derived client-side from the in-set + each edge's
+    supporting assumptions (`attackSupportedByIn`), so **active attacks turn red** in
+    every show mode (joint attacks need all contributors IN; fact/⊤ attacks are
+    always active). No core change / re-sync needed.
+  Legend updated with In/Out node states. 5 new unit tests
+  (`tests/unit/graph-highlighting.test.js`), incl. the projection case (active edge
+  detected with an empty `successfulAttacks`).
+
 ## 20260630-8
 
 - **fix: assumption-graph (Direct + Branching) could misrepresent the semantics.**

@@ -2088,6 +2088,22 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border-bottom: 17px solid #667eea;
 }
 
+.node-in {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #34d399;
+    border: 2px solid #10b981;
+}
+
+.node-out {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #94a3b8;
+    border: 2px solid #64748b;
+}
+
 /* Edge symbols */
 .edge-derived,
 .edge-joint,

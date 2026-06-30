@@ -39,6 +39,19 @@ function edgeMatches(edge, source, target) {
     return fromMatch && toMatch;
 }
 
+// An attack edge is "active" in the selected extension when every assumption that
+// must support its contrary is IN. Computed from the in-set directly, so it works
+// even in projection mode, whose #show omits attacks_successfully_with_weight.
+function attackSupportedByIn(edge, inSet) {
+    if (edge.attackType === 'fact') {
+        return true; // the contrary is supported by a fact, so the attack always launches
+    }
+    const contributors = (Array.isArray(edge.jointWith) && edge.jointWith.length > 0)
+        ? edge.jointWith
+        : (edge.attackingElement ? [edge.attackingElement] : []);
+    return contributors.length > 0 && contributors.every((assumption) => inSet.has(assumption));
+}
+
 // Inject a "State" row (Active / Discarded / Inactive) into an existing edge
 // hover panel, right after its title. Returns the title unchanged if it is not a
 // recognizable hover-panel string.
@@ -79,31 +92,43 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
     const nodes = networkData.nodes.get();
     const edges = networkData.edges.get();
     const parsedSuccessful = parseSuccessfulAttacks(successfulAttacks);
+    const inSet = new Set(inAssumptions);
 
     const nodeUpdates = nodes.flatMap((node) => {
-        const nodeAssumptions = node.assumptions || [];
-        const hasIn = inAssumptions.some((assumption) => nodeAssumptions.includes(assumption));
-
-        if (!hasIn) {
-            return [];
-        }
-
-        return [{
-            id: node.id,
+        const preserved = {
             // Preserve the pre-highlight color once so resetGraphColors can restore it
             // (the guard keeps the original across re-highlights without a reset).
             originalColor: node.originalColor || node.color,
-            originalBorderWidth: node.originalBorderWidth || node.borderWidth || 2,
-            color: {
-                border: '#10b981',
-                background: '#34d399',
-                highlight: {
-                    border: '#059669',
-                    background: '#10b981'
-                }
-            },
+            originalBorderWidth: node.originalBorderWidth || node.borderWidth || 2
+        };
+        const accepted = {
+            id: node.id,
+            ...preserved,
+            color: { border: '#10b981', background: '#34d399', highlight: { border: '#059669', background: '#10b981' } },
             borderWidth: 4
-        }];
+        };
+
+        // Assumption-level nodes ARE a single assumption (node.id): colour by IN/OUT
+        // membership. ⊤ and junction nodes have no in/out status, so leave them.
+        if (node.isAssumption === true) {
+            if (inSet.has(node.id)) {
+                return [accepted];
+            }
+            return [{
+                id: node.id,
+                ...preserved,
+                color: { border: '#64748b', background: '#94a3b8', highlight: { border: '#475569', background: '#64748b' } },
+                borderWidth: 2
+            }];
+        }
+
+        // Standard-mode set nodes carry their members in node.assumptions: keep the
+        // prior behaviour (highlight a set that contains any accepted assumption).
+        const members = node.assumptions || [];
+        if (members.some((assumption) => inSet.has(assumption))) {
+            return [accepted];
+        }
+        return [];
     });
 
     const edgeUpdates = edges.map((edge) => {
@@ -130,7 +155,10 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             };
         }
 
-        const successful = parsedSuccessful.find((attack) => edgeMatches(edge, attack.source, attack.target));
+        // Active iff clingo reports the attack successful (standard mode emits it) OR
+        // its supporting assumptions are all IN (works in projection mode too).
+        const successful = parsedSuccessful.some((attack) => edgeMatches(edge, attack.source, attack.target))
+            || attackSupportedByIn(edge, inSet);
         if (successful) {
             return {
                 id: edge.id,
