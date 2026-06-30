@@ -30,6 +30,28 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-2
+
+Audit: do the displayed controls all map to real implementation, with no legacy
+leftovers? Findings — every dropdown/button/graph-mode is backed by a real module
+or handler, and the semiring (4 algebras, no Łukasiewicz) and monoid (SUM/MAX/MIN,
+no Count) doc tables are accurate. Two gaps found and fixed:
+
+- **Grounded semantics was broken.** It runs complete candidates then keeps the
+  subset-minimal one via `wabaModules.semantics.subset_minimal_filter`, but that
+  module never existed (only `subset_maximal_filter`, used by preferred). Selecting
+  Grounded produced `Clingo returned ERROR: syntax error` (the missing module was
+  injected into the program as the literal `undefined`). Added a
+  `subset_minimal_filter.lp` (the dual of the maximal filter) to the WABA modules,
+  re-synced the bundle, and verified Grounded now runs (returns the empty extension
+  for the conflict-cycle example, as expected). The existing browser test masked
+  this because an errored run leaves the previous run's answers on screen.
+- **Semantics reference table** advertised "Semi-Stable" (never an offered option)
+  and omitted "Conflict-free" (which IS offered). Aligned the table with the actual
+  Semantics dropdown.
+
+stable / complete / admissible / preferred were re-verified working end to end.
+
 ## 20260630-1
 
 GUI bug-fix pass (multi-agent audit across ~10 UI dimensions; 35 bugs confirmed,
