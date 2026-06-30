@@ -30,6 +30,34 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-8
+
+- **fix: assumption-graph (Direct + Branching) could misrepresent the semantics.**
+  The builder was static (one rule deep, assumption-typed body atoms only, no
+  semiring), so four things diverged from the real framework. Rewrote it around a
+  recursive **minimal-support computation** (`computeSupportSets`: the DNF of the
+  AND-OR derivation tree, tracing chains through non-assumption atoms + nested
+  disjunction, with a cycle guard and a blow-up cap). Now:
+  - **#1 Indirect attacks no longer vanish.** A contrary derived through a chain
+    (`c ← x ← b`) now draws `b → a`; the attacked assumption is no longer shown as
+    isolated/unattacked (verified vs clingo: `b` defeats `a` with weight 7).
+  - **#2 Joint attacks include conjuncts reached through chains.** `c ← b1, x` with
+    `x ← b2` now draws the junction over `{b1, b2}`; `b2` is no longer isolated.
+  - **#3 Direct mode distinguishes joint (AND) from disjunctive (OR).** Joint
+    contributions are green and marked `∧`; disjunctive attacks stay amber and carry
+    their weights — previously the two differed only by edge colour. Branching keeps
+    the junction node. Legend updated to state the AND semantics.
+  - **#4 Edge weights are no longer fabricated.** Single-premise edges show the leaf
+    assumption's weight (correct under every semiring — conflict_cycle now reads
+    8/3/5, matching the Results panel, instead of a fixed `1`); joint/junction edges
+    omit the numeric label because the ⊗-aggregate is semiring-dependent (shown in
+    the tooltip + Results). Fact-based attacks (incl. those reached through a chain
+    bottoming at a fact) still render as `⊤`.
+  Both modes now fold into one shared core (`buildAssumptionGraph({ branching })`);
+  highlight/popup fields (`contrary`, `targetAssumption`, `attackingElement`,
+  `weight`) preserved — extension highlighting still greys/dashes the right edges.
+  8 new unit tests lock in the support-set logic and each fix.
+
 ## 20260630-7
 
 - **fix: Results panel showed every attack as coming from `⊤`** (e.g.
