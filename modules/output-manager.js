@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260630-2';
-import { MetricsManager } from './metrics-manager.js?v=20260630-2';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-2';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-2';
+import { PopupManager } from './popup-manager.js?v=20260630-3';
+import { MetricsManager } from './metrics-manager.js?v=20260630-3';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-3';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-3';
 
 export class OutputManager {
     constructor(dom, getConfig = null) {

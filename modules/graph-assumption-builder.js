@@ -1,10 +1,10 @@
-import { GraphUtils } from './graph-utils.js?v=20260630-2';
+import { GraphUtils } from './graph-utils.js?v=20260630-3';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
     buildJunctionTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260630-2';
+} from './graph-tooltip-builder.js?v=20260630-3';
 
 function assumptionNodeColor() {
     return GraphUtils.createNodeColor('assumption');
@@ -41,7 +41,7 @@ function createTopNode(factBasedAttacks) {
         id: '⊤',
         label: '⊤',
         size: 25,
-        shape: 'ellipse',
+        shape: 'triangle', // match the legend's ⊤ (Facts) triangle symbol
         color: assumptionNodeColor(),
         title: buildTopNodeTooltip(factBasedAttacks),
         font: {
@@ -186,13 +186,17 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
                     targetAssumption: assumption,
                     derivationBody: [contrary]
                 }));
-            } else {
+            } else if (derivingRules.length > 0) {
+                // Genuine fact-based attack: the contrary is derived by an empty-body rule.
                 factBasedAttacks.push({
                     assumption,
                     contrary,
                     weight: getContraryWeight(weights, contrary)
                 });
             }
+            // Otherwise the contrary has no deriving rule and is not itself an
+            // assumption, so it can never be supported: the assumption is
+            // unattacked and must NOT be drawn as a ⊤ fact-based attack.
             return;
         }
 
@@ -324,13 +328,17 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                     attackType: 'direct',
                     derivationBody: [contrary]
                 }));
-            } else {
+            } else if (derivingRules.length > 0) {
+                // Genuine fact-based attack: the contrary is derived by an empty-body rule.
                 factBasedAttacks.push({
                     assumption,
                     contrary,
                     weight: getContraryWeight(weights, contrary)
                 });
             }
+            // Otherwise the contrary has no deriving rule and is not itself an
+            // assumption, so it can never be supported: the assumption is
+            // unattacked and must NOT be drawn as a ⊤ fact-based attack.
             return;
         }
 

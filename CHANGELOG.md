@@ -30,6 +30,33 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-3
+
+Audit: does the Argumentation Graph render correctly and match its legend? Two
+graph-correctness/consistency bugs found and fixed in the assumption-level modes
+(Assumption-Direct / Assumption-Branching):
+
+- **Unattacked assumptions were drawn as ⊤ fact-based attacks.** The builder
+  computed `hasNonFactRules = derivingRules.some(r => r.body.length > 0)`, which is
+  false both for a genuine empty-body fact *and* for a contrary with no deriving
+  rule at all. So every unattacked assumption (its contrary never derivable — and
+  since `contrary` is total, that's common) got a spurious amber `⊤ → assumption`
+  edge. Now a fact edge is drawn only when the contrary is actually derived by a
+  rule; otherwise the assumption is correctly shown unattacked (no edge).
+- **⊤ (Facts) node shape** was an ellipse but the legend depicts a triangle —
+  changed the node to a triangle so it matches the legend symbol.
+
+Verified by rendering a joint-attack + fact-attack framework: ⊤ (blue triangle)
+now attacks only the genuinely fact-attacked assumption, joint premises feed the
+green diamond junction, and unattacked premises have no incoming edge.
+
+Known, not changed here (design decision): the **Standard** graph mode (the
+default) shows a *set-level* power-set attack graph — uniform blue set-nodes with
+weight-colored edges (amber/red/grey) — which does NOT match the legend's
+assumption-level node/edge types. The legend is accurate for the Assumption-*
+modes. Options for a follow-up: make the legend mode-aware, or default to an
+assumption mode.
+
 ## 20260630-2
 
 Audit: do the displayed controls all map to real implementation, with no legacy
