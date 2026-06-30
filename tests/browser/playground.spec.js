@@ -38,6 +38,16 @@ test('curated stable and grounded runs complete without startup errors', async (
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
 
+    // Attack provenance: conflict_cycle has no fact-based attacks, so every attack
+    // line must name its supporting assumption (e.g. "climate ⊬ against_welfare …"),
+    // never the ⊤ fallback — even in projection mode, which omits head/body from the
+    // witness (regression guard for the framework-source provenance fallback).
+    const attackTexts = await page.locator('.attack-item').allTextContents();
+    expect(attackTexts.length).toBeGreaterThan(0);
+    for (const text of attackTexts) {
+        expect(text.trim().startsWith('⊤')).toBe(false);
+    }
+
     await page.selectOption('#semantics-select', 'grounded');
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });

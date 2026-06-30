@@ -1,10 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260630-6';
-import { MetricsManager } from './metrics-manager.js?v=20260630-6';
-import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-6';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-6';
+import { PopupManager } from './popup-manager.js?v=20260630-7';
+import { MetricsManager } from './metrics-manager.js?v=20260630-7';
+import { parseAnswerSet } from '../runtime/answer-set-parser.js?v=20260630-7';
+import { ParserUtils } from './parser-utils.js?v=20260630-7';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-7';
 
 export class OutputManager {
     constructor(dom, getConfig = null) {
@@ -17,6 +18,12 @@ export class OutputManager {
         this.polaritySelect = dom.polaritySelect;
         this.getConfig = getConfig;
         this.activeExtensionId = null;  // Track currently highlighted extension
+        // Static framework structure (rules + assumptions) for attack provenance,
+        // populated per run in displayResults(). Needed because projection mode's
+        // #show omits head/body/assumption, so the witness alone cannot trace an
+        // attack back to its supporting assumptions.
+        this.frameworkRules = new Map();
+        this.frameworkAssumptions = new Set();
         this.renderAnalysisHome();
     }
 
@@ -57,7 +64,7 @@ export class OutputManager {
     // ===================================
     // Display Results
     // ===================================
-    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null) {
+    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '') {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
@@ -69,6 +76,21 @@ export class OutputManager {
             budgetIntent: 'no_discard'
         });
         this.lastRunConfig = config;
+
+        // Parse the static framework structure for attack provenance. In projection
+        // mode the witness omits head/body/assumption (#show is minimal), so the
+        // attacking element cannot be traced to its supporting assumptions from the
+        // witness alone — fall back to the framework source.
+        this.frameworkRules = new Map();
+        this.frameworkAssumptions = new Set();
+        if (frameworkCode) {
+            for (const rule of ParserUtils.parseRules(frameworkCode)) {
+                this.frameworkRules.set(rule.id, { head: rule.head, body: rule.body });
+            }
+            for (const a of ParserUtils.parseAssumptions(frameworkCode)) {
+                this.frameworkAssumptions.add(a);
+            }
+        }
 
         // Reset active extension when displaying new results
         this.activeExtensionId = null;
@@ -652,25 +674,31 @@ export class OutputManager {
     }
 
     findSupportingAssumptions(element, parsed) {
-        // If element is an assumption (in or out), return it
-        if (parsed.assumptions.has(element)) {
+        // If element is an assumption (declared in the witness or the framework), return it
+        if (parsed.assumptions.has(element) || this.frameworkAssumptions.has(element)) {
             return [element];
         }
 
-        // Find the rule that derives this element
-        for (const [, rule] of parsed.rules.entries()) {
-            if (rule.head === element) {
-                // Found the rule, recursively find assumptions supporting the body
-                const assumptions = new Set();
-                for (const bodyElement of rule.body) {
-                    const supporting = this.findSupportingAssumptions(bodyElement, parsed);
-                    supporting.forEach(a => assumptions.add(a));
+        // Find the rule that derives this element. Prefer the witness rules; fall back
+        // to the static framework rules, since projection mode's #show omits head/body.
+        const ruleMaps = this.frameworkRules.size > 0
+            ? [parsed.rules, this.frameworkRules]
+            : [parsed.rules];
+        for (const rules of ruleMaps) {
+            for (const [, rule] of rules.entries()) {
+                if (rule.head === element) {
+                    // Found the rule, recursively find assumptions supporting the body
+                    const assumptions = new Set();
+                    for (const bodyElement of rule.body) {
+                        const supporting = this.findSupportingAssumptions(bodyElement, parsed);
+                        supporting.forEach(a => assumptions.add(a));
+                    }
+                    return Array.from(assumptions).sort();
                 }
-                return Array.from(assumptions).sort();
             }
         }
 
-        // Not derived from any rule (fact with empty body)
+        // Genuinely not derived from any rule (a fact with empty body) -> attack from ⊤
         return [];
     }
 

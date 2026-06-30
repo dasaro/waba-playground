@@ -30,6 +30,22 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-7
+
+- **fix: Results panel showed every attack as coming from `⊤`** (e.g.
+  `⊤ ⊬ against_growth [growth] (w: 5)`) in **projection mode**, regardless of the
+  real attacker. Root cause: projection mode's `#show` emits only in/out/
+  discarded_attack, so the witness carries no head/body/assumption facts —
+  `findSupportingAssumptions` could neither trace the attacking element to its rule
+  nor bottom out at an assumption, so it always took the `⊤` fallback. Fix: thread
+  the framework source into `displayResults` and parse its rules + assumptions
+  (`ParserUtils`) as the provenance fallback. Derived attacks now name their
+  supporting assumption(s) — `welfare ⊬ against_growth [growth] (w: 5)` — and joint
+  attacks list every ground (`eco, ground_a ⊬ against_jobs [jobs] (w: 9)`), while
+  genuine empty-body facts still correctly render `⊤`. Applies to both the Active
+  and Discarded attack lists, in both projection and standard modes. Regression
+  guard added (conflict_cycle in projection must show no `⊤`-prefixed attack line).
+
 ## 20260630-6
 
 - curated examples: broadened for **variety across the four algebras and attack
