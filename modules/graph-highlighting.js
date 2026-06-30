@@ -39,6 +39,17 @@ function edgeMatches(edge, source, target) {
     return fromMatch && toMatch;
 }
 
+// Inject a "State" row (Active / Discarded / Inactive) into an existing edge
+// hover panel, right after its title. Returns the title unchanged if it is not a
+// recognizable hover-panel string.
+function withAttackState(baseTitle, label, color) {
+    if (typeof baseTitle !== 'string' || !baseTitle.includes('</strong></div>')) {
+        return baseTitle;
+    }
+    const row = `<div><strong>State:</strong> <span style="color: ${color}; font-weight: 600;">${label}</span></div>`;
+    return baseTitle.replace('</strong></div>', `</strong></div>${row}`);
+}
+
 export function buildResetUpdates(networkData) {
     const nodes = networkData.nodes.get();
     const edges = networkData.edges.get();
@@ -54,7 +65,8 @@ export function buildResetUpdates(networkData) {
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
+            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 },
+            title: edge.originalTitle || edge.title
         }))
     };
 }
@@ -100,14 +112,17 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             originalColor: edge.originalColor || edge.color,
             originalWidth: edge.originalWidth || edge.width || 2,
             originalDashes: edge.originalDashes !== undefined ? edge.originalDashes : (edge.dashes || false),
-            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
+            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 },
+            originalTitle: edge.originalTitle || edge.title
         };
+        const baseTitle = preserved.originalTitle;
 
         const discarded = discardedAttacks.find((attack) => edgeMatches(edge, attack.source, attack.via));
         if (discarded) {
             return {
                 id: edge.id,
                 ...preserved,
+                title: withAttackState(baseTitle, 'Discarded — overridden against the budget', '#9ca3af'),
                 color: { color: '#9ca3af', highlight: '#6b7280' },
                 width: 3,
                 dashes: [8, 4],
@@ -120,6 +135,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return {
                 id: edge.id,
                 ...preserved,
+                title: withAttackState(baseTitle, 'Active — defeats its target in this extension', '#ef4444'),
                 color: { color: '#ef4444', highlight: '#dc2626' },
                 width: 2,
                 dashes: false
@@ -130,6 +146,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         return {
             id: edge.id,
             ...preserved,
+            title: withAttackState(baseTitle, 'Inactive — attacker not supported in this extension', '#94a3b8'),
             color: {
                 color: colorToRGBA(originalColor, 0.2),
                 highlight: colorToRGBA(originalColor, 0.4)

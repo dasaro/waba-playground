@@ -30,6 +30,21 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-4
+
+- **Mode-aware graph legend.** The legend now matches the active graph mode. The
+  Assumption-Direct/Branching modes show the assumption-level legend (Assumption /
+  Joint Attack Node / ⊤ Facts; Attack / Joint Attack / Fact-based Attack). The
+  Standard mode shows a set-level legend instead: "Assumption set (extension
+  candidate)" nodes and edges coloured by weight (finite = amber, #sup = red,
+  #inf = grey) — which is what Standard mode actually renders. Both variants share
+  the Active/Discarded attack-state key. Switches automatically on mode change
+  (features/docs-controller.js setLegendMode, wired from playground-controller).
+- **Hover tooltips now show attack state.** When an extension is selected, each
+  edge's hover panel gains a "State" row — Active (defeats its target), Discarded
+  (overridden against the budget), or Inactive (attacker not supported) — coloured
+  to match the legend. The base tooltip is restored when the selection is cleared.
+
 ## 20260630-3
 
 Audit: does the Argumentation Graph render correctly and match its legend? Two

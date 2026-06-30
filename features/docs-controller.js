@@ -35,6 +35,19 @@ export class DocsController {
         this.dom.legendToggleBtn.addEventListener('click', () => this.toggleLegend());
     }
 
+    setLegendMode(graphMode) {
+        // Standard mode draws a set-level graph; the Assumption-* modes draw the
+        // assumption-level graph. Show only the matching legend variant.
+        const variant = graphMode === 'standard' ? 'standard' : 'assumption';
+        this.dom.graphLegend.querySelectorAll('.legend-variant').forEach((element) => {
+            if (element.dataset.legendMode === variant) {
+                element.removeAttribute('hidden');
+            } else {
+                element.setAttribute('hidden', '');
+            }
+        });
+    }
+
     toggleLegend() {
         const isHidden = this.dom.graphLegend.hasAttribute('hidden');
         if (isHidden) {

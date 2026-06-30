@@ -2092,11 +2092,26 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .edge-derived,
 .edge-joint,
 .edge-fact,
+.edge-sup,
+.edge-inf,
 .edge-active,
 .edge-discarded {
     width: 40px;
     height: 3px;
     position: relative;
+}
+
+/* Standard-mode weight-based edge colours (match graph-manager) */
+.edge-sup {
+    background: #ff6b6b;
+}
+
+.edge-inf {
+    background: #888;
+}
+
+.legend-variant[hidden] {
+    display: none;
 }
 
 .edge-derived {
