@@ -86,7 +86,7 @@ test('budgeted stable surface and subset-closure admissible smoke both run on th
 
     await waitForClingoReady(page);
 
-    await page.selectOption('#example-select', 'dispute_chain');
+    await page.selectOption('#example-select', 'arctic_grounds');
     await page.selectOption('#semantics-select', 'stable');
     await page.selectOption('#constraint-select', 'ub');
     await page.selectOption('#monoid-select', 'sum');

@@ -100,14 +100,23 @@ the inconsistency budget resolving conflicts that classical ABA cannot, with
 several weighted resolutions at *different, non-zero* costs (not one trivial
 cost-0 extension):
 
-- `conflict_cycle` — **Three-Way Standoff** (default): an odd rebuttal cycle that
-  classical ABA cannot settle (UNSAT). WABA discards the cheapest rebuttal —
-  three settlements at costs 3, 5, 8 (Gödel + sum + ub, β=8).
-- `dispute_chain` — **Dispute Chain**: a longer five-claim rebuttal cycle; five
-  weighted settlements at costs 2, 4, 6, 7, 9 (Gödel + sum + ub, β=9).
-- `probabilistic` — **Weights as Probabilities**: surprisal encoding where the
-  budget β is a probability threshold; the improbable objection can be overridden
-  at its surprisal cost (tropical + sum + ub, β=800).
+The four span the four algebras and several attack shapes (single-premise vs.
+joint attacks, sum vs. max monoid):
+
+- `conflict_cycle` — **Three-Way Standoff** (default, **Gödel** / weakest link): an
+  odd rebuttal cycle that classical ABA cannot settle (UNSAT). WABA discards the
+  cheapest rebuttal — three settlements at costs 3, 5, 8 (Gödel + sum + ub, β=8).
+- `arctic_grounds` — **Accumulated Objections** (**Arctic** / max-plus): each
+  rebuttal is a JOINT attack whose force is the *sum* of its grounds (⊗=+), so
+  well-supported rebuttals cost more to drop — three positions at costs 5, 7, 9
+  (Tropical-higher = arctic, sum + ub, β=9).
+- `bottleneck_worstcase` — **Worst-Case Concession** (**Bottleneck-cost** / min-max
+  + MAX monoid): a rebuttal is only as strong as its *worst* ground (⊗=max) and an
+  extension costs its single worst concession, so all three decisions can be kept
+  by paying just the hardest block (8) (Gödel-lower = bottleneck, max + ub, β=8).
+- `probabilistic` — **Weights as Probabilities** (**Tropical** / min-plus):
+  surprisal encoding where the budget β is a probability threshold; the improbable
+  objection can be overridden at its surprisal cost (tropical + sum + ub, β=800).
 
 Earlier examples whose weights/budget did not affect the result (classical
 reference cases, the rule-less `simple_attack` smoke, trivial topology fixtures)

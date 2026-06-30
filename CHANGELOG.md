@@ -30,6 +30,23 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260630-6
+
+- curated examples: broadened for **variety across the four algebras and attack
+  shapes**. Replaced the redundant second odd-cycle (`dispute_chain`) with two new
+  inline examples that exercise the previously-unshowcased algebras:
+  - **Accumulated Objections** (`arctic_grounds`) — Arctic / max-plus: each rebuttal
+    is a JOINT attack whose force is the *sum* of its grounds (⊗=+); three settlements
+    at costs 5, 7, 9 (Tropical-higher = arctic, sum + ub, β=9). Joint attacks render
+    as ⬥ junction nodes.
+  - **Worst-Case Concession** (`bottleneck_worstcase`) — Bottleneck-cost (min-max) +
+    MAX monoid: a rebuttal is only as strong as its *worst* ground (⊗=max) and an
+    extension costs its single worst concession, so all three decisions can be kept
+    by paying just the hardest block (8) (Gödel-lower = bottleneck, max + ub, β=8).
+  The curated set is now Gödel (single-premise cycle), Arctic (joint cycle), Bottleneck
+  (joint + max monoid), Tropical (probabilities) — verified end-to-end (3/4/3/2
+  settlements; correct family+polarity → semiring resolution; 0 page errors).
+
 ## 20260630-5
 
 - re-synced the bundle from the refactored WABA core, propagating all recent core
