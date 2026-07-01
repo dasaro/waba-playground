@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260630-10';
+import { wabaModules } from '../waba-modules.js?v=20260701-1';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -20,7 +20,11 @@ const SEMIRING_POLARITY = {
     tropical: 'lower',
     tropical_high: 'higher',
     arctic: 'higher',
-    bottleneck_cost: 'lower'
+    bottleneck_cost: 'lower',
+    // Łukasiewicz is a standalone family (bounded-sum ⊗, ⊕=max) with no polarity
+    // variants — it resolves directly to itself. Listed here so validateConfig
+    // accepts it as a supported semiring.
+    lukasiewicz: 'higher'
 };
 
 export function resolveSemiringModuleKey(semiringFamily, polarity) {

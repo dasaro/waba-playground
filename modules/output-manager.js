@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260630-10';
-import { MetricsManager } from './metrics-manager.js?v=20260630-10';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260630-10';
-import { ParserUtils } from './parser-utils.js?v=20260630-10';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260630-10';
+import { PopupManager } from './popup-manager.js?v=20260701-1';
+import { MetricsManager } from './metrics-manager.js?v=20260701-1';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260701-1';
+import { ParserUtils } from './parser-utils.js?v=20260701-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260701-1';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -525,7 +525,7 @@ export class OutputManager {
             contentHTML += '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
             parsed.derived.forEach(atom => {
                 const weight = parsed.weights.get(atom);
-                const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color); font-size: 0.85em;">(w: ${weight})</span>` : '';
+                const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color); font-size: 0.85em;">(w: ${displayValue(weight)})</span>` : '';
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
                 contentHTML += `<span class="chip" style="background: var(--info-color, #3b82f6); border-color: var(--info-color, #3b82f6); cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</span>`;
             });
@@ -812,10 +812,13 @@ export class OutputManager {
     }
 
     restoreActiveExtension() {
-        // Re-trigger the click on the previously active extension
+        // Re-apply the highlight for the previously active extension. Clear the id
+        // first so the click RE-highlights instead of toggling the (still-active)
+        // extension off.
         if (this.activeExtensionId !== null) {
             const header = this.output.querySelector(`.answer-header[data-extension-id="${this.activeExtensionId}"]`);
             if (header) {
+                this.activeExtensionId = null;
                 header.click();
             }
         }

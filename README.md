@@ -21,32 +21,34 @@ The app remains GitHub-Pages compatible:
 
 The main UI exposes only the mature WABA contract:
 
-- semiring family: `godel`, `lukasiewicz`
-- polarity: `higher`, `lower`
-- effective semiring keys: `godel`, `lukasiewicz`, `lukasiewicz_low`
+- semiring family: `godel`, `tropical` (each with a polarity), plus standalone `lukasiewicz`
+- polarity: `higher`, `lower` (ignored for `lukasiewicz`, which has no variants)
+- effective semiring keys: `godel`, `bottleneck_cost`, `arctic`, `tropical`, `lukasiewicz`
 - default policy: `legacy`, `aba`, `neutral`
 - ABA recovery: `neutral` defaults + `no_discard`
-- monoid: `sum`, `max`, `count`, `min`
+- monoid: `sum`, `max`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
 - semantics: `cf`, `stable`, `admissible`, `complete`, `grounded`, `preferred`
+  (the four defence semantics run on the no-discard surface)
 - output filter: `projection`, `standard`
 - opt mode: `ignore`, `optN`
 
-Family/polarity stays in the browser UI only as a thin selector over the supported direct semiring keys:
+Family/polarity is a thin selector over the direct semiring module keys:
 
 - `godel + higher` -> `godel`
-- `lukasiewicz + higher` -> `lukasiewicz`
-- `lukasiewicz + lower` -> `lukasiewicz_low`
+- `godel + lower` -> `bottleneck_cost`
+- `tropical + higher` -> `arctic`
+- `tropical + lower` -> `tropical`
+- `lukasiewicz` (no polarity) -> `lukasiewicz`
 
 Bounded presets intentionally match the mature WABA support policy:
 
 - `sum + ub`
 - `max + ub`
-- `count + ub`
 - `min + lb`
 
-When `budget mode = none`, the browser matches the wrapper's `no_discard` surface. There is no separate “minimum β exploration” mode anymore.
+When `budget mode = none`, the browser matches the wrapper's `no_discard` surface. The Monoid / Optimization / Opt-Mode controls only apply when a budget mode (discarding) is active. There is no separate “minimum β exploration” mode anymore.
 
 The startup configuration is wrapper-aligned:
 
@@ -80,7 +82,7 @@ This makes the panel more useful for “best course of action” or “best assu
 `npm run sync` regenerates [waba-modules.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/waba-modules.js) from the public WABA manifest only:
 
 - `core/base.lp`
-- supported semiring modules only: `godel`, `lukasiewicz`, `lukasiewicz_low`
+- supported semiring modules: `godel`, `bottleneck_cost`, `arctic`, `tropical`, `lukasiewicz`
 - `defaults/*.lp`
 - `monoid/*.lp`
 - `optimize/*.lp`

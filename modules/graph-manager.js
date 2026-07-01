@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260630-10';
-import { ParserUtils } from './parser-utils.js?v=20260630-10';
-import { UIManager } from './ui-manager.js?v=20260630-10';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260630-10';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260630-10';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260630-10';
+import { GraphUtils } from './graph-utils.js?v=20260701-1';
+import { ParserUtils } from './parser-utils.js?v=20260701-1';
+import { UIManager } from './ui-manager.js?v=20260701-1';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260701-1';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260701-1';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260701-1';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
@@ -222,6 +222,14 @@ export class GraphManager {
         this.networkData.edges.add(visEdges);
         this.isolatedNodes = isolatedNodes;
 
+        if (!visNodes || visNodes.length === 0) {
+            // Empty / degenerate framework: show the empty-state instead of a blank
+            // canvas (there are no assumptions/attacks to draw).
+            UIManager.showGraphEmptyState();
+            this.updateIsolatedAssumptionsOverlay();
+            return;
+        }
+
         UIManager.hideGraphEmptyState();
         this.updateIsolatedAssumptionsOverlay();
 
@@ -245,13 +253,17 @@ export class GraphManager {
     async updateGraph(frameworkCode, graphMode, clingoManager, config) {
         this.currentFrameworkCode = frameworkCode;
         this.currentGraphMode = graphMode;
+        // Generation token: a later updateGraph() supersedes earlier in-flight ones,
+        // so a slow standard-mode (clingo) build cannot clobber a newer graph after
+        // an example/mode switch.
+        const generation = (this._graphGeneration = (this._graphGeneration || 0) + 1);
 
         if (graphMode === 'assumption-direct') {
             await this.updateGraphAssumptionLevelDirect(frameworkCode, clingoManager, config);
         } else if (graphMode === 'assumption-branching') {
             await this.updateGraphAssumptionLevelBranching(frameworkCode, clingoManager, config);
         } else {
-            await this.updateGraphStandard(frameworkCode, clingoManager, config);
+            await this.updateGraphStandard(frameworkCode, clingoManager, config, generation);
         }
     }
 
@@ -260,7 +272,7 @@ export class GraphManager {
      * @param {string} frameworkCode - The WABA framework code
      * @param {ClingoManager} clingoManager - Reference to ClingoManager instance
      */
-    async updateGraphStandard(frameworkCode, clingoManager, config) {
+    async updateGraphStandard(frameworkCode, clingoManager, config, generation) {
         if (!clingoManager.clingoReady) {
             return;
         }
@@ -519,6 +531,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 }
             });
 
+            // Drop this result if a newer graph build has since been requested.
+            if (generation !== undefined && generation !== this._graphGeneration) {
+                return;
+            }
             this.applyGraphData(visNodes, visEdges, isolatedNodes);
 
         } catch (error) {

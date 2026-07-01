@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260630-10';
-import { wabaModules } from '../waba-modules.js?v=20260630-10';
+import { examples } from '../examples.js?v=20260701-1';
+import { wabaModules } from '../waba-modules.js?v=20260701-1';
 
 export class ExamplesController {
     constructor(dom, configController, editorController, outputManager) {
@@ -26,6 +26,14 @@ export class ExamplesController {
 
     async loadExample(exampleName, onGraphUpdate) {
         if (exampleName === '__uploaded__') {
+            // Re-selecting the 📁 uploaded option restores the uploaded framework
+            // (rather than silently doing nothing).
+            if (this.uploadedCode) {
+                this.editorController.loadClingoCode(this.uploadedCode, null);
+                if (onGraphUpdate) {
+                    await onGraphUpdate(this.uploadedCode);
+                }
+            }
             return;
         }
         if (!exampleName || !examples[exampleName]) {
@@ -58,6 +66,8 @@ export class ExamplesController {
     }
 
     updateExampleSelectWithFilename(filename) {
+        // Remember the uploaded framework so re-selecting the 📁 option can restore it.
+        this.uploadedCode = this.editorController.getFrameworkCode();
         const existingOption = this.dom.exampleSelect.querySelector('option[value="__uploaded__"]');
         if (existingOption) {
             existingOption.remove();

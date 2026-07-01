@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260630-10';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260701-1';
 
 export class ConfigController {
     constructor(dom) {
@@ -73,17 +73,27 @@ export class ConfigController {
         let budgetMode = this.dom.constraintSelect.value;
         const semantics = this.dom.semanticsSelect.value;
         const abaRecovery = this.dom.abaRecoveryToggle.checked;
+        const isLukasiewicz = semiringFamily === 'lukasiewicz';
+        // Defence semantics are defined on the classical no-discard surface; their
+        // interaction with discarding (undefeated/affordability vs the budget) is
+        // undefined, so we run them with no budget.
+        const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(semantics);
 
-        // Both families expose both polarities (godel: higher=godel / lower=bottleneck_cost;
-        // tropical: higher=arctic / lower=tropical), resolved via the bundle's canonicalSemiring.
-        this.dom.polaritySelect.querySelector('option[value="lower"]').disabled = false;
+        // Polarity: godel/tropical have higher/lower variants; Łukasiewicz is a
+        // standalone family with no polarity, so its selector is disabled.
+        const lowerOption = this.dom.polaritySelect.querySelector('option[value="lower"]');
+        if (lowerOption) {
+            lowerOption.disabled = false;
+        }
+        this.dom.polaritySelect.disabled = isLukasiewicz;
         const ALIAS_MAP = {
             godel: { higher: 'godel', lower: 'bottleneck_cost (godel_low)' },
             tropical: { higher: 'arctic (tropical_high)', lower: 'tropical' }
         };
         const polarity = this.dom.polaritySelect.value;
-        const mapped = (ALIAS_MAP[semiringFamily] || ALIAS_MAP.godel)[polarity];
-        this.dom.semiringAliasNote.textContent = `${polarity} polarity maps to ${mapped}.`;
+        this.dom.semiringAliasNote.textContent = isLukasiewicz
+            ? 'Łukasiewicz (bounded-sum ⊗, ⊕=max): a standalone algebra with no polarity variants.'
+            : `${polarity} polarity maps to ${(ALIAS_MAP[semiringFamily] || ALIAS_MAP.godel)[polarity]}.`;
 
         if (abaRecovery) {
             // Snapshot the user's selections once, then force the ABA-recovery profile.
@@ -99,6 +109,10 @@ export class ConfigController {
             this.dom.constraintSelect.value = this._savedBudgetMode;
             this._savedDefaultPolicy = undefined;
             this._savedBudgetMode = undefined;
+        }
+        // Defence semantics run with no budget (see above).
+        if (isDefence && !abaRecovery) {
+            this.dom.constraintSelect.value = 'none';
         }
         // Re-read after the block so the monoid/budget enable logic below runs
         // against the current budget mode (restored or forced), not the stale read.
@@ -125,9 +139,20 @@ export class ConfigController {
             });
         }
 
-        this.dom.monoidSelect.disabled = abaRecovery;
-        this.dom.optimizeSelect.disabled = abaRecovery;
-        this.dom.constraintSelect.disabled = abaRecovery;
+        // With no discarding there is nothing to aggregate or optimise, so the
+        // Monoid / Optimization / Opt-Mode controls have no effect — grey them out.
+        const noDiscard = abaRecovery || budgetMode === 'none';
+        // grounded/preferred enumerate ALL complete candidates then subset-filter,
+        // so they require Opt-Mode = ignore (enumerate); force and lock it.
+        const forceEnumerate = semantics === 'grounded' || semantics === 'preferred';
+        if (forceEnumerate) {
+            this.dom.optModeSelect.value = 'ignore';
+        }
+
+        this.dom.monoidSelect.disabled = noDiscard;
+        this.dom.optimizeSelect.disabled = noDiscard;
+        this.dom.optModeSelect.disabled = noDiscard || forceEnumerate;
+        this.dom.constraintSelect.disabled = abaRecovery || isDefence;
         this.dom.budgetInput.disabled = abaRecovery || budgetMode === 'none';
         this.dom.budgetInput.style.opacity = (abaRecovery || budgetMode === 'none') ? '0.5' : '1';
 
@@ -138,17 +163,13 @@ export class ConfigController {
             this.dom.budgetInputLabel.style.opacity = abaRecovery || budgetMode === 'none' ? '0.5' : '1';
         }
 
-        this.dom.optModeSelect.disabled = false;
-        if ((semantics === 'grounded' || semantics === 'preferred') && this.dom.optModeSelect.value === 'ignore') {
-            this.dom.optModeSelect.value = 'ignore';
-        }
-
         this.updateNumModelsVisibility();
         this.updateSurfaceCopy();
     }
 
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
+        const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(config.semantics);
         const profile = config.abaRecovery
             ? 'ABA recovery / neutral defaults / no-discard'
             : (config.budgetMode === 'none'
@@ -157,11 +178,14 @@ export class ConfigController {
         const postFilterCopy = (config.semantics === 'preferred' || config.semantics === 'grounded')
             ? ` Exact ${config.semantics} uses browser-side ${config.semantics === 'grounded' ? 'subset-minimal' : 'subset-maximal'} filtering over complete candidates.`
             : '';
+        const defenceCopy = isDefence
+            ? ' Defence semantics (admissible/complete/grounded/preferred) run on the no-discard surface.'
+            : '';
 
         this.dom.supportedSurfaceNote.innerHTML = `
-            Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code> (families G&ouml;del / Tropical).
+            Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code>, <code>lukasiewicz</code> (families G&ouml;del / Tropical, plus standalone &#321;ukasiewicz).
             Canonical bounded presets are <code>sum/max + ub</code> and <code>min + lb</code>.
-            Current profile: <code>${profile}</code>.${postFilterCopy}
+            Current profile: <code>${profile}</code>.${postFilterCopy}${defenceCopy}
         `;
 
         this.dom.budgetIntentNote.textContent = config.abaRecovery

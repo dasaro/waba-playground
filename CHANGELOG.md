@@ -30,6 +30,41 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260701-1
+
+Implemented the remaining deferred GUI-audit fixes:
+
+- **Łukasiewicz is now selectable** (semiring-select option + `SEMIRING_POLARITY`
+  entry; polarity selector disabled since it has no variants). It composes + solves.
+- **Defence semantics run on the no-discard surface.** admissible/complete/grounded/
+  preferred now force Budget Mode = none and disable the budget control (their
+  interaction with discarding is undefined). Surface copy notes it.
+- **Inert controls are greyed out.** With no discarding (Budget = none / ABA recovery /
+  defence), the Monoid / Optimization / Opt-Mode controls have no effect and are now
+  disabled. grounded/preferred force + lock Opt-Mode = ignore (replacing a dead no-op).
+- **Failed / timed-out runs no longer leave stale results.** Output + graph highlight
+  are cleared before solving.
+- **A re-selected 📁 uploaded example is restored** instead of doing nothing.
+- **Empty / degenerate frameworks show the graph empty-state** instead of a blank canvas.
+- **Config changes no longer un-highlight the active extension** (restore re-applies
+  the highlight instead of toggling it off).
+- **Standard-mode highlight is exact** — only the set-node equal to the selected
+  extension is highlighted, not every set sharing an assumption (#18).
+- **PrismEditor no longer yanks the caret** from another editor/input (guards the
+  global selection to this editor) (#15).
+- **Async graph race guard**: a slow standard-mode build can no longer clobber a newer
+  graph after an example/mode switch (#16).
+- **Derived-atom weights** show `+inf`/`-inf` instead of raw `#sup`/`#inf`.
+- Docs: corrected the stale "Supported Surface" in README.md and ARCHITECTURE.md
+  (real families/keys godel/bottleneck_cost/arctic/tropical/lukasiewicz; sum/max/min;
+  no `count`); fixed the Optimization vs Opt-Mode help entry.
+
+Deferred (low value / contested): ParserUtils nested-term-comma parsing (#30; simple
+atoms only in practice, and the user-facing discarded-attack display is already
+nested-safe); grounded/preferred 2× solver-timeout sharing; a program-builder change
+for Optimization-in-enumerate-mode (it still affects ranking, so not a true no-op —
+clarified in the help copy instead).
+
 ## 20260630-10
 
 GUI audit pass (multi-agent audit, fixes applied + independently re-verified):

@@ -122,10 +122,13 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             }];
         }
 
-        // Standard-mode set nodes carry their members in node.assumptions: keep the
-        // prior behaviour (highlight a set that contains any accepted assumption).
+        // Standard-mode set nodes carry their members in node.assumptions. Highlight
+        // ONLY the node whose members are EXACTLY the accepted set (the selected
+        // extension) — not every set that merely shares an assumption with it.
         const members = node.assumptions || [];
-        if (members.some((assumption) => inSet.has(assumption))) {
+        const isExactExtension = members.length === inAssumptions.length
+            && members.every((assumption) => inSet.has(assumption));
+        if (isExactExtension) {
             return [accepted];
         }
         return [];

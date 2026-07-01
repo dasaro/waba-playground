@@ -11,7 +11,7 @@ async function waitForClingoReady(page) {
 
 test('collapsible panels toggle cleanly', async ({ page }) => {
     await waitForClingoReady(page);
-    await expect(page.locator('#semiring-select option')).toHaveText(['Gödel', 'Tropical']);
+    await expect(page.locator('#semiring-select option')).toHaveText(['Gödel', 'Tropical', 'Łukasiewicz']);
     await expect(page.locator('#default-policy-select option')).toHaveText(['Legacy', 'ABA', 'Neutral']);
     await expect(page.locator('#show-select option')).toHaveText(['Projection', 'Standard']);
     await expect(page.locator('#analysis-export-png-proxy')).toBeVisible();
@@ -63,7 +63,10 @@ test('exact preferred flow renders and graph modes switch without regressions', 
 
     await page.selectOption('#example-select', 'conflict_cycle');
     await page.selectOption('#semantics-select', 'preferred');
-    await page.selectOption('#constraint-select', 'none');
+    // preferred is a defence semantics -> the budget is forced to none and the
+    // constraint control is disabled (defence runs on the no-discard surface).
+    await expect(page.locator('#constraint-select')).toBeDisabled();
+    await expect(page.locator('#constraint-select')).toHaveValue('none');
     await page.selectOption('#show-select', 'projection');
     await page.click('#run-btn');
     await expect(page.locator('.answer-header')).toHaveCount(1, { timeout: 60000 });
@@ -109,8 +112,10 @@ test('budgeted stable surface and subset-closure admissible smoke both run on th
 
     await page.selectOption('#example-select', 'conflict_cycle');
     await page.selectOption('#semantics-select', 'admissible');
-    await page.selectOption('#constraint-select', 'none');
-    await page.selectOption('#opt-mode-select', 'ignore');
+    // admissible (defence) forces the no-discard surface: the budget + opt-mode
+    // controls are disabled (nothing to discard/optimise).
+    await expect(page.locator('#constraint-select')).toBeDisabled();
+    await expect(page.locator('#opt-mode-select')).toBeDisabled();
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
 

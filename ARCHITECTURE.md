@@ -97,20 +97,20 @@ These remain “manager” style modules, but their responsibilities are narrowe
 
 The browser preserves exactly this public surface:
 
-- semiring family: `godel`, `tropical`, `lukasiewicz`
-- polarity: `higher`, `lower`
-- default policy: `neutral` only in the UI
-- monoid: `sum`, `max`, `count`, `min`
+- semiring family: `godel`, `tropical` (with polarity), plus standalone `lukasiewicz`
+- polarity: `higher`, `lower` (n/a for `lukasiewicz`)
+- default policy: `legacy`, `aba`, `neutral`
+- monoid: `sum`, `max`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
 - semantics: `cf`, `stable`, `admissible`, `complete`, `grounded`, `preferred`
-- exact `preferred` via browser-side multi-pass plain `clingo`
+  (defence semantics run on the no-discard surface)
+- exact `preferred`/`grounded` via browser-side multi-pass plain `clingo`
 
 Supported bounded presets:
 
 - `sum + ub`
 - `max + ub`
-- `count + ub`
 - `min + lb`
 
 ## Solver Flow

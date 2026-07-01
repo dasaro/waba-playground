@@ -75,6 +75,12 @@ export class PrismEditor {
         }
 
         const range = selection.getRangeAt(0);
+        // Only preserve the cursor when the selection actually lives inside THIS
+        // editor; otherwise restoring it would yank the caret away from wherever the
+        // user really is (another editor or input on the page).
+        if (!this.codeElement.contains(range.endContainer)) {
+            return null;
+        }
         const preRange = range.cloneRange();
         preRange.selectNodeContents(this.codeElement);
         preRange.setEnd(range.endContainer, range.endOffset);
