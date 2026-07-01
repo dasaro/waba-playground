@@ -119,6 +119,12 @@ joint attacks, sum vs. max monoid):
 - `probabilistic` — **Weights as Probabilities** (**Tropical** / min-plus):
   surprisal encoding where the budget β is a probability threshold; the improbable
   objection can be overridden at its surprisal cost (tropical + sum + ub, β=800).
+- `big_bang_steady_state` — **Big Bang vs Steady-State** (**Arctic** / max-plus): a real
+  cosmology debate as evidential consilience. Weights count independent converging
+  evidence lines and ⊗=+ sums them; five observations (CMB, its blackbody spectrum,
+  primordial He-4 & deuterium, evolving radio counts) jointly refute Steady-State with
+  weight 5. Accepted at cost 0: Big Bang (settled consensus); a Steady-State holdout is
+  admissible only at β=5 — the cost of dismissing all five lines (arctic + sum + ub, β=5).
 
 Earlier examples whose weights/budget did not affect the result (classical
 reference cases, the rule-less `simple_attack` smoke, trivial topology fixtures)

@@ -30,6 +30,22 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260701-2
+
+- new curated example **`big_bang_steady_state` — Big Bang vs Steady-State**, a real
+  scientific debate cast as **Arctic evidential consilience**. A weight counts
+  independent converging lines of evidence (one unit each), and Arctic's ⊗=+ SUMS them,
+  so the joint case `not_steady <- {CMB exists, CMB blackbody, primordial He-4,
+  deuterium, evolving radio counts}` has weight 5. Contraries respect the total-function
+  requirement (one per assumption). Verified in clingo (β-sweep): the accepted, cost-0
+  extension is `in(big_bang), out(steady_state)` — today's settled consensus — for all
+  β<5; a Steady-State extension appears only at β≥5 and costs exactly 5 (you must discard
+  all five lines). Ships at β=5 so both stances enumerate (Big Bang at cost 0 is the
+  optimum). Weights are a modelling count, not physical constants; the lithium-7
+  discrepancy is flagged as a tolerated within-model anomaly. (Candidate debate chosen by
+  an 8-way web-researched + adversarially-judged workflow; runner-up: the solar neutrino
+  problem.)
+
 ## 20260701-1
 
 Implemented the remaining deferred GUI-audit fixes:

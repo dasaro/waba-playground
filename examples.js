@@ -2,8 +2,10 @@
 // The curated set spans the FOUR algebras and several attack shapes so the
 // distinctive machinery is visible: Gödel (weakest-link, single-premise cycle),
 // Arctic (reward accumulation, joint attacks), Bottleneck-cost (worst-case, MAX
-// monoid), and Tropical (weights as probabilities). `probabilistic` is synced
-// from the WABA repo (waba-modules.js); the others are inline.
+// monoid), and Tropical (weights as probabilities) -- plus one real scientific
+// debate, Big Bang vs Steady-State, cast as Arctic evidential consilience (weights
+// count independent converging evidence lines). `probabilistic` is synced from the
+// WABA repo (waba-modules.js); the others are inline.
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
 %%
@@ -90,6 +92,52 @@ contrary(merge,  block_merge).
 contrary(caveat_a, c_ca). contrary(caveat_b, c_cb). contrary(caveat_c, c_cc).
 `;
 
+const BIG_BANG_STEADY_STATE = `%% BIG BANG vs STEADY-STATE -- evidential consilience (Arctic / max-plus).
+%%
+%% A real 20th-century cosmology debate: the hot Big Bang (Gamow; Λ-CDM today) vs the
+%% eternal, unchanging Steady-State universe with continuous matter creation (Bondi,
+%% Gold & Hoyle, 1948). Here a weight counts INDEPENDENT converging lines of evidence
+%% -- one "evidence unit" each -- so under Arctic the conjunction ⊗ = + ADDS the lines:
+%% the joint case against Steady-State is exactly as strong as the NUMBER of independent
+%% observations it rests on (this is Whewell's "consilience of inductions").
+%%
+%% Five methodologically distinct observations each require a hot, dense, evolving past
+%% and so refute an eternal steady state (each weight 1):
+assumption(cmb_exists).     weight(cmb_exists, 1).     % the cosmic microwave background exists (Penzias & Wilson, 1965)
+assumption(cmb_blackbody).  weight(cmb_blackbody, 1).  % the CMB is a near-perfect blackbody (COBE/FIRAS) -- relic of a hot past
+assumption(he4_abundance).  weight(he4_abundance, 1).  % primordial helium-4 ≈ 25% by mass (BBN) -- far more than stars can make
+assumption(deuterium).      weight(deuterium, 1).      % primordial deuterium D/H (BBN) -- destroyed, not made, in stars
+assumption(radio_counts).   weight(radio_counts, 1).   % radio-source / quasar counts evolve with cosmic time (Ryle)
+
+%% The two rival stances:
+assumption(big_bang).       weight(big_bang, 1).       % the hot Big Bang
+assumption(steady_state).   weight(steady_state, 1).   % the eternal Steady-State universe
+
+%% not_steady <- all five lines.  Arctic ⊗ = + makes its weight 1+1+1+1+1 = 5
+%% ("a hot dense past is required"): the accumulated strength of the converging case.
+head(r1, not_steady).
+body(r1, cmb_exists). body(r1, cmb_blackbody). body(r1, he4_abundance).
+body(r1, deuterium).  body(r1, radio_counts).
+
+%% contrary(X, Y): "Y attacks X"  (contrary is a TOTAL function -- one per assumption)
+contrary(steady_state, not_steady).   % the weight-5 converging case refutes Steady-State
+contrary(big_bang, steady_state).     % Steady-State, if still held, attacks Big Bang (weight 1)
+%% the five observations are unattacked (their contraries are never derivable):
+contrary(cmb_exists, c1). contrary(cmb_blackbody, c2). contrary(he4_abundance, c3).
+contrary(deuterium, c4).  contrary(radio_counts, c5).
+
+%% As configured (Tropical-higher = Arctic, sum + ub, β = 5, enumerate):
+%%   * the accepted (cost-0) extension is  in(big_bang), out(steady_state)  = today's
+%%     SETTLED consensus. Big Bang wins at ZERO cost -- no evidence has to be set aside.
+%%   * a Steady-State extension exists ONLY at β ≥ 5, and it costs exactly 5: to still
+%%     hold Steady-State you must DISCARD the entire converging body of evidence (all 5
+%%     lines). So β = 5 literally measures how much evidence a holdout must deny.
+%%
+%% NOTE: the integer weights are a modelling COUNT of independent evidence lines, not
+%% physical constants ("5" is not a measured quantity). The primordial lithium-7
+%% discrepancy is a real but tolerated WITHIN-model anomaly, not support for Steady-State.
+`;
+
 export const examples = {
     conflict_cycle: {
         label: 'Three-Way Standoff',
@@ -165,6 +213,25 @@ export const examples = {
             semantics: 'stable',
             optMode: 'ignore',
             beta: 800
+        }
+    },
+    big_bang_steady_state: {
+        label: 'Big Bang vs Steady-State',
+        description: 'A real cosmology debate as evidential consilience (Arctic / max-plus): a weight counts independent converging evidence lines and ⊗=+ sums them. Five observations (the CMB, its blackbody spectrum, primordial helium-4 & deuterium, evolving radio-source counts) jointly refute Steady-State with weight 5. Accepted at cost 0: Big Bang — today\'s settled consensus; a Steady-State holdout is admissible only at β=5, the cost of dismissing all five lines. (Tropical-higher = arctic, sum + ub, β=5.)',
+        section: 'curated',
+        source: 'inline',
+        code: BIG_BANG_STEADY_STATE,
+        preset: {
+            semiringFamily: 'tropical',
+            polarity: 'higher',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
+            semantics: 'stable',
+            optMode: 'ignore',
+            beta: 5
         }
     },
 };
