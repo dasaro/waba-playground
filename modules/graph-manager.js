@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260701-2';
-import { ParserUtils } from './parser-utils.js?v=20260701-2';
-import { UIManager } from './ui-manager.js?v=20260701-2';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260701-2';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260701-2';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260701-2';
+import { GraphUtils } from './graph-utils.js?v=20260702-1';
+import { ParserUtils } from './parser-utils.js?v=20260702-1';
+import { UIManager } from './ui-manager.js?v=20260702-1';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260702-1';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260702-1';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260702-1';
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
@@ -274,6 +274,23 @@ export class GraphManager {
      */
     async updateGraphStandard(frameworkCode, clingoManager, config, generation) {
         if (!clingoManager.clingoReady) {
+            return;
+        }
+
+        // The standard graph is the POWER SET of the assumptions (2^n candidate sets),
+        // which clingo cannot enumerate for large frameworks and would otherwise stall
+        // the solver queue on load. Guard it; the assumption-level views (linear in the
+        // number of assumptions) remain available and are the right view here.
+        const assumptionCount = ParserUtils.parseAssumptions(frameworkCode).length;
+        if (assumptionCount > 8) {
+            if (generation !== undefined && generation !== this._graphGeneration) {
+                return;
+            }
+            this.networkData.nodes.clear();
+            this.networkData.edges.clear();
+            this.isolatedNodes = [];
+            this.updateIsolatedAssumptionsOverlay();
+            UIManager.showGraphEmptyState(`${assumptionCount} assumptions ⇒ 2^${assumptionCount} candidate sets — too many for the Standard set-graph. Switch to Assumption-Direct or Assumption-Branching to view this framework.`);
             return;
         }
 

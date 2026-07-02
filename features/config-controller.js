@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260701-2';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260702-1';
 
 export class ConfigController {
     constructor(dom) {
@@ -35,6 +35,14 @@ export class ConfigController {
         this.dom.optModeSelect.value = config.optMode;
         this.dom.budgetInput.value = String(config.beta ?? 0);
         this.dom.showSelect.value = config.filterType || 'projection';
+        // Graph mode: an example may prefer a view (e.g. debates open in the
+        // assumption-level view rather than the exponential Standard set-graph).
+        const graphMode = config.graphMode || 'standard';
+        if (this.dom.graphModeRadios) {
+            this.dom.graphModeRadios.forEach((radio) => {
+                radio.checked = radio.value === graphMode;
+            });
+        }
         // A freshly applied config supersedes any held ABA-recovery snapshot.
         this._savedDefaultPolicy = undefined;
         this._savedBudgetMode = undefined;

@@ -1,11 +1,18 @@
 // WABA Playground examples.
-// The curated set spans the FOUR algebras and several attack shapes so the
-// distinctive machinery is visible: Gödel (weakest-link, single-premise cycle),
-// Arctic (reward accumulation, joint attacks), Bottleneck-cost (worst-case, MAX
-// monoid), and Tropical (weights as probabilities) -- plus one real scientific
-// debate, Big Bang vs Steady-State, cast as Arctic evidential consilience (weights
-// count independent converging evidence lines). `probabilistic` is synced from the
-// WABA repo (waba-modules.js); the others are inline.
+// Two families of curated examples:
+//  (1) Algebra demos across the four semirings: Gödel (weakest-link cycle),
+//      Arctic (joint accumulation), Bottleneck-cost (worst-case + MAX monoid),
+//      Tropical (weights as probabilities).
+//  (2) Real SCIENTIFIC DEBATES whose weights take a natural meaning under the
+//      matching algebra, with the WABA-accepted (min-cost) extension reproducing
+//      today's scientific consensus and β measuring how much evidence a holdout
+//      must dismiss:
+//        - big_bang_steady_state  : consilience              (Arctic,  β=5,  cost-0 consensus)
+//        - smoking_lung_cancer    : Bradford-Hill consilience (Arctic,  β=54, cost-0 consensus)
+//        - solar_neutrino         : combined significance     (Tropical, β=53, cost-0 consensus)
+//        - age_of_earth           : weakest-link              (Gödel,   β=80, cost-0 consensus)
+//        - plate_tectonics        : consilience w/ a TOLERATED objection (Arctic, β=19, cost-7 consensus)
+// `probabilistic` is synced from the WABA repo (waba-modules.js); the rest are inline.
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
 %%
@@ -138,6 +145,377 @@ contrary(deuterium, c4).  contrary(radio_counts, c5).
 %% discrepancy is a real but tolerated WITHIN-model anomaly, not support for Steady-State.
 `;
 
+const SMOKING_LUNG_CANCER = `%% ============================================================================
+%% WABA curated debate: "Smoking causes lung cancer"
+%% ============================================================================
+%% Guide: Doll & Hill / Bradford-Hill causal criteria  vs  R. A. Fisher's
+%% "constitutional hypothesis" (a hidden genetic factor causes BOTH smoking and
+%% lung cancer -> confounding, not causation).
+%%
+%% Semiring : arctic  (oplus=max, otimes=+, 1bar=0, 0bar=#inf) -- CONSILIENCE.
+%%            The Bradford-Hill lines are INDEPENDENT lines of evidence; the
+%%            support of a joint argument is the SUM of its premises' support
+%%            (otimes=+), and oplus=max keeps the best-supported derivation. So
+%%            the weight of the argument refuting confounding = accumulated evid.
+%% Monoid   : sum   -- total tolerated objection-severity when discarding.
+%% Budget   : ub    -- inconsistency budget beta = how much accumulated evidence
+%%            you are willing to DISMISS to hold the rival (confounding) stance.
+%% Weights  : integer encoding of the relative evidential force of each line
+%%            (a modelling encoding, NOT a physical constant). Decisive lines
+%%            (strength of association RR~10-20, dose-response, reversibility)
+%%            carry the most weight.
+%%
+%% ABA rigor:
+%%   * contrary is a TOTAL FUNCTION -- exactly one contrary atom per assumption.
+%%     The evidence lines attack the confounding stance by ALL deriving its
+%%     SINGLE contrary atom (no_conf) via ONE joint rule, combined by otimes=+.
+%%   * every assumption has a contrary (dummy c_* for the settled evidence leaves).
+%%   * flat: no assumption is ever a rule head (heads are no_conf / no_caus).
+%% ============================================================================
+
+%% ---------------------------------------------------------------------------
+%% THE TWO RIVAL STANCES
+%% ---------------------------------------------------------------------------
+%% caus : "smoking causes lung cancer"  (the modern consensus)
+assumption(caus).   contrary(caus, no_caus).
+%% conf : Fisher's constitutional / confounding hypothesis
+%%        "a hidden genetic factor causes both smoking and cancer; no causation"
+%%   Given a modest positive weight: Fisher's confounding argument is a serious
+%%   a-priori statistical objection (it has real force), just decisively
+%%   outweighed by the accumulated Bradford-Hill case (54 >> 8).
+assumption(conf).   weight(conf, 8).   contrary(conf, no_conf).
+
+%% ---------------------------------------------------------------------------
+%% THE BRADFORD-HILL LINES OF EVIDENCE  (independent evidence assumptions)
+%% weight = integer encoding of that line's evidential force
+%% ---------------------------------------------------------------------------
+assumption(assoc).      weight(assoc, 10).   contrary(assoc, c_assoc).      % strong association, RR ~ 10-20
+assumption(dose).       weight(dose, 9).     contrary(dose, c_dose).        % dose-response / biological gradient
+assumption(reverse).    weight(reverse, 9).  contrary(reverse, c_reverse).  % reversibility: risk falls after cessation
+assumption(consist).    weight(consist, 7).  contrary(consist, c_consist).  % consistency across many studies/populations
+assumption(mechanism).  weight(mechanism, 6).contrary(mechanism, c_mech).   % mechanism: carcinogens in tar
+assumption(temporal).   weight(temporal, 5). contrary(temporal, c_temporal).% temporality: smoking precedes cancer
+assumption(coherent).   weight(coherent, 4). contrary(coherent, c_coherent).% coherence with known biology
+assumption(animal).     weight(animal, 4).   contrary(animal, c_animal).    % animal carcinogenesis experiments
+
+%% ---------------------------------------------------------------------------
+%% ARGUMENTS (rule heads are derived atoms, never assumptions)
+%% ---------------------------------------------------------------------------
+%% r_evidence : no_conf <- assoc, dose, reverse, consist, mechanism, temporal, coherent, animal.
+%%   The accumulated Bradford-Hill case refutes the confounding stance.
+%%   arctic otimes=+  =>  weight(no_conf) = 10+9+9+7+6+5+4+4 = 54.
+head(r_evidence, no_conf).
+body(r_evidence, assoc). body(r_evidence, dose).      body(r_evidence, reverse).
+body(r_evidence, consist). body(r_evidence, mechanism). body(r_evidence, temporal).
+body(r_evidence, coherent). body(r_evidence, animal).
+
+%% r_confound : no_caus <- conf.
+%%   IF the confounding stance stands, THEN causation is defeated.
+head(r_confound, no_caus).
+body(r_confound, conf).
+`;
+
+const SOLAR_NEUTRINO = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SOLAR NEUTRINO PROBLEM
+%% Neutrino oscillation (SSM correct) vs. Standard-Solar-Model error
+%%
+%% STORY
+%% Homestake / Kamiokande / SAGE / GALLEX saw a solar electron-neutrino flux
+%% ~1/3 of the Standard Solar Model (SSM) prediction. Two rival explanations:
+%%   (A) the SSM is WRONG (the Sun really makes fewer neutrinos), or
+%%   (B) neutrinos OSCILLATE (change flavour en route; the SSM is correct).
+%% SNO (2001-02) settled it with TWO independent channels:
+%%   - charged-current (CC): the electron-neutrino flux, reduced;
+%%   - neutral-current (NC): the TOTAL all-flavour flux, which MATCHED the SSM.
+%% A matched total flux means the Sun makes the predicted number of neutrinos,
+%% so the SSM is NOT wrong; the electron deficit is flavour change. The combined
+%% CC+NC evidence reached ~5.3 sigma -> discovery. Nobel Prize 2015.
+%%
+%% SEMIRING: tropical (min-plus), a COST/surprisal algebra.
+%%   otimes = +   : premises of ONE joint argument accumulate SURPRISAL. The
+%%                  significances of two INDEPENDENT measurements ADD (their
+%%                  -log-p / chi-square surprisals accumulate additively).
+%%   oplus  = min : among alternative proofs, keep the LEAST-surprising one.
+%%   Weights = statistical significance in units of 0.1 sigma -- a modelling
+%%             ENCODING of -log-p surprisal (see NATURALNESS caveat), NOT a
+%%             claim that raw sigma adds (independent sigma add in quadrature;
+%%             the surprisal that otimes=+ sums is the correct additive quantity).
+%%
+%% MONOID: sum. Extension cost = total significance of the SNO evidence a
+%%   position must DISMISS (discard) to survive. sum = total ignored significance.
+%%
+%% BUDGET beta (UPPER bound, ub): the inconsistency budget = how much established
+%%   significance a position is allowed to wave away. beta is a DISCOVERY /
+%%   significance THRESHOLD: below it, the SNO result cannot be dismissed and the
+%%   holdout "SSM is wrong" position is INFEASIBLE.
+%%
+%% WEIGHT ENCODING (units of 0.1 sigma; modelling encoding, not physical values)
+%%   sno_cc (electron-nu deficit)   : 25  (~2.5 sigma on its own)
+%%   sno_nc (total flux matches SSM): 28  (~2.8 sigma on its own)
+%%   joint flavour_change argument  : 25 + 28 = 53  (~5.3 sigma) via otimes=+
+%% Neither channel alone crosses discovery; SUMMED (tropical otimes=+) they do.
+%%
+%% EXPECTED RESULT (verified by enumeration + optimization)
+%%   Min-cost accepted extension (cost 0, for every beta) = CONSENSUS:
+%%     in: oscillation, sno_cc, sno_nc ; out: ssm_wrong
+%%     (flavour_change is derived and DEFEATS ssm_wrong; nothing is discarded).
+%%   The holdout "ssm_wrong in" costs 53 (it must discard the 5.3-sigma SNO
+%%   attack) and is INFEASIBLE until beta >= 53. Threshold beta* = 53.
+%%
+%% USAGE (sweep beta):
+%%   clingo --warn=no-atom-undefined -n 0 -c beta=B \
+%%     WABA/core/base.lp WABA/semiring/tropical.lp WABA/defaults/legacy.lp \
+%%     WABA/monoid/sum.lp WABA/constraint/ub.lp \
+%%     WABA/filter/projection.lp WABA/semantics/stable.lp solar_neutrino.lp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% ============================================================================
+%% ASSUMPTIONS
+%% ============================================================================
+assumption(oscillation).   % Position B: neutrinos oscillate (SSM correct)
+assumption(ssm_wrong).     % Position A: the Standard Solar Model is wrong
+assumption(sno_cc).        % Evidence leaf: SNO charged-current (e-nu deficit)
+assumption(sno_nc).        % Evidence leaf: SNO neutral-current (total matches SSM)
+
+%% ============================================================================
+%% WEIGHTS (significance in units of 0.1 sigma; modelling encoding)
+%% ============================================================================
+weight(sno_cc, 25).        % ~2.5 sigma  (electron-neutrino deficit, on its own)
+weight(sno_nc, 28).        % ~2.8 sigma  (total all-flavour flux matches SSM)
+
+%% ============================================================================
+%% RULES
+%% The decisive joint argument: SNO's two INDEPENDENT channels together
+%% demonstrate flavour change. Under tropical otimes=+ its surprisal is the SUM
+%% 25 + 28 = 53 (~5.3 sigma). flavour_change is the CONTRARY of ssm_wrong:
+%% a matched total flux (NC) plus a reduced electron flux (CC) proves the Sun
+%% makes the predicted neutrinos, refuting "the SSM is wrong".
+%% ============================================================================
+%% r1: flavour_change <- sno_cc, sno_nc.
+head(r1, flavour_change).
+body(r1, sno_cc).
+body(r1, sno_nc).
+
+%% ============================================================================
+%% CONTRARIES (TOTAL FUNCTION: exactly one contrary atom per assumption)
+%% ============================================================================
+contrary(ssm_wrong, flavour_change).  % the SNO joint argument refutes position A
+contrary(oscillation, c_osc).         % dummy: nothing derives c_osc (B unattacked)
+contrary(sno_cc, c_cc).               % dummy: evidence leaf, never attacked
+contrary(sno_nc, c_nc).               % dummy: evidence leaf, never attacked
+
+%% Budget beta is supplied on the command line (-c beta=B).
+budget(beta).
+`;
+
+const AGE_OF_EARTH = `%% =====================================================================
+%% Age of the Earth: Kelvin's cooling estimate vs radiometric ~4.54 Gyr
+%% =====================================================================
+%% Semiring: godel  (oplus=max over alternative derivations, otimes=min over a
+%%                   rule's premises = WEAKEST-LINK; higher weight = higher confidence).
+%% Monoid  : sum (or max) over discarded-attack weights = inconsistency cost.
+%% Budget  : ub (upper bound). beta = how much objection-strength a holdout may dismiss.
+%%
+%% Weights are a 1..100 CONFIDENCE encoding (a modelling device, NOT physical
+%% constants): 100 = essentially certain, ~5 = a premise the evidence has refuted.
+%%
+%% THE DEBATE
+%%   Position A (young_earth): Kelvin (1862), Earth ~20-100 Myr, from conductive
+%%     cooling of an initially molten Earth. His conclusion is a CONJUNCTION of
+%%     premises; the crucial one, "NO internal heat source" (no_internal_heat), is
+%%     FALSE -- radioactivity (1896-1903) supplies internal heat and voids the calc.
+%%   Position B (old_earth): radiometric dating gives ~4.54 Gyr; premises all strong.
+%%
+%% WHY godel / WEAKEST-LINK is the natural algebra here:
+%%   Kelvin's young-Earth argument is a chain whose otimes=min strength is dragged
+%%   down to its weakest premise. Once no_internal_heat's confidence collapses to ~5,
+%%   the whole Kelvin argument is only strength 5 -- a WEAK attack on old_earth. The
+%%   radiometric argument's weakest premise is still strong (~80), so its attack on
+%%   young_earth is STRONG.
+%%
+%% CONSENSUS-VS-HOLDOUT STRUCTURE (asymmetric, following the settled-science
+%% pattern): the ACCEPTED theory (old_earth) is defended for FREE by permanent,
+%% strong radiometric evidence that refutes its rival; the rival (young_earth) is
+%% attacked by that strength-80 evidence at all times. To overturn the consensus a
+%% holdout must PAY to discard that strong objection (cost 80). Old_earth, by
+%% contrast, is only attacked WHEN young_earth is actually adopted, so the settled
+%% consensus stands at cost 0. beta is exactly "how much objection-strength a holdout
+%% is allowed to dismiss": the young-Earth extension appears only once beta >= 80.
+
+%% -------------------- BUDGET (beta set on the command line) --------------------
+budget(beta).
+
+%% -------------------- THE TWO RIVAL POSITIONS (assumptions) ------------------
+%% Flat ABA: these are assumptions, never rule heads. Each has EXACTLY ONE contrary
+%% (contrary is a total function: one contrary atom per assumption).
+assumption(young_earth).   % Kelvin: Earth is young (~20-100 Myr)
+assumption(old_earth).     % Radiometric: Earth is ~4.54 Gyr
+
+%% contrary(Y,X): "X attacks Y".  Single contrary atom per assumption.
+contrary(young_earth, c_young).   % c_young ("Earth is old") attacks young_earth
+contrary(old_earth,   c_old).     % c_old   ("Earth is young") attacks old_earth
+
+%% -------------------- EVIDENCE LEAVES (assumptions) --------------------------
+%% Premises of the two arguments. Unattacked (their contraries are dummy,
+%% never-derivable atoms), so they are always 'in'. Confidence weights are
+%% intrinsic (godel: higher = stronger).
+
+%% -- Radiometric argument premises (all strong) --
+assumption(decay_constant_known). weight(decay_constant_known, 95).  % lab-measured decay const
+assumption(isotope_ratios).       weight(isotope_ratios,       90).  % measured Pb/U ratios
+assumption(closed_system).        weight(closed_system,        80).  % rock closed to loss/gain
+contrary(decay_constant_known, c_decay).      % dummy, never derived
+contrary(isotope_ratios,       c_iso).        % dummy, never derived
+contrary(closed_system,        c_closed).     % dummy, never derived
+
+%% -- Kelvin's cooling-chain premises --
+assumption(initial_molten).       weight(initial_molten,       70).  % Earth began molten
+assumption(conductive_cooling).   weight(conductive_cooling,   60).  % heat leaves by conduction
+assumption(no_internal_heat).     weight(no_internal_heat,      5).  % NO internal source -- FALSE
+contrary(initial_molten,     c_molten).        % dummy, never derived
+contrary(conductive_cooling, c_cond).          % dummy, never derived
+contrary(no_internal_heat,   c_noheat).        % dummy, never derived
+
+%% -------------------- ARGUMENTS (rules) --------------------------------------
+
+%% Radiometric argument derives c_young ("Earth is old"), attacking young_earth.
+%% Built purely from the ALWAYS-IN radiometric leaves, so it is PERMANENTLY active:
+%% young_earth is under attack no matter what stance is taken.
+%% godel otimes=min over premises => strength = min(95,90,80) = 80  (STRONG attack).
+%% r_rad: c_young <- decay_constant_known, isotope_ratios, closed_system.
+head(r_rad, c_young).
+body(r_rad, decay_constant_known; r_rad, isotope_ratios; r_rad, closed_system).
+
+%% Kelvin's cooling argument derives c_old ("Earth is young"), attacking old_earth.
+%% It is the young-Earth POSITION's own case, so it is deployed only when
+%% young_earth is actually adopted (young_earth is one of its premises). Hence the
+%% settled consensus (old_earth, young_earth out) faces NO active attack and stands
+%% at cost 0; the "both out" abstention is NOT stable, because old_earth could then
+%% only be defeated by this (now inactive) attack.
+%% godel otimes=min over premises => strength = min(#sup,70,60,5) = 5  (WEAK attack,
+%% dragged down by the refuted no_internal_heat premise; young_earth is unweighted
+%% -> godel default #sup, so it does not change the min).
+%% r_kelvin: c_old <- young_earth, initial_molten, conductive_cooling, no_internal_heat.
+head(r_kelvin, c_old).
+body(r_kelvin, young_earth; r_kelvin, initial_molten; r_kelvin, conductive_cooling; r_kelvin, no_internal_heat).
+`;
+
+const PLATE_TECTONICS = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% CONTINENTAL DRIFT / PLATE TECTONICS  vs  FIXISM
+%%
+%% STORY
+%%   Wegener (1912-) argued the continents drift, stacking several INDEPENDENT
+%%   lines of evidence: the coastline + continental-shelf fit, matching fossils
+%%   (Mesosaurus, Glossopteris), matching orogenic rock belts, Permo-Carboniferous
+%%   glacial tillites, and later paleomagnetism and the sea-floor magnetic stripes
+%%   (Vine-Matthews, 1963).  Fixists (Harold Jeffreys) rejected drift on ONE
+%%   quantitative objection: there is NO adequate MECHANISM -- the mantle is too
+%%   rigid and the invoked forces far too weak to move continents.
+%%
+%%   The historically striking fact: plate tectonics was ACCEPTED (~1966-67) on the
+%%   converging evidence BEFORE a fully worked-out driving mechanism was in hand.
+%%   The heavyweight mechanism objection was TOLERATED at acceptance.  So the
+%%   accepted mobilist position DISCARDS a real, decisive objection (paying its
+%%   weight); it is admissible only because the ACCUMULATED evidence outweighs the
+%%   objection budget.  (Contrast Big Bang, where the consensus wins at cost 0.)
+%%
+%% SEMIRING: arctic  (max-plus)   -- in the UI: family=tropical, polarity=higher
+%%   * (+) conjunction = CONSILIENCE: the independent premises of one joint
+%%     argument ADD their support.  Wegener's case is exactly a conjunction of
+%%     independent evidence lines, so its strength is their SUM.
+%%   * (max) alternative derivations = keep the best-supported argument.
+%%   Weights are STRENGTH / lines-of-evidence support (higher = better).
+%%
+%% MONOID: sum   -- extension cost = TOTAL severity of the objections the accepted
+%%   position must dismiss (discarded attacks).  BUDGET beta = how much objection-
+%%   severity the community is willing to tolerate.
+%%
+%% CONSTRAINT: ub  (upper bound)  -- sum of discarded weights must be <= beta.
+%% SEMANTICS: stable.  OPTIMIZATION: minimize (accept the min-cost extension).
+%%
+%% WEIGHTS are a MODELLING ENCODING (defensible small integers ranking the
+%% relative evidential weight of each line), NOT physical constants.
+%%
+%% USAGE (sweep beta; holdout first appears at beta = 19):
+%%   clingo --warn=no-atom-undefined -n 0 -c beta=19 \
+%%     WABA/core/base.lp WABA/semiring/arctic.lp WABA/defaults/legacy.lp \
+%%     WABA/monoid/sum.lp WABA/constraint/ub.lp WABA/filter/projection.lp \
+%%     WABA/semantics/stable.lp  tectonics_final.lp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% ============================================================================
+%% ASSUMPTIONS + CONTRARIES  (contrary is a TOTAL function: exactly one per assumption)
+%% ============================================================================
+
+%% -- Rival theories --
+assumption(drift).          contrary(drift,  c_drift).    % mobilism / plate tectonics
+assumption(fixism).         contrary(fixism, c_fixism).   % continents are fixed
+
+%% -- Independent lines of evidence (unattacked leaves; dummy never-derivable contraries) --
+assumption(fit).            contrary(fit,      c_fit).       % coastline + shelf fit
+assumption(fossils).        contrary(fossils,  c_fossils).   % Mesosaurus / Glossopteris
+assumption(rocks).          contrary(rocks,    c_rocks).     % matching orogenic belts
+assumption(tillites).       contrary(tillites, c_tillites).  % Permo-Carboniferous glacial tillites
+assumption(paleomag).       contrary(paleomag, c_paleomag).  % paleomagnetism (polar wander)
+assumption(stripes).        contrary(stripes,  c_stripes).   % sea-floor magnetic stripes
+
+%% -- The fixist mechanism objection premise (unattacked leaf; dummy contrary) --
+assumption(rigid_mantle).   contrary(rigid_mantle, c_rigid_mantle). % "mantle too rigid, forces too weak"
+
+%% ============================================================================
+%% WEIGHTS  (arctic = STRENGTH; each line's evidential support, small integers)
+%% ============================================================================
+weight(fit,       2).   % suggestive but qualitative
+weight(fossils,   3).   % biogeographic, strong
+weight(rocks,     2).   % geological correlation
+weight(tillites,  3).   % paleoclimatic, strong
+weight(paleomag,  4).   % quantitative, mid-1950s
+weight(stripes,   5).   % the Vine-Matthews clincher (1963), decisive
+%% Sum of the six lines = 2+3+2+3+4+5 = 19  (arctic (x)=+ : consilience)
+
+weight(rigid_mantle, 6).   % the single heavyweight mechanism objection
+weight(drift,        1).   % bare hypothesis carries little weight on its own
+weight(fixism,       1).
+
+%% ============================================================================
+%% ARGUMENTS (rules).  Head = derived contrary atom; body = premises.
+%%   arctic:  premises of ONE rule ADD (consilience);  alternative rules -> max.
+%% ============================================================================
+
+%% [rev]  Converging evidence refutes fixism (STANDING argument).
+%%        c_fixism <- fit, fossils, rocks, tillites, paleomag, stripes
+%%        Strength = 2+3+2+3+4+5 = 19 (the accumulated independent lines).
+head(rev, c_fixism).
+body(rev, fit).   body(rev, fossils).  body(rev, rocks).
+body(rev, tillites).  body(rev, paleomag).  body(rev, stripes).
+
+%% [mech] The mechanism objection bites the mobilist position itself:
+%%        c_drift <- drift, rigid_mantle    (strength = 1 + 6 = 7)
+%%        Modelling choice: the "no mechanism" objection is directed AT the act of
+%%        endorsing drift (it is an objection to drift, activated when drift is
+%%        held).  This makes drift's own contrary depend on drift, so a "reject
+%%        BOTH theories" answer is not stable (drift, if left out, would be
+%%        unattacked and thus forced back in) -- eliminating the trivial cost-0
+%%        skeptical extension while keeping the objection a genuine, payable cost.
+head(mech, c_drift).  body(mech, drift).  body(mech, rigid_mantle).
+
+%% [mx]   Rival attack: holding fixism is itself an argument against drift.
+%%        c_drift <- fixism    (strength = 1).  Lets the fixist holdout defeat
+%%        drift (cheaply) when fixism is accepted; combined with [mech] by (+)=max,
+%%        so in the mobilist world c_drift's strength is max(7,-) = 7.
+head(mx, c_drift).  body(mx, fixism).
+
+%% ----------------------------------------------------------------------------
+%% RESULTING STABLE EXTENSIONS (verified by enumeration):
+%%   {drift in,  fixism out}  discard c_drift@7   cost  7   <-- CONSENSUS (plate tectonics)
+%%   {fixism in, drift  out}  discard c_fixism@19 cost 19   <-- fixist holdout
+%%   {drift in,  fixism in }  discard both         cost 26
+%%   ("reject both" is NOT stable -> no cost-0 degeneracy)
+%% beta sweep:  beta<7 UNSAT;  7<=beta<19 consensus is UNIQUE;
+%%              beta=19 fixist holdout first appears;  min-cost accepted = consensus (7).
+%% ----------------------------------------------------------------------------
+`;
+
 export const examples = {
     conflict_cycle: {
         label: 'Three-Way Standoff',
@@ -231,7 +609,88 @@ export const examples = {
             budgetIntent: 'bounded',
             semantics: 'stable',
             optMode: 'ignore',
-            beta: 5
+            beta: 5,
+            graphMode: "assumption-branching"
+        }
+    },
+    smoking_lung_cancer: {
+        label: 'Smoking causes lung cancer',
+        description: "A settled debate as Bradford-Hill CONSILIENCE (Arctic / max-plus): each of eight independent causal criteria is an evidence assumption and ⊗=+ sums them, so the case refuting R.A. Fisher's confounding (\"constitutional\") hypothesis has weight 54. Accepted at cost 0: smoking causes lung cancer (consensus); Fisher's holdout is admissible only at β=54 — the cost of dismissing the entire Bradford-Hill case. (Tropical-higher = arctic, sum + ub, β=54.)",
+        section: 'curated',
+        source: 'inline',
+        code: SMOKING_LUNG_CANCER,
+        preset: {
+            semiringFamily: 'tropical',
+            polarity: 'higher',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
+            semantics: 'stable',
+            optMode: 'ignore',
+            beta: 54,
+            graphMode: "assumption-branching"
+        }
+    },
+    solar_neutrino: {
+        label: 'Solar neutrino problem',
+        description: "The solar-neutrino deficit as combined statistical significance (Tropical / min-plus): the measured electron-neutrino flux was ~1/3 of the Standard Solar Model. SNO's two channels (electron + total flux) give ⊗=+ additive surprisal (≈5.3σ) refuting \"the SSM is wrong\". Accepted at cost 0: neutrino oscillation / SSM correct (consensus, Nobel 2015); the SSM-error holdout survives only at β=53 (dismissing the SNO result). (Tropical-lower = tropical, sum + ub, β=53.)",
+        section: 'curated',
+        source: 'inline',
+        code: SOLAR_NEUTRINO,
+        preset: {
+            semiringFamily: 'tropical',
+            polarity: 'lower',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
+            semantics: 'stable',
+            optMode: 'ignore',
+            beta: 53,
+            graphMode: "assumption-branching"
+        }
+    },
+    age_of_earth: {
+        label: 'Age of the Earth: Kelvin vs radiometric',
+        description: "A WEAKEST-LINK debate (Gödel / min): Kelvin's 1862 cooling estimate (20–100 Myr) is a conjunction whose weakest premise — \"no internal heat source\" — was refuted by radioactivity, so under ⊗=min his young-Earth argument is weak (strength 5). Radiometric dating gives ~4.54 Gyr. Accepted at cost 0: old Earth (consensus); the young-Earth holdout appears only at β=80 (waiving the strongest radiometric evidence). (Gödel + sum + ub, β=80.)",
+        section: 'curated',
+        source: 'inline',
+        code: AGE_OF_EARTH,
+        preset: {
+            semiringFamily: 'godel',
+            polarity: 'higher',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
+            semantics: 'stable',
+            optMode: 'ignore',
+            beta: 80,
+            graphMode: "assumption-branching"
+        }
+    },
+    plate_tectonics: {
+        label: 'Plate tectonics vs fixism',
+        description: "Continental drift as consilience with a TOLERATED objection (Arctic / max-plus): Wegener's converging lines (fossils, rock belts, glacial tillites, paleomagnetism, sea-floor stripes) vs the fixists' \"no adequate mechanism\". Unlike the other debates the accepted plate-tectonics extension pays a NONZERO cost 7 — it discards the mechanism objection, just as history tolerated it before the mechanism was found — yet still wins as the min-cost position (the fixist holdout costs 19). (Tropical-higher = arctic, sum + ub, β=19.)",
+        section: 'curated',
+        source: 'inline',
+        code: PLATE_TECTONICS,
+        preset: {
+            semiringFamily: 'tropical',
+            polarity: 'higher',
+            defaultPolicy: 'legacy',
+            monoid: 'sum',
+            optimization: 'minimize',
+            budgetMode: 'ub',
+            budgetIntent: 'bounded',
+            semantics: 'stable',
+            optMode: 'ignore',
+            beta: 19,
+            graphMode: "assumption-branching"
         }
     },
 };

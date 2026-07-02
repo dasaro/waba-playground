@@ -125,6 +125,26 @@ joint attacks, sum vs. max monoid):
   primordial He-4 & deuterium, evolving radio counts) jointly refute Steady-State with
   weight 5. Accepted at cost 0: Big Bang (settled consensus); a Steady-State holdout is
   admissible only at β=5 — the cost of dismissing all five lines (arctic + sum + ub, β=5).
+- `smoking_lung_cancer` — **Smoking causes lung cancer** (**Arctic**): Bradford-Hill
+  consilience (eight independent causal criteria, ⊗=+ → weight 54) vs R. A. Fisher's
+  confounding hypothesis. Accepted at cost 0: causation (consensus); Fisher's holdout
+  only at β=54 — dismissing the whole Bradford-Hill case (arctic + sum + ub, β=54).
+- `solar_neutrino` — **Solar neutrino problem** (**Tropical** / min-plus): combined
+  statistical significance — SNO's two channels add surprisal (≈5.3σ) refuting "the
+  Standard Solar Model is wrong". Accepted at cost 0: neutrino oscillation / SSM correct
+  (consensus, Nobel 2015); the SSM-error holdout only at β=53 (tropical + sum + ub, β=53).
+- `age_of_earth` — **Age of the Earth: Kelvin vs radiometric** (**Gödel** / weakest-link):
+  Kelvin's cooling estimate is a conjunction whose weakest premise ("no internal heat
+  source") was refuted by radioactivity (⊗=min → strength 5). Accepted at cost 0: ~4.54 Gyr
+  (consensus); the young-Earth holdout only at β=80 (gödel + sum + ub, β=80).
+- `plate_tectonics` — **Plate tectonics vs fixism** (**Arctic**, consilience with a
+  *tolerated objection*): unlike the others, the accepted plate-tectonics extension pays a
+  **nonzero cost 7** — it discards the "no mechanism" objection, as history tolerated it
+  before the mechanism was found — yet still wins (the fixist holdout costs 19)
+  (arctic + sum + ub, β=19).
+
+These five debate examples open in the **Assumption-Branching** graph view (the Standard
+set-graph is the 2ⁿ power set of assumptions, guarded off above ~8 assumptions).
 
 Earlier examples whose weights/budget did not affect the result (classical
 reference cases, the rule-less `simple_attack` smoke, trivial topology fixtures)

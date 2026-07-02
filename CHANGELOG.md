@@ -30,6 +30,31 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260702-1
+
+- **four more scientific-debate curated examples**, each designed + clingo-verified so the
+  accepted (min-cost) extension reproduces the modern consensus, and each mapping to the
+  algebra whose operation matches the debate's reasoning:
+  - `smoking_lung_cancer` — Bradford-Hill CONSILIENCE (Arctic, ⊗=+ sums 8 independent
+    criteria → weight 54) vs Fisher's confounding hypothesis. Consensus at cost 0; holdout at β=54.
+  - `solar_neutrino` — combined statistical significance (Tropical; SNO's two channels add
+    surprisal ≈5.3σ). Consensus (oscillation) at cost 0; SSM-error holdout at β=53.
+  - `age_of_earth` — WEAKEST-LINK (Gödel, ⊗=min): Kelvin's cooling estimate collapses on its
+    false "no internal heat" premise (strength 5). Consensus (~4.54 Gyr) at cost 0; holdout at β=80.
+  - `plate_tectonics` — consilience with a TOLERATED objection (Arctic): the accepted mobilist
+    extension pays a NONZERO cost 7 (discarding the "no mechanism" objection, as history did),
+    still beating the fixist holdout (cost 19). β<7 is UNSAT.
+  Chosen + designed by two web-researched, adversarially-QA'd workflows; each framework
+  independently re-verified in clingo, and every `contrary` is a total function (single contrary
+  per assumption). Weights are labelled as modelling encodings, not physical constants.
+- these five debate examples carry a `graphMode` preset and open in the **Assumption-Branching**
+  view (the meaningful view for a debate); presets can now set the graph mode.
+- **fix (latent): the Standard set-graph is the 2ⁿ power set of assumptions** and would stall the
+  solver queue on load for large frameworks (smoking has 10 → 1024 sets). `updateGraphStandard`
+  now guards frameworks with >8 assumptions, showing a message directing to the assumption views
+  instead of enumerating. Also made `showGraphEmptyState` re-inject its element (vis.Network wipes
+  #cy's children on render), so the empty-state message actually appears.
+
 ## 20260701-2
 
 - new curated example **`big_bang_steady_state` — Big Bang vs Steady-State**, a real

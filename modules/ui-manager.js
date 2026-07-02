@@ -102,9 +102,26 @@ export class UIManager {
     // ===================================
     // Empty State Management
     // ===================================
-    static showGraphEmptyState() {
-        const emptyState = document.getElementById('graph-empty-state');
+    static showGraphEmptyState(message) {
         const canvas = document.getElementById('cy');
+        let emptyState = document.getElementById('graph-empty-state');
+        // vis.Network replaces #cy's children when it renders, which wipes the static
+        // empty-state element; re-create it as an overlay so the message can still show.
+        if (!emptyState && canvas) {
+            emptyState = document.createElement('div');
+            emptyState.id = 'graph-empty-state';
+            emptyState.className = 'graph-empty-state';
+            emptyState.setAttribute('role', 'status');
+            emptyState.innerHTML = '<div class="empty-state-icon" aria-hidden="true">📊</div>'
+                + '<h3>No Graph to Display</h3>'
+                + '<p id="graph-empty-message"></p>'
+                + '<p class="empty-state-hint">Pick a curated example or write a framework, then Run.</p>';
+            canvas.appendChild(emptyState);
+        }
+        const msg = document.getElementById('graph-empty-message');
+        if (msg) {
+            msg.textContent = message || 'Run a WABA framework to visualize the argumentation graph.';
+        }
         if (emptyState) emptyState.removeAttribute('hidden');
         if (canvas) canvas.style.opacity = '0.3';
     }
