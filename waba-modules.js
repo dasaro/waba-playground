@@ -46,6 +46,22 @@ non_flat_assumption(X) :- assumption(X), is_head(X).
 :- non_flat_assumption(_).
 
 %% ====================
+%% WELL-FOUNDEDNESS GUARD (acyclic derivations)
+%% ====================
+%% The semiring weight of a derived atom is ⊕ over its derivations, each ⊗ over a rule
+%% body — well-defined only when the rule-dependency graph is ACYCLIC. A derivation cycle
+%% (p <- q, q <- p) admits an unfounded second fixpoint in which the cyclic atom floats in
+%% at the ⊗-identity, yielding spurious weights (and, under the cost semirings, spurious
+%% free-discard extensions). Such frameworks are rejected outright, like non-flat ones,
+%% rather than silently producing ill-defined weights. (WABA is defined for well-founded
+%% flat frameworks; the curated/reference examples are all acyclic.)
+derivation_edge(H,B) :- head(R,H), body(R,B).
+derivation_reaches(X,Y) :- derivation_edge(X,Y).
+derivation_reaches(X,Z) :- derivation_edge(X,Y), derivation_reaches(Y,Z).
+derivation_cycle(X) :- derivation_reaches(X,X).
+:- derivation_cycle(_).
+
+%% ====================
 %% CORE LOGIC
 %% ====================
 
@@ -119,7 +135,6 @@ active_semiring(arctic).
 oplus(max).
 oplus_identity(#inf).
 otimes_identity(0).
-affordability_polarity(strength).
 
 semiring_default_weight(legacy,0).
 semiring_default_weight(aba,#sup).
@@ -159,32 +174,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -216,16 +225,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -261,7 +262,6 @@ oplus(min).
 otimes(max).
 oplus_identity(#sup).
 otimes_identity(#inf).
-affordability_polarity(cost).
 
 semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
@@ -300,32 +300,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -357,16 +351,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 rule_deriv(P, R, X, W) :-
@@ -389,7 +375,6 @@ oplus(max).
 otimes(min).
 oplus_identity(#inf).
 otimes_identity(#sup).
-affordability_polarity(strength).
 
 semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
@@ -428,32 +413,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -485,16 +464,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 rule_deriv(P, R, X, W) :-
@@ -522,7 +493,6 @@ oplus(min).
 otimes(max).
 oplus_identity(#sup).
 otimes_identity(#inf).
-affordability_polarity(cost).
 
 semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
@@ -561,32 +531,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -618,16 +582,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 rule_deriv(P, R, X, W) :-
@@ -654,10 +610,13 @@ active_semiring(lukasiewicz).
 oplus(max).
 oplus_identity(0).
 otimes_identity(k).
-affordability_polarity(strength).
 
 semiring_default_weight(legacy,k).
-semiring_default_weight(aba,k).
+%% aba default is #sup (un-discardable): an unweighted assumption then behaves as a
+%% plain ABA assumption whose attack survives any finite budget, so β=0 / no_discard
+%% recovers classical ABA at every k. (In luk's ⊗, a #sup premise saturates to the
+%% grid top k; see the luk_body_has_sup case below.)
+semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,k).
 
 %% Default weight policy selection for unweighted assumptions.
@@ -682,32 +641,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -739,16 +692,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 %% Bounded-sum ⊗ (both phases). #sum drops #sup/#inf, so saturate them first:
@@ -779,7 +724,6 @@ active_semiring(tropical).
 oplus(min).
 oplus_identity(#sup).
 otimes_identity(0).
-affordability_polarity(cost).
 
 semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
@@ -819,32 +763,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -876,16 +814,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -925,7 +855,6 @@ active_semiring(arctic).
 oplus(max).
 oplus_identity(#inf).
 otimes_identity(0).
-affordability_polarity(strength).
 
 semiring_default_weight(legacy,0).
 semiring_default_weight(aba,#sup).
@@ -965,32 +894,26 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Folds the support-phase and undefeated-phase weight propagations into ONE
-%% parameterized computation pweight(Phase, X, W):
-%%   support    : weights over the selected (in) atoms        -> supported_with_weight/2
-%%   undefeated : weights over the not-defeated atoms         -> undefeated_weight/2
-%%                (only populated when a defense semantics, e.g. semantics/admissible.lp,
-%%                 defines derived_from_undefeated/1 + triggered_by_undefeated/1)
+%% Weight propagation over the selected (in) atoms as one parameterized
+%% computation pweight(Phase, X, W):
+%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%%
+%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
+%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
+%% for them. See semantics/admissible.lp.)
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
-%%   oplus(min|max)                       -- ⊕ combine of alternative derivations
-%%   otimes_identity(I)                   -- 1̄ (empty-body / fact weight)
-%%   affordability_polarity(strength|cost)
+%%   oplus(min|max)      -- ⊕ combine of alternative derivations
+%%   otimes_identity(I)  -- 1̄ (empty-body / fact weight)
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
 phase(support).
-phase(undefeated).
 
-phase_active(support, X)       :- supported(X).
-phase_active(undefeated, X)    :- derived_from_undefeated(X).
-phase_triggered(support, R)    :- triggered_by_in(R).
-phase_triggered(undefeated, R) :- triggered_by_undefeated(R).
-%% "selected" = the assumption is committed in this phase (in / not-defeated). The
-%% undefeated form is gated by derived_from_undefeated, so the whole undefeated
-%% phase is inert (no extra grounding) unless a defense semantics is loaded.
-phase_selected(support, X)     :- in(X).
-phase_selected(undefeated, X)  :- assumption(X), derived_from_undefeated(X).
+phase_active(support, X)    :- supported(X).
+phase_triggered(support, R) :- triggered_by_in(R).
+%% "selected" = the assumption is committed in this phase (in).
+phase_selected(support, X)  :- in(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -1022,16 +945,8 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the two phases under their conventional names --------------------
+%% ---- expose the support phase under its conventional name --------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
-undefeated_weight(X, W)     :- pweight(undefeated, X, W).
-
-%% ---- attack affordability for defense semantics (polarity-parameterized) -----
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = #sup, W != #sup.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(strength), undefeated_weight(_, W), budget(B), B != #sup, B != 0, W < B.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B = 0,     W != #inf.
-unaffordable_attack(W, B) :- affordability_polarity(cost),     undefeated_weight(_, W), budget(B), B != 0,    W > B.
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -1182,7 +1097,11 @@ active_constraint(lb).
 %% passes a lower bound, so guarding only changes the otherwise-broken max+lb case.
 some_discard :- discarded_attack(_,_,_).
 :- budget_value(C), C < B, budget(B), some_discard.
+
+%% #sup weights are un-discardable at any budget (a maximal-cost / un-droppable attack).
 :- discarded_attack(_,_,#sup).
+
+%% For plain ABA (no discards at all) use constraint/no_discard.lp, not a budget here.
 `,
         "no_discard": `%% No Discarding Constraint
 %% =========================
@@ -1220,7 +1139,16 @@ active_constraint(ub).
 %% bound, so guarding only changes the otherwise-broken min+ub case.
 some_discard :- discarded_attack(_,_,_).
 :- budget_value(C), C > B, budget(B), some_discard.
+
+%% #sup weights are un-discardable at any budget (a maximal-cost / un-droppable attack).
 :- discarded_attack(_,_,#sup).
+
+%% Exact classical-ABA recovery is constraint/no_discard.lp (forbids ALL discards, for
+%% ANY weight) — NOT ub with beta=0. A budget of 0 here is a genuine budget=0: the cost
+%% semirings' ⊗-identity (#inf, the "negligible-cost" weight of an unweighted legacy
+%% attack or a fact-derived contrary) is free to discard at any budget by design — a
+%% zero-cost attack costs nothing to drop. For plain ABA use no_discard, or the \`aba\`
+%% default policy (unweighted attacks are then #sup, hence un-discardable above).
 `
     },
     filter: {
@@ -1256,13 +1184,31 @@ some_discard :- discarded_attack(_,_,_).
 1{ in(X); out(X) }1 :- assumption(X).
 :- in(X), defeated(X).
 
-%% Admissibility
-
+%% Admissibility (CLASSICAL, weight-blind).
+%%
+%% WABA has TWO orthogonal knobs: the argumentation SEMANTICS (this file) and the
+%% inconsistency BUDGET (the discard machinery: monoid + constraint/ub|lb). Defense
+%% semantics are the classical ABA notions computed over the attack graph; the budget
+%% is NOT folded into the defense reasoning. To reason under a budget, use cf/stable
+%% with a monoid + ub/lb; for classical defense (admissible/complete/grounded/preferred)
+%% use this family, which pins the discard set to empty (see the constraint below).
+%%
+%% "defended / undefeated" set: the atoms derivable from the not-defeated assumptions.
 derived_from_undefeated(X) :- assumption(X), not defeated(X).
 derived_from_undefeated(X) :- head(R,X), triggered_by_undefeated(R).
 triggered_by_undefeated(R) :- rule(R), derived_from_undefeated(X) : body(R,X).
-attacked_by_undefeated(X) :- contrary(X,Y), undefeated_weight(Y,W), budget(B), unaffordable_attack(W,B).
+
+%% X is attacked-by-undefeated iff some undefeated element is a contrary (attacker) of X.
+%% This is the plain classical condition — every attacker counts, regardless of weight.
+attacked_by_undefeated(X) :- contrary(X,Y), derived_from_undefeated(Y).
+
+%% Admissibility: an IN assumption may not be attacked by an undefeated attacker.
 :- in(X), attacked_by_undefeated(X).
+
+%% Defense is classical: the budget/discard knob is off for this family. Pinning the
+%% discard set to empty keeps the semantics weight-blind (identical across semirings)
+%% and prevents discard-varied duplicate extensions.
+:- discarded_attack(_,_,_).
 `,
         "cf": `defeated(X) :- attacks_successfully_with_weight(_,X,_).
 1{ in(X); out(X) }1 :- assumption(X).
@@ -1274,13 +1220,31 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
 1{ in(X); out(X) }1 :- assumption(X).
 :- in(X), defeated(X).
 
-%% Admissibility
-
+%% Admissibility (CLASSICAL, weight-blind).
+%%
+%% WABA has TWO orthogonal knobs: the argumentation SEMANTICS (this file) and the
+%% inconsistency BUDGET (the discard machinery: monoid + constraint/ub|lb). Defense
+%% semantics are the classical ABA notions computed over the attack graph; the budget
+%% is NOT folded into the defense reasoning. To reason under a budget, use cf/stable
+%% with a monoid + ub/lb; for classical defense (admissible/complete/grounded/preferred)
+%% use this family, which pins the discard set to empty (see the constraint below).
+%%
+%% "defended / undefeated" set: the atoms derivable from the not-defeated assumptions.
 derived_from_undefeated(X) :- assumption(X), not defeated(X).
 derived_from_undefeated(X) :- head(R,X), triggered_by_undefeated(R).
 triggered_by_undefeated(R) :- rule(R), derived_from_undefeated(X) : body(R,X).
-attacked_by_undefeated(X) :- contrary(X,Y), undefeated_weight(Y,W), budget(B), unaffordable_attack(W,B).
+
+%% X is attacked-by-undefeated iff some undefeated element is a contrary (attacker) of X.
+%% This is the plain classical condition — every attacker counts, regardless of weight.
+attacked_by_undefeated(X) :- contrary(X,Y), derived_from_undefeated(Y).
+
+%% Admissibility: an IN assumption may not be attacked by an undefeated attacker.
 :- in(X), attacked_by_undefeated(X).
+
+%% Defense is classical: the budget/discard knob is off for this family. Pinning the
+%% discard set to empty keeps the semantics weight-blind (identical across semirings)
+%% and prevents discard-varied duplicate extensions.
+:- discarded_attack(_,_,_).
 
 
 %% Completeness: All unattacked assumptions must be IN
@@ -1301,13 +1265,31 @@ defeated(X) :- attacks_successfully_with_weight(_,X,_).
 1{ in(X); out(X) }1 :- assumption(X).
 :- in(X), defeated(X).
 
-%% Admissibility
-
+%% Admissibility (CLASSICAL, weight-blind).
+%%
+%% WABA has TWO orthogonal knobs: the argumentation SEMANTICS (this file) and the
+%% inconsistency BUDGET (the discard machinery: monoid + constraint/ub|lb). Defense
+%% semantics are the classical ABA notions computed over the attack graph; the budget
+%% is NOT folded into the defense reasoning. To reason under a budget, use cf/stable
+%% with a monoid + ub/lb; for classical defense (admissible/complete/grounded/preferred)
+%% use this family, which pins the discard set to empty (see the constraint below).
+%%
+%% "defended / undefeated" set: the atoms derivable from the not-defeated assumptions.
 derived_from_undefeated(X) :- assumption(X), not defeated(X).
 derived_from_undefeated(X) :- head(R,X), triggered_by_undefeated(R).
 triggered_by_undefeated(R) :- rule(R), derived_from_undefeated(X) : body(R,X).
-attacked_by_undefeated(X) :- contrary(X,Y), undefeated_weight(Y,W), budget(B), unaffordable_attack(W,B).
+
+%% X is attacked-by-undefeated iff some undefeated element is a contrary (attacker) of X.
+%% This is the plain classical condition — every attacker counts, regardless of weight.
+attacked_by_undefeated(X) :- contrary(X,Y), derived_from_undefeated(Y).
+
+%% Admissibility: an IN assumption may not be attacked by an undefeated attacker.
 :- in(X), attacked_by_undefeated(X).
+
+%% Defense is classical: the budget/discard knob is off for this family. Pinning the
+%% discard set to empty keeps the semantics weight-blind (identical across semirings)
+%% and prevents discard-varied duplicate extensions.
+:- discarded_attack(_,_,_).
 
 
 %% Completeness: All unattacked assumptions must be IN

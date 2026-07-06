@@ -30,6 +30,27 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-6
+
+- **Synced the WABA core soundness fixes (2026-07) into the bundle.** A differential-fuzzing health
+  check confirmed the classical/cf/stable core sound but surfaced five defects in the higher-order
+  layer; the fixed core is now bundled. User-visible effects:
+  - **Defense semantics are now classical and weight-blind.** `admissible`/`complete`/`grounded`/
+    `preferred` are computed over the attack graph with the discard set pinned empty, so they no longer
+    fold the budget into defense reasoning (the old `unaffordable_attack` was monoid-blind and, for the
+    strength algebras, inverted — raising β made an assumption *harder* to defend). They now return the
+    same extensions across all five semirings and are budget-invariant. Budget stays the orthogonal
+    `cf`/`stable` knob.
+  - **Derivation cycles are rejected.** A framework with a cyclic derivation (`p ← q`, `q ← p`) has no
+    well-defined propagated weight and is now refused outright, like a non-flat one.
+  - **Recovery + boundary.** `no_discard` (not `ub` with β=0) is the exact ABA-recovery knob; the
+    Łukasiewicz `aba` default is now `#sup`, matching the other four semirings, so an unweighted
+    assumption's attack is un-discardable at any budget.
+
+  Verified: unit 27/27, browser 5/5 (incl. the admissible + budgeted-stable smokes), and the WABA
+  regression suite `test/regression.sh` 17/17. No change to the 11 curated examples (all flat, acyclic,
+  cf/stable — the sound surface). See the WABA core commit for the algebra-level detail.
+
 ## 20260706-5
 
 - **Advisory warning when an explicit weight on a derived atom is dominated.** Synced the WABA core's
