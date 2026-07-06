@@ -153,6 +153,11 @@ as a **cost or weakness** (not a strength), the natural home of the cost-polarit
 - `deorbit_plan_risk` — **Deorbit plan: redundant vs single-string** (**Tropical** / risk): a plan's
   failure risk *accumulates* across steps (⊗=+) — valve leak (12) + attitude drift (9) + comms blackout
   (7) = 28; the redundant plan is accepted at **cost 5** (a residual sensor-crosscheck risk) (β=28).
+- `testimony_erosion` — **Testimony erosion: eyewitness vs long-chain legend** (**Łukasiewicz** /
+  bounded sum): reliability *erodes* along a transmission chain — ⊗ = max(0, Σw − (n−1)·k), k=1000. Same
+  90%-faithful links (weight 900); only length differs: 2 copies retain 900⊗900 = 800, but 7 retellings
+  collapse to max(0, 6300−6000) = **300** (the "telephone game"). The eyewitness account is accepted at
+  **cost 300** (dismissing the eroded legend); the legend holdout costs 800 (β=800).
 
 The debate and cost/weakness examples open in the **Assumption-Branching** graph view (the Standard
 set-graph is the 2ⁿ power set of assumptions, guarded off above ~8 assumptions).

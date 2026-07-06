@@ -14,12 +14,14 @@
 //        out_of_africa         : recent African origin vs multiregional     (Arctic,   @8 / @37)
 //        lipid_hypothesis      : LDL causal vs LDL-is-only-a-marker         (Arctic,   @5 / @25)
 //  (3) COST/WEAKNESS reasoning: weights read as a COST or WEAKNESS (not a strength) -- the natural home
-//      of the cost-polarity semirings: Tropical (otimes=+ ; cost/improbability/risk ACCUMULATES) and
-//      Bottleneck (otimes=max ; cost = the single WORST component / weakest link). Same nonzero-cost,
+//      of the cost-polarity semirings: Tropical (otimes=+ ; cost/improbability/risk ACCUMULATES),
+//      Bottleneck (otimes=max ; cost = the single WORST component / weakest link), and Lukasiewicz
+//      (bounded-sum otimes ; RELIABILITY that erodes along a long chain). Same nonzero-cost,
 //      weighted-argument, multi-model contract as (2), from non-scientific domains:
 //        detective_locked_house : butler vs intruder -- improbability of coincidences (Tropical,   @5 / @27)
 //        weakest_link_security  : layered vs single barrier -- worst vulnerability   (Bottleneck, @3 / @9)
 //        deorbit_plan_risk      : redundant vs single-string -- accumulated risk     (Tropical,   @5 / @28)
+//        testimony_erosion      : eyewitness vs long-chain legend -- reliability ERODES (Lukasiewicz, @300 / @800)
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
 %%
@@ -323,6 +325,41 @@ head(rmx, c_redundant). body(rmx, single_string).
 budget(beta).
 `;
 
+const EROSION_TRANSMISSION = `%% LUKASIEWICZ EROSION: an eyewitness account (short chain) vs a legend (long chain of retellings).
+%% Lukasiewicz (bounded-sum) semiring: otimes = max(0, sum(w) - (n-1)*k), k=1000 -- the one algebra whose
+%% conjunction is neither min, max nor plain +. A claim relayed through MANY links ERODES toward 0, even
+%% when each link is individually reliable. Same per-link fidelity (900 = 90%); only the chain LENGTH differs.
+
+assumption(t_eyewitness). contrary(t_eyewitness, c_eyewitness).   % the near-contemporary eyewitness record
+assumption(t_legend).     contrary(t_legend, c_legend).           % the popular legend
+
+%% Eyewitness account: 2 faithful transmission links (WEIGHTED FACTS, fidelity 900 = 90%):
+weight(copy_1, 900). head(e1, copy_1).    % the witness's own written record
+weight(copy_2, 900). head(e2, copy_2).    % one careful copy down to us
+%% eyewitness_support = bounded-sum(900,900) = max(0, 1800-1000) = 800  (mild erosion, still strong)
+head(re, eyewitness_support). body(re, copy_1). body(re, copy_2).
+%% the strong eyewitness record refutes the legend: c_legend = 800 (standing)
+head(rref, c_legend). body(rref, eyewitness_support).
+
+%% Legend: 7 successive retellings (WEIGHTED FACTS, each individually 900 = 90% faithful):
+weight(retell_1, 900). head(l1, retell_1).
+weight(retell_2, 900). head(l2, retell_2).
+weight(retell_3, 900). head(l3, retell_3).
+weight(retell_4, 900). head(l4, retell_4).
+weight(retell_5, 900). head(l5, retell_5).
+weight(retell_6, 900). head(l6, retell_6).
+weight(retell_7, 900). head(l7, retell_7).
+%% legend_support = bounded-sum(900 x7) = max(0, 6300-6000) = 300
+%% EROSION: seven individually-strong (90%) retellings collapse to 300 -- the "telephone game".
+head(rl, legend_support).
+body(rl, retell_1). body(rl, retell_2). body(rl, retell_3). body(rl, retell_4).
+body(rl, retell_5). body(rl, retell_6). body(rl, retell_7).
+%% the eroded legend attacks the eyewitness account (self-activated): c_eyewitness = bounded-sum(k,300) = 300
+head(robj, c_eyewitness). body(robj, t_eyewitness). body(robj, legend_support).
+head(rmx, c_eyewitness). body(rmx, t_legend).
+budget(beta).
+`;
+
 export const examples = {
     conflict_cycle: {
         label: 'Three-Way Standoff',
@@ -470,6 +507,19 @@ export const examples = {
             defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 28, graphMode: "assumption-branching"
+        }
+    },
+    testimony_erosion: {
+        label: 'Testimony erosion: eyewitness vs long-chain legend',
+        description: "A textual / testimonial-transmission dispute showing weights as RELIABILITY that ERODES along a chain, under the Lukasiewicz (bounded-sum) semiring -- the one algebra whose conjunction is neither min, max, nor plain sum. otimes = max(0, sum(w) - (n-1)*k) with k=1000, so each link in a transmission chain loses (k - fidelity), and a LONG chain erodes toward zero even when every link is individually reliable. Two accounts of an event compete: a near-contemporary eyewitness record preserved through 2 faithful copies (accepted) and a popular legend transmitted through 7 successive retellings (rival). Every link has the SAME 90%-faithful reliability (weight 900); only the chain LENGTH differs. The eyewitness account retains 900(x)900 = max(0, 1800-1000) = 800 (mild erosion), but the legend's 7 retellings collapse to max(0, 6300-6000) = 300 -- the classic 'telephone game'. So the eyewitness account is accepted at cost 300 (dismissing the eroded legend) while the legend holdout costs 800 (dismissing the strong eyewitness record). Lukasiewicz is the right algebra because reliability degrades toward a floor along a chain -- not by weakest link (Godel) or unbounded accumulation (Tropical). beta=800 enumerates both extensions.",
+        section: 'curated',
+        source: 'inline',
+        code: EROSION_TRANSMISSION,
+        preset: {
+            semiringFamily: 'lukasiewicz', polarity: 'higher',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 800, graphMode: "assumption-branching"
         }
     },
 };

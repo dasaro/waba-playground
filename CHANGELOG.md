@@ -30,6 +30,19 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-4
+
+- **New curated example `testimony_erosion` (Łukasiewicz / bounded-sum) — the erosion algebra.** An
+  eyewitness account preserved through 2 faithful copies vs a legend transmitted through 7 retellings.
+  ⊗ = max(0, Σw − (n−1)·k), k=1000: with every link the same 90%-faithful (weight 900), the eyewitness
+  account retains 900⊗900 = 800 but the 7-link legend erodes to max(0, 6300−6000) = 300 — the "telephone
+  game", where a long chain collapses even though each link is individually strong (unlike Gödel's
+  weakest-link or Tropical's unbounded sum). Eyewitness accepted @300 (dismissing the eroded legend) vs
+  legend holdout @800; β=800. clingo-verified against all five criteria (no cost-0, 2 models, weighted
+  intermediate atoms as facts). First curated example to exercise the Łukasiewicz semiring. This
+  completes the "cost/weakness" family across all three non-arctic aggregations (Tropical accumulate,
+  Bottleneck worst-case, Łukasiewicz erode). Now 11 curated examples.
+
 ## 20260706-3
 
 - **Three new curated examples where weights read as a COST or WEAKNESS** (not a strength) — the natural
