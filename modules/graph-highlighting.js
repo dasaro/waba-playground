@@ -145,6 +145,22 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         };
         const baseTitle = preserved.originalTitle;
 
+        // Derivation (support) edges chain evidence -> intermediate claim -> contrary;
+        // they are NOT attacks, so keep them at their original neutral styling instead
+        // of fading them as "inactive". The active/inactive story is told by the attack
+        // edges (red) and the IN/OUT colouring of the assumption nodes.
+        if (edge.attackType === 'support') {
+            return {
+                id: edge.id,
+                ...preserved,
+                color: preserved.originalColor,
+                width: preserved.originalWidth,
+                dashes: preserved.originalDashes,
+                smooth: preserved.originalSmooth,
+                title: baseTitle
+            };
+        }
+
         const discarded = discardedAttacks.find((attack) => edgeMatches(edge, attack.source, attack.via));
         if (discarded) {
             return {

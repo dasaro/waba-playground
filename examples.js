@@ -12,6 +12,12 @@
 //        - solar_neutrino         : combined significance     (Tropical, β=53, cost-0 consensus)
 //        - age_of_earth           : weakest-link              (Gödel,   β=80, cost-0 consensus)
 //        - plate_tectonics        : consilience w/ a TOLERATED objection (Arctic, β=19, cost-7 consensus)
+//     Each debate is modelled as a DERIVATION CHAIN: no evidence assumption attacks a
+//     stance directly. Instead the evidence combines into intermediate CLAIMS which
+//     combine into the refutation of the rival. Because the ⊗ operators are associative
+//     (arctic/tropical + , gödel min) the propagated weights — and the β thresholds —
+//     are unchanged; the chains just expose the debate's inferential structure, best
+//     viewed in Assumption-Branching mode (which renders every intermediate claim node).
 // `probabilistic` is synced from the WABA repo (waba-modules.js); the rest are inline.
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
@@ -120,11 +126,22 @@ assumption(radio_counts).   weight(radio_counts, 1).   % radio-source / quasar c
 assumption(big_bang).       weight(big_bang, 1).       % the hot Big Bang
 assumption(steady_state).   weight(steady_state, 1).   % the eternal Steady-State universe
 
-%% not_steady <- all five lines.  Arctic ⊗ = + makes its weight 1+1+1+1+1 = 5
-%% ("a hot dense past is required"): the accumulated strength of the converging case.
-head(r1, not_steady).
-body(r1, cmb_exists). body(r1, cmb_blackbody). body(r1, he4_abundance).
-body(r1, deuterium).  body(r1, radio_counts).
+%% DERIVATION CHAIN (no observation attacks a stance directly): the five lines first
+%% combine into three intermediate CLAIMS, which in turn combine into not_steady.
+%% Arctic ⊗ = + is associative, so the accumulated strength is still 1+1+1+1+1 = 5 --
+%% but the graph now shows the debate's inferential STRUCTURE rather than a flat pile.
+%%   hot_dense_past             <- cmb_exists, cmb_blackbody     (⊗=+  1+1 = 2)  relic thermal bath
+%%   primordial_nucleosynthesis <- he4_abundance, deuterium      (⊗=+  1+1 = 2)  BBN in the first minutes
+%%   cosmic_evolution           <- radio_counts                 (      1)      the universe evolves
+%%   not_steady                 <- the three claims above        (⊗=+  2+2+1 = 5)
+head(r_hot, hot_dense_past).
+body(r_hot, cmb_exists; r_hot, cmb_blackbody).
+head(r_bbn, primordial_nucleosynthesis).
+body(r_bbn, he4_abundance; r_bbn, deuterium).
+head(r_evo, cosmic_evolution).
+body(r_evo, radio_counts).
+head(r_ns, not_steady).
+body(r_ns, hot_dense_past; r_ns, primordial_nucleosynthesis; r_ns, cosmic_evolution).
 
 %% contrary(X, Y): "Y attacks X"  (contrary is a TOTAL function -- one per assumption)
 contrary(steady_state, not_steady).   % the weight-5 converging case refutes Steady-State
@@ -201,18 +218,31 @@ assumption(animal).     weight(animal, 4).   contrary(animal, c_animal).    % an
 %% ---------------------------------------------------------------------------
 %% ARGUMENTS (rule heads are derived atoms, never assumptions)
 %% ---------------------------------------------------------------------------
-%% r_evidence : no_conf <- assoc, dose, reverse, consist, mechanism, temporal, coherent, animal.
-%%   The accumulated Bradford-Hill case refutes the confounding stance.
-%%   arctic otimes=+  =>  weight(no_conf) = 10+9+9+7+6+5+4+4 = 54.
-head(r_evidence, no_conf).
-body(r_evidence, assoc). body(r_evidence, dose).      body(r_evidence, reverse).
-body(r_evidence, consist). body(r_evidence, mechanism). body(r_evidence, temporal).
-body(r_evidence, coherent). body(r_evidence, animal).
+%% DERIVATION CHAIN (no evidence line attacks a stance directly): the eight Bradford-
+%% Hill lines first fuse into THREE intermediate strands of the causal argument, which
+%% then combine to refute confounding. arctic otimes=+ is associative, so the total is
+%% still 54 -- but the graph now shows HOW the case is built, strand by strand.
+%%   not_confoundable        <- assoc, dose, reverse            (⊗=+ 10+9+9 = 28)
+%%       a strong, dose-graded, reversible association is not explicable by confounding
+%%   biologically_causal     <- mechanism, animal, coherent     (⊗=+ 6+4+4 = 14)
+%%       tar carcinogens + animal experiments + coherent biology establish a mechanism
+%%   epidemiologically_sound <- consist, temporal               (⊗=+ 7+5 = 12)
+%%       consistent across populations, and smoking precedes the cancer
+%%   no_conf                 <- the three strands above         (⊗=+ 28+14+12 = 54)
+head(r_str, not_confoundable).
+body(r_str, assoc; r_str, dose; r_str, reverse).
+head(r_bio, biologically_causal).
+body(r_bio, mechanism; r_bio, animal; r_bio, coherent).
+head(r_epi, epidemiologically_sound).
+body(r_epi, consist; r_epi, temporal).
+head(r_conf, no_conf).
+body(r_conf, not_confoundable; r_conf, biologically_causal; r_conf, epidemiologically_sound).
 
-%% r_confound : no_caus <- conf.
-%%   IF the confounding stance stands, THEN causation is defeated.
-head(r_confound, no_caus).
-body(r_confound, conf).
+%% Fisher's side is itself a short chain (his inferential step, not a bare attack):
+%%   genetic_common_cause <- conf                 a hidden genotype drives both habits
+%%   no_caus              <- genetic_common_cause a common cause => no DIRECT causation
+head(r_fish1, genetic_common_cause). body(r_fish1, conf).
+head(r_fish2, no_caus).              body(r_fish2, genetic_common_cause).
 `;
 
 const SOLAR_NEUTRINO = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -291,10 +321,18 @@ weight(sno_nc, 28).        % ~2.8 sigma  (total all-flavour flux matches SSM)
 %% a matched total flux (NC) plus a reduced electron flux (CC) proves the Sun
 %% makes the predicted neutrinos, refuting "the SSM is wrong".
 %% ============================================================================
-%% r1: flavour_change <- sno_cc, sno_nc.
-head(r1, flavour_change).
-body(r1, sno_cc).
-body(r1, sno_nc).
+%% DERIVATION CHAIN (neither channel attacks a stance directly): each SNO channel
+%% first yields its own physical CLAIM, and the two claims combine into flavour_change.
+%% tropical otimes=+ is associative, so the surprisal is still 28+25 = 53 (~5.3 sigma) --
+%% but the graph now shows the actual physics: total-conserved AND electron-deficit
+%% together force flavour change.
+%%   total_flux_conserved <- sno_nc                 (28)  NC: the Sun makes the SSM number
+%%   electron_deficit     <- sno_cc                 (25)  CC: only 1/3 arrive as electron-nu
+%%   flavour_change       <- the two claims above   (⊗=+ 28+25 = 53)
+head(r_nc, total_flux_conserved). body(r_nc, sno_nc).
+head(r_cc, electron_deficit).     body(r_cc, sno_cc).
+head(r_fc, flavour_change).
+body(r_fc, total_flux_conserved; r_fc, electron_deficit).
 
 %% ============================================================================
 %% CONTRARIES (TOTAL FUNCTION: exactly one contrary atom per assumption)
@@ -378,26 +416,37 @@ contrary(no_internal_heat,   c_noheat).        % dummy, never derived
 
 %% -------------------- ARGUMENTS (rules) --------------------------------------
 
-%% Radiometric argument derives c_young ("Earth is old"), attacking young_earth.
-%% Built purely from the ALWAYS-IN radiometric leaves, so it is PERMANENTLY active:
-%% young_earth is under attack no matter what stance is taken.
-%% godel otimes=min over premises => strength = min(95,90,80) = 80  (STRONG attack).
-%% r_rad: c_young <- decay_constant_known, isotope_ratios, closed_system.
-head(r_rad, c_young).
-body(r_rad, decay_constant_known; r_rad, isotope_ratios; r_rad, closed_system).
+%% Both arguments are CHAINS (no premise attacks a stance directly). godel otimes=min
+%% is associative, so the chain propagates the WEAKEST premise all the way to the
+%% attack -- which is the whole point of this example: watch strength collapse to 5.
 
-%% Kelvin's cooling argument derives c_old ("Earth is young"), attacking old_earth.
-%% It is the young-Earth POSITION's own case, so it is deployed only when
-%% young_earth is actually adopted (young_earth is one of its premises). Hence the
-%% settled consensus (old_earth, young_earth out) faces NO active attack and stands
-%% at cost 0; the "both out" abstention is NOT stable, because old_earth could then
-%% only be defeated by this (now inactive) attack.
-%% godel otimes=min over premises => strength = min(#sup,70,60,5) = 5  (WEAK attack,
-%% dragged down by the refuted no_internal_heat premise; young_earth is unweighted
-%% -> godel default #sup, so it does not change the min).
-%% r_kelvin: c_old <- young_earth, initial_molten, conductive_cooling, no_internal_heat.
-head(r_kelvin, c_old).
-body(r_kelvin, young_earth; r_kelvin, initial_molten; r_kelvin, conductive_cooling; r_kelvin, no_internal_heat).
+%% Radiometric CHAIN:  leaves -> radiometric_age -> c_young  ("Earth is old").
+%% Built purely from the ALWAYS-IN radiometric leaves, so c_young is PERMANENTLY
+%% active: young_earth is under attack no matter what stance is taken.
+%%   radiometric_age <- decay_constant_known, isotope_ratios, closed_system
+%%                      (otimes=min => min(95,90,80) = 80, still STRONG)
+%%   c_young         <- radiometric_age                          (carries 80)
+head(r_rad1, radiometric_age).
+body(r_rad1, decay_constant_known; r_rad1, isotope_ratios; r_rad1, closed_system).
+head(r_rad2, c_young). body(r_rad2, radiometric_age).
+
+%% Kelvin CHAIN:  molten+conduction -> secular_cooling -> young_age_estimate -> c_old.
+%% This is the young-Earth position's OWN case, deployed only when young_earth is
+%% actually adopted (young_earth is a premise of the last step). Watch the weakest
+%% link drag the strength down as the chain grows:
+%%   secular_cooling    <- initial_molten, conductive_cooling      (min(70,60)     = 60)
+%%   young_age_estimate <- secular_cooling, no_internal_heat       (min(60, 5)     =  5) <- COLLAPSE
+%%       the refuted "no internal heat source" premise (weight 5) poisons the whole chain
+%%   c_old              <- young_age_estimate, young_earth         (min(5,#sup)    =  5)  WEAK attack
+%% Hence the settled consensus (old_earth in, young_earth out) faces NO active attack
+%% and stands at cost 0; "reject both" is not stable (old_earth, left out, would be
+%% unattacked and forced back in).
+head(r_k1, secular_cooling).
+body(r_k1, initial_molten; r_k1, conductive_cooling).
+head(r_k2, young_age_estimate).
+body(r_k2, secular_cooling; r_k2, no_internal_heat).
+head(r_k3, c_old).
+body(r_k3, young_age_estimate; r_k3, young_earth).
 `;
 
 const PLATE_TECTONICS = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -482,28 +531,38 @@ weight(fixism,       1).
 %%   arctic:  premises of ONE rule ADD (consilience);  alternative rules -> max.
 %% ============================================================================
 
-%% [rev]  Converging evidence refutes fixism (STANDING argument).
-%%        c_fixism <- fit, fossils, rocks, tillites, paleomag, stripes
-%%        Strength = 2+3+2+3+4+5 = 19 (the accumulated independent lines).
-head(rev, c_fixism).
-body(rev, fit).   body(rev, fossils).  body(rev, rocks).
-body(rev, tillites).  body(rev, paleomag).  body(rev, stripes).
+%% [rev]  DERIVATION CHAIN: the six lines refute fixism through TWO intermediate
+%%        claims (no line attacks a stance directly). arctic otimes=+ is associative,
+%%        so the standing strength is still 2+3+2+3+4+5 = 19.
+%%          continents_were_joined <- fit, fossils, tillites   (⊗=+ 2+3+3 = 8)
+%%              the matching coastlines, fossils and glacial tillites => once one landmass
+%%          seafloor_spreads       <- rocks, paleomag, stripes (⊗=+ 2+4+5 = 11)
+%%              matching rock belts + polar wander + magnetic stripes => the floor spreads
+%%          c_fixism               <- the two claims above     (⊗=+ 8+11 = 19)
+head(r_join, continents_were_joined).
+body(r_join, fit; r_join, fossils; r_join, tillites).
+head(r_spread, seafloor_spreads).
+body(r_spread, rocks; r_spread, paleomag; r_spread, stripes).
+head(r_rev, c_fixism).
+body(r_rev, continents_were_joined; r_rev, seafloor_spreads).
 
-%% [mech] The mechanism objection bites the mobilist position itself:
-%%        c_drift <- drift, rigid_mantle    (strength = 1 + 6 = 7)
-%%        Modelling choice: the "no mechanism" objection is directed AT the act of
-%%        endorsing drift (it is an objection to drift, activated when drift is
-%%        held).  This makes drift's own contrary depend on drift, so a "reject
-%%        BOTH theories" answer is not stable (drift, if left out, would be
-%%        unattacked and thus forced back in) -- eliminating the trivial cost-0
-%%        skeptical extension while keeping the objection a genuine, payable cost.
-head(mech, c_drift).  body(mech, drift).  body(mech, rigid_mantle).
+%% [mech] The mechanism objection, CHAINED: rigid_mantle first yields the claim
+%%        "no adequate mechanism", which (with drift) bites the mobilist position:
+%%          no_mechanism <- rigid_mantle                       (6)
+%%          c_drift      <- drift, no_mechanism                (⊗=+ 1+6 = 7)
+%%        Modelling choice: the objection is directed AT the act of endorsing drift
+%%        (drift is a premise), so drift's own contrary depends on drift -- a "reject
+%%        BOTH" answer is not stable (drift, left out, would be unattacked and forced
+%%        back in), eliminating the trivial cost-0 skeptical extension while keeping the
+%%        objection a genuine, payable cost.
+head(r_nomech, no_mechanism). body(r_nomech, rigid_mantle).
+head(r_mech, c_drift). body(r_mech, drift; r_mech, no_mechanism).
 
 %% [mx]   Rival attack: holding fixism is itself an argument against drift.
 %%        c_drift <- fixism    (strength = 1).  Lets the fixist holdout defeat
 %%        drift (cheaply) when fixism is accepted; combined with [mech] by (+)=max,
 %%        so in the mobilist world c_drift's strength is max(7,-) = 7.
-head(mx, c_drift).  body(mx, fixism).
+head(r_mx, c_drift).  body(r_mx, fixism).
 
 %% ----------------------------------------------------------------------------
 %% RESULTING STABLE EXTENSIONS (verified by enumeration):

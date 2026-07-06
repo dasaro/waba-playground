@@ -1,10 +1,10 @@
-import { GraphUtils } from './graph-utils.js?v=20260702-1';
+import { GraphUtils } from './graph-utils.js?v=20260706-1';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
     buildJunctionTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260702-1';
+} from './graph-tooltip-builder.js?v=20260706-1';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
@@ -446,6 +446,179 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
     return buildAssumptionGraph(assumptions, contraries, rules, weights, { branching: false });
 }
 
+// ---------------------------------------------------------------------------
+// Branching mode renders the FULL DERIVATION DAG (unlike Direct, which flattens
+// a contrary to its leaf assumptions). Intermediate derived atoms become their own
+// nodes, so a CHAIN  contrary <- claim2 <- claim1 <- evidence  is drawn as a visible
+// path evidence -> claim1 -> claim2 -> contrary -> (attacks) stance. This shows the
+// inferential STRUCTURE of the debate and how the semiring propagates along it.
+// ---------------------------------------------------------------------------
+
+function derivedNodeColor() {
+    return { border: '#6366f1', background: '#818cf8', highlight: { border: '#4f46e5', background: '#6366f1' } };
+}
+
 export function buildBranchingAssumptionGraph(assumptions, contraries, rules, weights) {
-    return buildAssumptionGraph(assumptions, contraries, rules, weights, { branching: true });
+    const visNodes = [];
+    const visEdges = [];
+    const factBasedAttacks = [];
+    const assumptionSet = new Set(assumptions);
+    const created = new Set();
+    const renderCache = new Map(); // atom -> node id (or null if it can never be supported)
+    let topAdded = false;
+
+    const ensureDerivedNode = (atom) => {
+        const id = `arg_${atom}`;
+        if (!created.has(id)) {
+            created.add(id);
+            const w = explicitWeight(weights, atom);
+            visNodes.push({
+                id,
+                label: atom,
+                shape: 'box',
+                size: 18,
+                color: derivedNodeColor(),
+                font: { color: '#ffffff', size: 13 },
+                title: buildAttackEdgeTooltip({
+                    typeLabel: 'Derived claim', attacker: atom, target: '', contrary: atom,
+                    weight: w === null ? '?' : w,
+                    note: 'An intermediate claim derived by rules from the assumptions — a step in the debate\'s reasoning.'
+                }),
+                isDerived: true,
+                atom
+            });
+        }
+        return id;
+    };
+
+    const ensureJunction = (id, body) => {
+        if (!created.has(id)) {
+            created.add(id);
+            visNodes.push({
+                id, label: '∧', size: 16, shape: 'diamond',
+                color: { border: '#10b981', background: '#10b981', highlight: { border: '#059669', background: '#059669' } },
+                font: { color: GraphUtils.getFontColor(), size: 15 },
+                isJunction: true, attackers: body, derivationBody: body
+            });
+        }
+        return id;
+    };
+
+    const ensureTop = () => {
+        if (!topAdded) {
+            topAdded = true;
+            visNodes.push(createTopNode([]));
+        }
+        return '⊤';
+    };
+
+    const pushSupportEdge = (from, to) => {
+        visEdges.push(createAttackEdge({
+            id: `support-${from}-to-${to}`,
+            from, to, width: 2,
+            color: { color: '#94a3b8', highlight: '#64748b' },
+            arrows: 'to', dashes: false,
+            title: buildAttackEdgeTooltip({
+                typeLabel: 'Derivation step', attacker: from, target: to, weight: '?',
+                note: 'A support step: the source helps derive the target claim (not itself an attack).'
+            }),
+            attackType: 'support'
+        }));
+    };
+
+    // Returns the node id representing "atom is supported", or null if it can never be.
+    const renderSupport = (atom, visited) => {
+        if (assumptionSet.has(atom)) return atom; // an assumption's own (circle) node
+        if (renderCache.has(atom)) return renderCache.get(atom);
+        if (visited.has(atom)) return null; // derivation cycle
+        const derivingRules = rules.filter((rule) => rule.head === atom);
+        if (derivingRules.length === 0) {
+            renderCache.set(atom, null);
+            return null;
+        }
+        const nextVisited = new Set(visited); nextVisited.add(atom);
+        const derivedId = ensureDerivedNode(atom);
+        renderCache.set(atom, derivedId);
+        let fired = false;
+        derivingRules.forEach((rule, ri) => {
+            const body = rule.body || [];
+            if (body.length === 0) {
+                pushSupportEdge(ensureTop(), derivedId); // empty-body fact -> ⊤
+                fired = true;
+                return;
+            }
+            const bodyNodes = body.map((bodyAtom) => renderSupport(bodyAtom, nextVisited));
+            if (bodyNodes.some((n) => n === null)) return; // a body atom is unsupportable -> dead rule
+            fired = true;
+            if (bodyNodes.length === 1) {
+                pushSupportEdge(bodyNodes[0], derivedId);
+            } else {
+                const jId = ensureJunction(`junction_${atom}_${rule.id || ri}`, body);
+                bodyNodes.forEach((bn) => pushSupportEdge(bn, jId));
+                pushSupportEdge(jId, derivedId);
+            }
+        });
+        if (!fired) {
+            renderCache.set(atom, null);
+            return null;
+        }
+        return derivedId;
+    };
+
+    contraries.forEach(({ assumption, contrary }) => {
+        const src = renderSupport(contrary, new Set());
+        if (src === null) {
+            // The contrary can never be supported: the stance is unattacked. But an
+            // empty-support (pure-fact) contrary is a ⊤ attack.
+            const leafSets = computeSupportSets(contrary, rules, assumptionSet, new Set(), SUPPORT_SET_CAP);
+            if (leafSets.some((s) => s.length === 0)) {
+                factBasedAttacks.push({ assumption, contrary, weight: explicitWeight(weights, contrary) ?? '?' });
+            }
+            return;
+        }
+        // The attack edge: the contrary's node defeats the stance. Carry the leaf
+        // support set as jointWith so extension highlighting can tell if it is active.
+        const isDirect = assumptionSet.has(contrary);
+        const leafSets = computeSupportSets(contrary, rules, assumptionSet, new Set(), SUPPORT_SET_CAP);
+        const jointWith = leafSets[0] || (isDirect ? [contrary] : []);
+        // A single-leaf support (a direct attack, or a chain of single-premise rules)
+        // carries that leaf's own weight under EVERY semiring (⊗ of one element is that
+        // element), so it is safe to label. A multi-leaf support is a semiring-dependent
+        // aggregate, so we show no number (the Results panel has the real value).
+        const leafW = (jointWith.length === 1) ? explicitWeight(weights, jointWith[0]) : null;
+        const shownWeight = leafW === null ? '?' : leafW;
+        visEdges.push(createAttackEdge({
+            id: `attack-${contrary}-${assumption}`,
+            from: src, to: assumption,
+            label: leafW === null ? '' : String(leafW),
+            weight: shownWeight,
+            width: 2,
+            color: { color: '#f59e0b', highlight: '#d97706' },
+            arrows: 'to', dashes: false,
+            title: buildAttackEdgeTooltip({
+                typeLabel: isDirect ? 'Direct attack' : 'Derived attack',
+                attacker: contrary, target: assumption, contrary,
+                weight: shownWeight,
+                derivationBody: jointWith,
+                note: isDirect
+                    ? 'The attacker is itself the contrary of the target assumption.'
+                    : 'This derived claim is the contrary of the target — it defeats it once its derivation is supported. The aggregate weight is semiring-dependent (see the Results panel).'
+            }),
+            attackType: isDirect ? 'direct' : 'derived',
+            attackingElement: isDirect ? contrary : undefined,
+            targetAssumption: assumption,
+            contrary,
+            jointWith,
+            derivationBody: jointWith
+        }));
+    });
+
+    visNodes.push(...createAssumptionNodes(assumptions, contraries, visEdges, weights));
+    addFactBasedAttacks(visNodes, visEdges, factBasedAttacks);
+
+    return {
+        visNodes,
+        visEdges,
+        isolatedNodes: collectIsolatedAssumptions(assumptions, visEdges, { excludeFrom: ['⊤', 'junction_', 'arg_'] })
+    };
 }

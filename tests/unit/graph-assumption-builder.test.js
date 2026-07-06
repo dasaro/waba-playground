@@ -7,21 +7,30 @@ globalThis.document ??= { documentElement: { getAttribute: () => 'dark' } };
 const { buildDirectAssumptionGraph, buildBranchingAssumptionGraph } =
     await import('../../modules/graph-assumption-builder.js');
 
-test('chained attack through a non-assumption atom is drawn, not isolated (issue #1)', () => {
-    // contrary(a,c). c <- x. x <- b.   ==> b defeats a through the chain.
+const derivedNode = (g, atom) => g.visNodes.find((n) => n.isDerived && n.atom === atom);
+const attackTo = (g, target) => g.visEdges.find((e) => e.to === target
+    && (e.attackType === 'derived' || e.attackType === 'direct'));
+const supportEdge = (g, from, to) => g.visEdges.find((e) => e.attackType === 'support' && e.from === from && e.to === to);
+
+test('Branching renders the derivation CHAIN: intermediate atom becomes its own node', () => {
+    // contrary(a,c). c <- x. x <- b.   ==> b -> arg_x -> arg_c -> (attacks) a.
     const assumptions = ['a', 'b'];
     const contraries = [{ assumption: 'a', contrary: 'c' }, { assumption: 'b', contrary: 'nb' }];
     const rules = [{ id: 'r1', head: 'c', body: ['x'] }, { id: 'r2', head: 'x', body: ['b'] }];
     const g = buildBranchingAssumptionGraph(assumptions, contraries, rules, { a: 5, b: 7 });
 
-    const edge = g.visEdges.find((e) => e.from === 'b' && e.to === 'a');
-    assert.ok(edge, 'b -> a attack edge must exist (the chain must not vanish)');
-    assert.equal(edge.label, '7', 'single-premise chain carries the leaf weight');
+    assert.ok(derivedNode(g, 'x'), 'the intermediate atom x must be drawn as its own (derived) node');
+    assert.ok(derivedNode(g, 'c'), 'the contrary c must be drawn as a derived node');
+    assert.ok(supportEdge(g, 'b', 'arg_x'), 'a support edge b -> arg_x must exist');
+    const atk = attackTo(g, 'a');
+    assert.ok(atk, 'an attack edge into a must exist');
+    assert.equal(atk.contrary, 'c', 'the attack carries its contrary for highlight matching');
+    assert.equal(atk.label, '7', 'a single-premise chain carries the leaf weight (⊗ of one element)');
     assert.deepEqual(g.isolatedNodes.map((n) => n.id), [], 'no genuinely-attacked assumption should be isolated');
 });
 
-test('non-assumption conjunct contributes its leaf assumption to the joint (issue #2)', () => {
-    // contrary(a,c). c <- b1, x. x <- b2.   ==> the attack needs b1 AND b2.
+test('Branching: a multi-premise step becomes an AND-junction feeding the derived claim', () => {
+    // contrary(a,c). c <- b1, x. x <- b2.   ==> junction(b1, x) -> arg_c ; b2 -> arg_x -> junction.
     const assumptions = ['a', 'b1', 'b2'];
     const contraries = [
         { assumption: 'a', contrary: 'c' },
@@ -32,9 +41,26 @@ test('non-assumption conjunct contributes its leaf assumption to the joint (issu
     const g = buildBranchingAssumptionGraph(assumptions, contraries, rules, {});
 
     const junction = g.visNodes.find((n) => n.isJunction);
-    assert.ok(junction, 'a junction must represent the joint attack');
-    assert.deepEqual([...junction.attackers].sort(), ['b1', 'b2'], 'both b1 and b2 must be contributors');
-    assert.ok(!g.isolatedNodes.some((n) => n.id === 'b2'), 'b2 must not be shown as isolated/irrelevant');
+    assert.ok(junction, 'a junction must represent the multi-premise rule c <- b1, x');
+    assert.deepEqual([...junction.attackers].sort(), ['b1', 'x'], 'the junction spans the rule body b1 and x');
+    assert.ok(derivedNode(g, 'x'), 'the nested intermediate x is its own derived node');
+    assert.ok(!g.isolatedNodes.some((n) => n.id === 'b2'), 'b2 (feeding x) must not be shown as isolated');
+});
+
+test('Branching: a 2-level debate-style chain renders every intermediate claim', () => {
+    // c <- m1, m2 ;  m1 <- b1, b2 ;  m2 <- b3      (like evidence -> claims -> refutation)
+    const assumptions = ['a', 'b1', 'b2', 'b3'];
+    const contraries = [{ assumption: 'a', contrary: 'c' }];
+    const rules = [
+        { id: 'r1', head: 'c', body: ['m1', 'm2'] },
+        { id: 'r2', head: 'm1', body: ['b1', 'b2'] },
+        { id: 'r3', head: 'm2', body: ['b3'] }
+    ];
+    const g = buildBranchingAssumptionGraph(assumptions, contraries, rules, {});
+    ['m1', 'm2', 'c'].forEach((atom) => assert.ok(derivedNode(g, atom), `${atom} must be a derived claim node`));
+    assert.ok(attackTo(g, 'a'), 'the top of the chain (c) attacks the stance a');
+    // Two AND-junctions: one for c <- m1,m2 and one for m1 <- b1,b2.
+    assert.equal(g.visNodes.filter((n) => n.isJunction).length, 2, 'two multi-premise steps -> two junctions');
 });
 
 test('Direct mode distinguishes joint (AND) from disjunctive (OR) by marker + colour (issue #3)', () => {
@@ -62,23 +88,25 @@ test('Direct mode distinguishes joint (AND) from disjunctive (OR) by marker + co
         'disjunctive edges carry their leaf weights, not the ∧ marker');
 });
 
-test('single-premise edge weight is the leaf weight, not a fabricated 1 (issue #4)', () => {
+test('Branching single-premise derived attack carries the leaf weight (issue #4)', () => {
     // contrary(climate, against_climate). against_climate <- growth. weight(growth,8).
     const g = buildBranchingAssumptionGraph(['growth', 'climate'],
         [{ assumption: 'climate', contrary: 'against_climate' }],
         [{ id: 'r1', head: 'against_climate', body: ['growth'] }], { growth: 8, climate: 3 });
-    const edge = g.visEdges.find((e) => e.from === 'growth' && e.to === 'climate');
+    const edge = attackTo(g, 'climate');
     assert.equal(edge.label, '8');
     assert.equal(edge.weight, 8);
+    assert.ok(supportEdge(g, 'growth', 'arg_against_climate'), 'growth supports the derived claim, not attacks climate directly');
 });
 
-test('joint attack edges do not fabricate a semiring-dependent aggregate weight (issue #4)', () => {
+test('Branching joint attack does not fabricate a semiring-dependent aggregate weight (issue #4)', () => {
     const g = buildBranchingAssumptionGraph(['a', 'b1', 'b2'],
         [{ assumption: 'a', contrary: 'c' }],
         [{ id: 'r1', head: 'c', body: ['b1', 'b2'] }], { b1: 3, b2: 4 });
-    const junctionEdge = g.visEdges.find((e) => e.attackType === 'joint' && e.from.startsWith('junction_'));
-    assert.equal(junctionEdge.label, '', 'no fabricated aggregate weight on the junction edge');
-    assert.equal(junctionEdge.weight, '?');
+    const atk = attackTo(g, 'a');
+    assert.equal(atk.label, '', 'no fabricated aggregate weight on a multi-leaf attack');
+    assert.equal(atk.weight, '?');
+    assert.ok(g.visNodes.some((n) => n.isJunction), 'the joint step is drawn as a junction');
 });
 
 test('empty-body and fact-chained contraries render as ⊤ attacks', () => {

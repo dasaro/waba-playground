@@ -30,6 +30,24 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-1
+
+- **Scientific-debate examples now use DERIVATION CHAINS** (no evidence assumption attacks a
+  stance directly). Each debate's evidence combines into intermediate CLAIM atoms, which combine
+  into the refutation of the rival — exposing the inferential structure and exercising WABA's
+  chain reasoning + semiring propagation. All five re-verified in clingo: because ⊗ is associative
+  (arctic/tropical `+`, gödel `min`) the propagated weights and β thresholds are unchanged
+  (big_bang 5, smoking 54, solar 53, age_of_earth 80, tectonics cost-7 / holdout-19). The
+  flagship is `age_of_earth`, where gödel ⊗=min drags Kelvin's multi-step chain down to strength
+  5 at the false "no internal heat" premise (`secular_cooling=60 → young_age_estimate=5`).
+- **Assumption-Branching graph now renders the full derivation DAG.** Intermediate derived atoms
+  become their own indigo "Derived Claim" nodes; multi-premise steps are AND-junctions (⬥); grey
+  "Derivation step" edges carry support (not attacks) and stay neutral under extension highlighting.
+  A chain `evidence → claim → … → contrary → (attacks) stance` is now drawn as a visible path.
+  Assumption-Direct mode is unchanged (still flattens to leaf assumptions) for contrast.
+- Legend gains the Derived Claim node + Derivation step edge; single-premise derived attacks still
+  show their leaf weight (⊗ of one element), multi-leaf attacks show none (semiring-dependent).
+
 ## 20260702-1
 
 - **four more scientific-debate curated examples**, each designed + clingo-verified so the

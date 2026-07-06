@@ -2080,6 +2080,14 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     transform: rotate(45deg);
 }
 
+.node-claim {
+    width: 22px;
+    height: 14px;
+    border-radius: 3px;
+    background: #818cf8;
+    border: 2px solid #6366f1;
+}
+
 .node-top {
     width: 0;
     height: 0;
@@ -2108,6 +2116,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .edge-derived,
 .edge-joint,
 .edge-fact,
+.edge-support,
 .edge-sup,
 .edge-inf,
 .edge-active,
@@ -2115,6 +2124,10 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     width: 40px;
     height: 3px;
     position: relative;
+}
+
+.edge-support {
+    background: #94a3b8;
 }
 
 /* Standard-mode weight-based edge colours (match graph-manager) */
