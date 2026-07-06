@@ -116,32 +116,29 @@ joint attacks, sum vs. max monoid):
   + MAX monoid): a rebuttal is only as strong as its *worst* ground (⊗=max) and an
   extension costs its single worst concession, so all three decisions can be kept
   by paying just the hardest block (8) (Gödel-lower = bottleneck, max + ub, β=8).
-- `probabilistic` — **Weights as Probabilities** (**Tropical** / min-plus):
-  surprisal encoding where the budget β is a probability threshold; the improbable
-  objection can be overridden at its surprisal cost (tropical + sum + ub, β=800).
-- `big_bang_steady_state` — **Big Bang vs Steady-State** (**Arctic** / max-plus): a real
-  cosmology debate as evidential consilience. Weights count independent converging
-  evidence lines and ⊗=+ sums them; five observations (CMB, its blackbody spectrum,
-  primordial He-4 & deuterium, evolving radio counts) jointly refute Steady-State with
-  weight 5. Accepted at cost 0: Big Bang (settled consensus); a Steady-State holdout is
-  admissible only at β=5 — the cost of dismissing all five lines (arctic + sum + ub, β=5).
-- `smoking_lung_cancer` — **Smoking causes lung cancer** (**Arctic**): Bradford-Hill
-  consilience (eight independent causal criteria, ⊗=+ → weight 54) vs R. A. Fisher's
-  confounding hypothesis. Accepted at cost 0: causation (consensus); Fisher's holdout
-  only at β=54 — dismissing the whole Bradford-Hill case (arctic + sum + ub, β=54).
-- `solar_neutrino` — **Solar neutrino problem** (**Tropical** / min-plus): combined
-  statistical significance — SNO's two channels add surprisal (≈5.3σ) refuting "the
-  Standard Solar Model is wrong". Accepted at cost 0: neutrino oscillation / SSM correct
-  (consensus, Nobel 2015); the SSM-error holdout only at β=53 (tropical + sum + ub, β=53).
-- `age_of_earth` — **Age of the Earth: Kelvin vs radiometric** (**Gödel** / weakest-link):
-  Kelvin's cooling estimate is a conjunction whose weakest premise ("no internal heat
-  source") was refuted by radioactivity (⊗=min → strength 5). Accepted at cost 0: ~4.54 Gyr
-  (consensus); the young-Earth holdout only at β=80 (gödel + sum + ub, β=80).
-- `plate_tectonics` — **Plate tectonics vs fixism** (**Arctic**, consilience with a
-  *tolerated objection*): unlike the others, the accepted plate-tectonics extension pays a
-  **nonzero cost 7** — it discards the "no mechanism" objection, as history tolerated it
-  before the mechanism was found — yet still wins (the fixist holdout costs 19)
-  (arctic + sum + ub, β=19).
+**Scientific theory competitions** — each modelled so the accepted (consensus) theory is
+resolved at **non-zero cost** (it must discard a genuine, tolerated residual objection — no
+cost-0 degeneracy), with evidence as **weighted argument atoms** (weights = real quantities:
+effect sizes, meta-analyses, σ/p-values, evidence strength) that accumulate along derivation
+chains into the rival's refutation. Competing theories map 1:1 to assumptions; each has ≥2 models:
+
+- `kpg_impact_vs_deccan` — **K-Pg extinction: impact vs volcanism** (**Arctic**): the Chicxulub
+  impact (Alvarez et al. 1980) vs Deccan volcanism. Iridium anomaly (9) + shocked quartz (7) +
+  global ejecta/crater (6) sum to 22 against a Deccan-only cause; the impact theory is accepted
+  at **cost 8** — discarding the tolerated extinction-selectivity objection (Hull et al. 2020)
+  that keeps a Deccan contribution alive (arctic + sum + ub, β=22).
+- `higgs_boson_discovery` — **Higgs boson: 5σ discovery vs the null** (**Tropical** / surprisal):
+  ATLAS 5.9σ (59) and CMS 5.0σ (50) add to 109 units of surprisal against the background-fluctuation
+  null (arXiv:1207.7214/7235); the discovery is accepted at **cost 8** — discarding the
+  look-elsewhere / trials-factor caveat every local 5σ carries (tropical + sum + ub, β=109).
+- `out_of_africa` — **Human origins: Out-of-Africa vs multiregional** (**Arctic**): coalescence (12)
+  + serial-founder decay (15) + African basal diversity (10) sum to 37; recent African origin is
+  accepted at **cost 8** — discarding the archaic-admixture objection (Neanderthal/Denisovan DNA;
+  Green 2010, Reich 2010) that partly vindicates gene flow (arctic + sum + ub, β=37).
+- `lipid_hypothesis` — **Lipid hypothesis: LDL causal vs marker-only** (**Arctic**, meta-analytic
+  effect sizes): CTT statin meta-analysis (8) + Mendelian randomization (11) + PCSK9 RCTs (6) sum to
+  25; causal-LDL is accepted at **cost 5** — discarding the residual-risk objection (~70-80% of
+  events remain despite LDL-lowering; CANTOS) (arctic + sum + ub, β=25).
 
 These five debate examples open in the **Assumption-Branching** graph view (the Standard
 set-graph is the 2ⁿ power set of assumptions, guarded off above ~8 assumptions).

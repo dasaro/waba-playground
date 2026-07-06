@@ -1,24 +1,18 @@
 // WABA Playground examples.
 // Two families of curated examples:
-//  (1) Algebra demos across the four semirings: Gödel (weakest-link cycle),
-//      Arctic (joint accumulation), Bottleneck-cost (worst-case + MAX monoid),
-//      Tropical (weights as probabilities).
-//  (2) Real SCIENTIFIC DEBATES whose weights take a natural meaning under the
-//      matching algebra, with the WABA-accepted (min-cost) extension reproducing
-//      today's scientific consensus and β measuring how much evidence a holdout
-//      must dismiss:
-//        - big_bang_steady_state  : consilience              (Arctic,  β=5,  cost-0 consensus)
-//        - smoking_lung_cancer    : Bradford-Hill consilience (Arctic,  β=54, cost-0 consensus)
-//        - solar_neutrino         : combined significance     (Tropical, β=53, cost-0 consensus)
-//        - age_of_earth           : weakest-link              (Gödel,   β=80, cost-0 consensus)
-//        - plate_tectonics        : consilience w/ a TOLERATED objection (Arctic, β=19, cost-7 consensus)
-//     Each debate is modelled as a DERIVATION CHAIN: no evidence assumption attacks a
-//     stance directly. Instead the evidence combines into intermediate CLAIMS which
-//     combine into the refutation of the rival. Because the ⊗ operators are associative
-//     (arctic/tropical + , gödel min) the propagated weights — and the β thresholds —
-//     are unchanged; the chains just expose the debate's inferential structure, best
-//     viewed in Assumption-Branching mode (which renders every intermediate claim node).
-// `probabilistic` is synced from the WABA repo (waba-modules.js); the rest are inline.
+//  (1) Algebra demos on abstract rebuttal cycles: Gödel (weakest link), Arctic (joint
+//      accumulation), Bottleneck-cost (worst-case + MAX monoid).
+//  (2) Real SCIENTIFIC THEORY COMPETITIONS from the literature, each modelled so that:
+//        - the accepted (consensus) theory is resolved at NON-ZERO cost: it must discard a
+//          genuine, tolerated residual objection (there is no cost-0 extension);
+//        - evidence enters as WEIGHTED ARGUMENT atoms (non-assumption, non-contrary) whose
+//          weights encode real quantities (effect sizes, meta-analyses, σ / p-values, evidence
+//          strength) and accumulate along derivation CHAINS into the rival's refutation;
+//        - competing theories map 1:1 to assumptions; every framework has >= 2 stable models.
+//        kpg_impact_vs_deccan  : Chicxulub impact vs Deccan volcanism      (Arctic,   accepted @8 / holdout @22)
+//        higgs_boson_discovery : 5-sigma discovery vs background-fluctuation (Tropical, @8 / @109)
+//        out_of_africa         : recent African origin vs multiregional     (Arctic,   @8 / @37)
+//        lipid_hypothesis      : LDL causal vs LDL-is-only-a-marker         (Arctic,   @5 / @25)
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
 %%
@@ -105,474 +99,150 @@ contrary(merge,  block_merge).
 contrary(caveat_a, c_ca). contrary(caveat_b, c_cb). contrary(caveat_c, c_cc).
 `;
 
-const BIG_BANG_STEADY_STATE = `%% BIG BANG vs STEADY-STATE -- evidential consilience (Arctic / max-plus).
-%%
-%% A real 20th-century cosmology debate: the hot Big Bang (Gamow; Λ-CDM today) vs the
-%% eternal, unchanging Steady-State universe with continuous matter creation (Bondi,
-%% Gold & Hoyle, 1948). Here a weight counts INDEPENDENT converging lines of evidence
-%% -- one "evidence unit" each -- so under Arctic the conjunction ⊗ = + ADDS the lines:
-%% the joint case against Steady-State is exactly as strong as the NUMBER of independent
-%% observations it rests on (this is Whewell's "consilience of inductions").
-%%
-%% Five methodologically distinct observations each require a hot, dense, evolving past
-%% and so refute an eternal steady state (each weight 1):
-assumption(cmb_exists).     weight(cmb_exists, 1).     % the cosmic microwave background exists (Penzias & Wilson, 1965)
-assumption(cmb_blackbody).  weight(cmb_blackbody, 1).  % the CMB is a near-perfect blackbody (COBE/FIRAS) -- relic of a hot past
-assumption(he4_abundance).  weight(he4_abundance, 1).  % primordial helium-4 ≈ 25% by mass (BBN) -- far more than stars can make
-assumption(deuterium).      weight(deuterium, 1).      % primordial deuterium D/H (BBN) -- destroyed, not made, in stars
-assumption(radio_counts).   weight(radio_counts, 1).   % radio-source / quasar counts evolve with cosmic time (Ryle)
+const KPG_IMPACT = `%% K-Pg MASS EXTINCTION: Chicxulub impact (accepted) vs Deccan volcanism (rival).
+%% Arctic semiring (otimes=+ accumulates independent evidence strength; oplus=max), sum monoid, ub budget.
+%% Weights = strength of each physical impact signature (small integers). The accepted impact
+%% theory does NOT win for free: it must discard the residual "extinction-selectivity" objection
+%% that keeps a Deccan contribution alive -> resolved at NON-ZERO cost 8 (< the Deccan holdout 22).
 
-%% The two rival stances:
-assumption(big_bang).       weight(big_bang, 1).       % the hot Big Bang
-assumption(steady_state).   weight(steady_state, 1).   % the eternal Steady-State universe
+%% -- competing theories (1 assumption each) --
+assumption(impact_theory).    contrary(impact_theory, c_impact).     % Alvarez / Chicxulub bolide
+assumption(deccan_volcanism). contrary(deccan_volcanism, c_deccan).  % Deccan Traps flood basalts
 
-%% DERIVATION CHAIN (no observation attacks a stance directly): the five lines first
-%% combine into three intermediate CLAIMS, which in turn combine into not_steady.
-%% Arctic ⊗ = + is associative, so the accumulated strength is still 1+1+1+1+1 = 5 --
-%% but the graph now shows the debate's inferential STRUCTURE rather than a flat pile.
-%%   hot_dense_past             <- cmb_exists, cmb_blackbody     (⊗=+  1+1 = 2)  relic thermal bath
-%%   primordial_nucleosynthesis <- he4_abundance, deuterium      (⊗=+  1+1 = 2)  BBN in the first minutes
-%%   cosmic_evolution           <- radio_counts                 (      1)      the universe evolves
-%%   not_steady                 <- the three claims above        (⊗=+  2+2+1 = 5)
-head(r_hot, hot_dense_past).
-body(r_hot, cmb_exists; r_hot, cmb_blackbody).
-head(r_bbn, primordial_nucleosynthesis).
-body(r_bbn, he4_abundance; r_bbn, deuterium).
-head(r_evo, cosmic_evolution).
-body(r_evo, radio_counts).
-head(r_ns, not_steady).
-body(r_ns, hot_dense_past; r_ns, primordial_nucleosynthesis; r_ns, cosmic_evolution).
+%% -- observations: UNWEIGHTED support assumptions (they establish derivability; the STRENGTH
+%%    lives in the weighted argument atoms below) --
+assumption(obs_iridium).            contrary(obs_iridium, x_ir).
+assumption(obs_shocked_quartz).     contrary(obs_shocked_quartz, x_sq).
+assumption(obs_ejecta_crater).      contrary(obs_ejecta_crater, x_ej).
+assumption(obs_extinction_pattern). contrary(obs_extinction_pattern, x_ep).
 
-%% contrary(X, Y): "Y attacks X"  (contrary is a TOTAL function -- one per assumption)
-contrary(steady_state, not_steady).   % the weight-5 converging case refutes Steady-State
-contrary(big_bang, steady_state).     % Steady-State, if still held, attacks Big Bang (weight 1)
-%% the five observations are unattacked (their contraries are never derivable):
-contrary(cmb_exists, c1). contrary(cmb_blackbody, c2). contrary(he4_abundance, c3).
-contrary(deuterium, c4).  contrary(radio_counts, c5).
+%% -- WEIGHTED ARGUMENTS (intermediate, non-contrary): strength of each impact signature --
+weight(arg_iridium_anomaly, 9).  % global Ir spike ~30x crustal background (Alvarez et al. 1980)
+head(d1, arg_iridium_anomaly). body(d1, obs_iridium).
+weight(arg_shocked_quartz, 7).   % planar deformation features -- impact-diagnostic, not volcanic
+head(d2, arg_shocked_quartz).  body(d2, obs_shocked_quartz).
+weight(arg_global_ejecta, 6).    % worldwide spherule layer + 180-km Chicxulub crater at the boundary
+head(d3, arg_global_ejecta).   body(d3, obs_ejecta_crater).
 
-%% As configured (Tropical-higher = Arctic, sum + ub, β = 5, enumerate):
-%%   * the accepted (cost-0) extension is  in(big_bang), out(steady_state)  = today's
-%%     SETTLED consensus. Big Bang wins at ZERO cost -- no evidence has to be set aside.
-%%   * a Steady-State extension exists ONLY at β ≥ 5, and it costs exactly 5: to still
-%%     hold Steady-State you must DISCARD the entire converging body of evidence (all 5
-%%     lines). So β = 5 literally measures how much evidence a holdout must deny.
-%%
-%% NOTE: the integer weights are a modelling COUNT of independent evidence lines, not
-%% physical constants ("5" is not a measured quantity). The primordial lithium-7
-%% discrepancy is a real but tolerated WITHIN-model anomaly, not support for Steady-State.
-`;
+%% refute the rival: the three signatures ACCUMULATE (arctic otimes=+ : 9+7+6 = 22) against Deccan-only
+head(rref, c_deccan). body(rref, arg_iridium_anomaly). body(rref, arg_shocked_quartz). body(rref, arg_global_ejecta).
 
-const SMOKING_LUNG_CANCER = `%% ============================================================================
-%% WABA curated debate: "Smoking causes lung cancer"
-%% ============================================================================
-%% Guide: Doll & Hill / Bradford-Hill causal criteria  vs  R. A. Fisher's
-%% "constitutional hypothesis" (a hidden genetic factor causes BOTH smoking and
-%% lung cancer -> confounding, not causation).
-%%
-%% Semiring : arctic  (oplus=max, otimes=+, 1bar=0, 0bar=#inf) -- CONSILIENCE.
-%%            The Bradford-Hill lines are INDEPENDENT lines of evidence; the
-%%            support of a joint argument is the SUM of its premises' support
-%%            (otimes=+), and oplus=max keeps the best-supported derivation. So
-%%            the weight of the argument refuting confounding = accumulated evid.
-%% Monoid   : sum   -- total tolerated objection-severity when discarding.
-%% Budget   : ub    -- inconsistency budget beta = how much accumulated evidence
-%%            you are willing to DISMISS to hold the rival (confounding) stance.
-%% Weights  : integer encoding of the relative evidential force of each line
-%%            (a modelling encoding, NOT a physical constant). Decisive lines
-%%            (strength of association RR~10-20, dose-response, reversibility)
-%%            carry the most weight.
-%%
-%% ABA rigor:
-%%   * contrary is a TOTAL FUNCTION -- exactly one contrary atom per assumption.
-%%     The evidence lines attack the confounding stance by ALL deriving its
-%%     SINGLE contrary atom (no_conf) via ONE joint rule, combined by otimes=+.
-%%   * every assumption has a contrary (dummy c_* for the settled evidence leaves).
-%%   * flat: no assumption is ever a rule head (heads are no_conf / no_caus).
-%% ============================================================================
+%% residual SELF-ACTIVATED objection to the accepted theory (weight 8 < 22): extinction
+%% selectivity / gradual pre-boundary decline keeps a Deccan contribution on the table (Hull et al. 2020).
+weight(arg_selectivity, 8).      head(dobj, arg_selectivity). body(dobj, obs_extinction_pattern).
+head(robj, c_impact). body(robj, impact_theory). body(robj, arg_selectivity).  % active only when impact is IN
+head(rmx, c_impact).  body(rmx, deccan_volcanism).                             % rival also attacks impact
 
-%% ---------------------------------------------------------------------------
-%% THE TWO RIVAL STANCES
-%% ---------------------------------------------------------------------------
-%% caus : "smoking causes lung cancer"  (the modern consensus)
-assumption(caus).   contrary(caus, no_caus).
-%% conf : Fisher's constitutional / confounding hypothesis
-%%        "a hidden genetic factor causes both smoking and cancer; no causation"
-%%   Given a modest positive weight: Fisher's confounding argument is a serious
-%%   a-priori statistical objection (it has real force), just decisively
-%%   outweighed by the accumulated Bradford-Hill case (54 >> 8).
-assumption(conf).   weight(conf, 8).   contrary(conf, no_conf).
-
-%% ---------------------------------------------------------------------------
-%% THE BRADFORD-HILL LINES OF EVIDENCE  (independent evidence assumptions)
-%% weight = integer encoding of that line's evidential force
-%% ---------------------------------------------------------------------------
-assumption(assoc).      weight(assoc, 10).   contrary(assoc, c_assoc).      % strong association, RR ~ 10-20
-assumption(dose).       weight(dose, 9).     contrary(dose, c_dose).        % dose-response / biological gradient
-assumption(reverse).    weight(reverse, 9).  contrary(reverse, c_reverse).  % reversibility: risk falls after cessation
-assumption(consist).    weight(consist, 7).  contrary(consist, c_consist).  % consistency across many studies/populations
-assumption(mechanism).  weight(mechanism, 6).contrary(mechanism, c_mech).   % mechanism: carcinogens in tar
-assumption(temporal).   weight(temporal, 5). contrary(temporal, c_temporal).% temporality: smoking precedes cancer
-assumption(coherent).   weight(coherent, 4). contrary(coherent, c_coherent).% coherence with known biology
-assumption(animal).     weight(animal, 4).   contrary(animal, c_animal).    % animal carcinogenesis experiments
-
-%% ---------------------------------------------------------------------------
-%% ARGUMENTS (rule heads are derived atoms, never assumptions)
-%% ---------------------------------------------------------------------------
-%% DERIVATION CHAIN (no evidence line attacks a stance directly): the eight Bradford-
-%% Hill lines first fuse into THREE intermediate strands of the causal argument, which
-%% then combine to refute confounding. arctic otimes=+ is associative, so the total is
-%% still 54 -- but the graph now shows HOW the case is built, strand by strand.
-%%   not_confoundable        <- assoc, dose, reverse            (⊗=+ 10+9+9 = 28)
-%%       a strong, dose-graded, reversible association is not explicable by confounding
-%%   biologically_causal     <- mechanism, animal, coherent     (⊗=+ 6+4+4 = 14)
-%%       tar carcinogens + animal experiments + coherent biology establish a mechanism
-%%   epidemiologically_sound <- consist, temporal               (⊗=+ 7+5 = 12)
-%%       consistent across populations, and smoking precedes the cancer
-%%   no_conf                 <- the three strands above         (⊗=+ 28+14+12 = 54)
-head(r_str, not_confoundable).
-body(r_str, assoc; r_str, dose; r_str, reverse).
-head(r_bio, biologically_causal).
-body(r_bio, mechanism; r_bio, animal; r_bio, coherent).
-head(r_epi, epidemiologically_sound).
-body(r_epi, consist; r_epi, temporal).
-head(r_conf, no_conf).
-body(r_conf, not_confoundable; r_conf, biologically_causal; r_conf, epidemiologically_sound).
-
-%% Fisher's side is itself a short chain (his inferential step, not a bare attack):
-%%   genetic_common_cause <- conf                 a hidden genotype drives both habits
-%%   no_caus              <- genetic_common_cause a common cause => no DIRECT causation
-head(r_fish1, genetic_common_cause). body(r_fish1, conf).
-head(r_fish2, no_caus).              body(r_fish2, genetic_common_cause).
-`;
-
-const SOLAR_NEUTRINO = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% SOLAR NEUTRINO PROBLEM
-%% Neutrino oscillation (SSM correct) vs. Standard-Solar-Model error
-%%
-%% STORY
-%% Homestake / Kamiokande / SAGE / GALLEX saw a solar electron-neutrino flux
-%% ~1/3 of the Standard Solar Model (SSM) prediction. Two rival explanations:
-%%   (A) the SSM is WRONG (the Sun really makes fewer neutrinos), or
-%%   (B) neutrinos OSCILLATE (change flavour en route; the SSM is correct).
-%% SNO (2001-02) settled it with TWO independent channels:
-%%   - charged-current (CC): the electron-neutrino flux, reduced;
-%%   - neutral-current (NC): the TOTAL all-flavour flux, which MATCHED the SSM.
-%% A matched total flux means the Sun makes the predicted number of neutrinos,
-%% so the SSM is NOT wrong; the electron deficit is flavour change. The combined
-%% CC+NC evidence reached ~5.3 sigma -> discovery. Nobel Prize 2015.
-%%
-%% SEMIRING: tropical (min-plus), a COST/surprisal algebra.
-%%   otimes = +   : premises of ONE joint argument accumulate SURPRISAL. The
-%%                  significances of two INDEPENDENT measurements ADD (their
-%%                  -log-p / chi-square surprisals accumulate additively).
-%%   oplus  = min : among alternative proofs, keep the LEAST-surprising one.
-%%   Weights = statistical significance in units of 0.1 sigma -- a modelling
-%%             ENCODING of -log-p surprisal (see NATURALNESS caveat), NOT a
-%%             claim that raw sigma adds (independent sigma add in quadrature;
-%%             the surprisal that otimes=+ sums is the correct additive quantity).
-%%
-%% MONOID: sum. Extension cost = total significance of the SNO evidence a
-%%   position must DISMISS (discard) to survive. sum = total ignored significance.
-%%
-%% BUDGET beta (UPPER bound, ub): the inconsistency budget = how much established
-%%   significance a position is allowed to wave away. beta is a DISCOVERY /
-%%   significance THRESHOLD: below it, the SNO result cannot be dismissed and the
-%%   holdout "SSM is wrong" position is INFEASIBLE.
-%%
-%% WEIGHT ENCODING (units of 0.1 sigma; modelling encoding, not physical values)
-%%   sno_cc (electron-nu deficit)   : 25  (~2.5 sigma on its own)
-%%   sno_nc (total flux matches SSM): 28  (~2.8 sigma on its own)
-%%   joint flavour_change argument  : 25 + 28 = 53  (~5.3 sigma) via otimes=+
-%% Neither channel alone crosses discovery; SUMMED (tropical otimes=+) they do.
-%%
-%% EXPECTED RESULT (verified by enumeration + optimization)
-%%   Min-cost accepted extension (cost 0, for every beta) = CONSENSUS:
-%%     in: oscillation, sno_cc, sno_nc ; out: ssm_wrong
-%%     (flavour_change is derived and DEFEATS ssm_wrong; nothing is discarded).
-%%   The holdout "ssm_wrong in" costs 53 (it must discard the 5.3-sigma SNO
-%%   attack) and is INFEASIBLE until beta >= 53. Threshold beta* = 53.
-%%
-%% USAGE (sweep beta):
-%%   clingo --warn=no-atom-undefined -n 0 -c beta=B \
-%%     WABA/core/base.lp WABA/semiring/tropical.lp WABA/defaults/legacy.lp \
-%%     WABA/monoid/sum.lp WABA/constraint/ub.lp \
-%%     WABA/filter/projection.lp WABA/semantics/stable.lp solar_neutrino.lp
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% ============================================================================
-%% ASSUMPTIONS
-%% ============================================================================
-assumption(oscillation).   % Position B: neutrinos oscillate (SSM correct)
-assumption(ssm_wrong).     % Position A: the Standard Solar Model is wrong
-assumption(sno_cc).        % Evidence leaf: SNO charged-current (e-nu deficit)
-assumption(sno_nc).        % Evidence leaf: SNO neutral-current (total matches SSM)
-
-%% ============================================================================
-%% WEIGHTS (significance in units of 0.1 sigma; modelling encoding)
-%% ============================================================================
-weight(sno_cc, 25).        % ~2.5 sigma  (electron-neutrino deficit, on its own)
-weight(sno_nc, 28).        % ~2.8 sigma  (total all-flavour flux matches SSM)
-
-%% ============================================================================
-%% RULES
-%% The decisive joint argument: SNO's two INDEPENDENT channels together
-%% demonstrate flavour change. Under tropical otimes=+ its surprisal is the SUM
-%% 25 + 28 = 53 (~5.3 sigma). flavour_change is the CONTRARY of ssm_wrong:
-%% a matched total flux (NC) plus a reduced electron flux (CC) proves the Sun
-%% makes the predicted neutrinos, refuting "the SSM is wrong".
-%% ============================================================================
-%% DERIVATION CHAIN (neither channel attacks a stance directly): each SNO channel
-%% first yields its own physical CLAIM, and the two claims combine into flavour_change.
-%% tropical otimes=+ is associative, so the surprisal is still 28+25 = 53 (~5.3 sigma) --
-%% but the graph now shows the actual physics: total-conserved AND electron-deficit
-%% together force flavour change.
-%%   total_flux_conserved <- sno_nc                 (28)  NC: the Sun makes the SSM number
-%%   electron_deficit     <- sno_cc                 (25)  CC: only 1/3 arrive as electron-nu
-%%   flavour_change       <- the two claims above   (⊗=+ 28+25 = 53)
-head(r_nc, total_flux_conserved). body(r_nc, sno_nc).
-head(r_cc, electron_deficit).     body(r_cc, sno_cc).
-head(r_fc, flavour_change).
-body(r_fc, total_flux_conserved; r_fc, electron_deficit).
-
-%% ============================================================================
-%% CONTRARIES (TOTAL FUNCTION: exactly one contrary atom per assumption)
-%% ============================================================================
-contrary(ssm_wrong, flavour_change).  % the SNO joint argument refutes position A
-contrary(oscillation, c_osc).         % dummy: nothing derives c_osc (B unattacked)
-contrary(sno_cc, c_cc).               % dummy: evidence leaf, never attacked
-contrary(sno_nc, c_nc).               % dummy: evidence leaf, never attacked
-
-%% Budget beta is supplied on the command line (-c beta=B).
 budget(beta).
 `;
 
-const AGE_OF_EARTH = `%% =====================================================================
-%% Age of the Earth: Kelvin's cooling estimate vs radiometric ~4.54 Gyr
-%% =====================================================================
-%% Semiring: godel  (oplus=max over alternative derivations, otimes=min over a
-%%                   rule's premises = WEAKEST-LINK; higher weight = higher confidence).
-%% Monoid  : sum (or max) over discarded-attack weights = inconsistency cost.
-%% Budget  : ub (upper bound). beta = how much objection-strength a holdout may dismiss.
-%%
-%% Weights are a 1..100 CONFIDENCE encoding (a modelling device, NOT physical
-%% constants): 100 = essentially certain, ~5 = a premise the evidence has refuted.
-%%
-%% THE DEBATE
-%%   Position A (young_earth): Kelvin (1862), Earth ~20-100 Myr, from conductive
-%%     cooling of an initially molten Earth. His conclusion is a CONJUNCTION of
-%%     premises; the crucial one, "NO internal heat source" (no_internal_heat), is
-%%     FALSE -- radioactivity (1896-1903) supplies internal heat and voids the calc.
-%%   Position B (old_earth): radiometric dating gives ~4.54 Gyr; premises all strong.
-%%
-%% WHY godel / WEAKEST-LINK is the natural algebra here:
-%%   Kelvin's young-Earth argument is a chain whose otimes=min strength is dragged
-%%   down to its weakest premise. Once no_internal_heat's confidence collapses to ~5,
-%%   the whole Kelvin argument is only strength 5 -- a WEAK attack on old_earth. The
-%%   radiometric argument's weakest premise is still strong (~80), so its attack on
-%%   young_earth is STRONG.
-%%
-%% CONSENSUS-VS-HOLDOUT STRUCTURE (asymmetric, following the settled-science
-%% pattern): the ACCEPTED theory (old_earth) is defended for FREE by permanent,
-%% strong radiometric evidence that refutes its rival; the rival (young_earth) is
-%% attacked by that strength-80 evidence at all times. To overturn the consensus a
-%% holdout must PAY to discard that strong objection (cost 80). Old_earth, by
-%% contrast, is only attacked WHEN young_earth is actually adopted, so the settled
-%% consensus stands at cost 0. beta is exactly "how much objection-strength a holdout
-%% is allowed to dismiss": the young-Earth extension appears only once beta >= 80.
+const HIGGS_DISCOVERY = `%% HIGGS-BOSON DISCOVERY (July 2012): a new ~125 GeV boson exists (accepted) vs the
+%% background-fluctuation null (rival). Tropical semiring (otimes=+ ADDS surprisal, Fisher-style;
+%% oplus=min keeps the least-surprising proof), sum monoid, ub budget.
+%% Weights = SURPRISAL under the null = local significance in units of sigma x10 -- the natural
+%% currency for combined-significance / p-value reasoning. The discovery is resolved at NON-ZERO
+%% cost 8: it must discard the look-elsewhere / trials-factor caveat every local 5-sigma carries.
 
-%% -------------------- BUDGET (beta set on the command line) --------------------
+%% -- competing hypotheses (1 assumption each) --
+assumption(higgs_exists).      contrary(higgs_exists, c_higgs).           % a new ~125 GeV boson exists
+assumption(null_fluctuation).  contrary(null_fluctuation, c_null).        % the excess is a background fluctuation
+
+%% -- observations: UNWEIGHTED support assumptions (the two experiments' datasets) --
+assumption(obs_atlas).         contrary(obs_atlas, x_atlas).
+assumption(obs_cms).           contrary(obs_cms, x_cms).
+
+%% -- WEIGHTED ARGUMENTS (surprisal under the null = local sigma x10) --
+weight(surprisal_atlas, 59).   % ATLAS 5.9 local sigma (arXiv:1207.7214)
+head(a1, surprisal_atlas). body(a1, obs_atlas).
+weight(surprisal_cms, 50).     % CMS 5.0 local sigma (arXiv:1207.7235)
+head(a2, surprisal_cms).   body(a2, obs_cms).
+
+%% refute the null: independent surprisals ADD (tropical otimes=+ : 59+50 = 109) -- far past 5 sigma
+head(rref, c_null). body(rref, surprisal_atlas). body(rref, surprisal_cms).
+
+%% residual SELF-ACTIVATED objection to the discovery (weight 8 < 109): the look-elsewhere effect --
+%% the GLOBAL significance is below the local 5-sigma, and in 2012 it was not yet confirmed to be
+%% THE Standard-Model Higgs (spin/couplings). Modelled as an objection derived from the claim itself.
+weight(look_elsewhere, 8).     head(dobj, look_elsewhere). body(dobj, higgs_exists).
+head(robj, c_higgs). body(robj, look_elsewhere).            % active only when the discovery is asserted
+head(rmx, c_higgs). body(rmx, null_fluctuation).            % the null, if held, attacks the discovery
+
 budget(beta).
-
-%% -------------------- THE TWO RIVAL POSITIONS (assumptions) ------------------
-%% Flat ABA: these are assumptions, never rule heads. Each has EXACTLY ONE contrary
-%% (contrary is a total function: one contrary atom per assumption).
-assumption(young_earth).   % Kelvin: Earth is young (~20-100 Myr)
-assumption(old_earth).     % Radiometric: Earth is ~4.54 Gyr
-
-%% contrary(Y,X): "X attacks Y".  Single contrary atom per assumption.
-contrary(young_earth, c_young).   % c_young ("Earth is old") attacks young_earth
-contrary(old_earth,   c_old).     % c_old   ("Earth is young") attacks old_earth
-
-%% -------------------- EVIDENCE LEAVES (assumptions) --------------------------
-%% Premises of the two arguments. Unattacked (their contraries are dummy,
-%% never-derivable atoms), so they are always 'in'. Confidence weights are
-%% intrinsic (godel: higher = stronger).
-
-%% -- Radiometric argument premises (all strong) --
-assumption(decay_constant_known). weight(decay_constant_known, 95).  % lab-measured decay const
-assumption(isotope_ratios).       weight(isotope_ratios,       90).  % measured Pb/U ratios
-assumption(closed_system).        weight(closed_system,        80).  % rock closed to loss/gain
-contrary(decay_constant_known, c_decay).      % dummy, never derived
-contrary(isotope_ratios,       c_iso).        % dummy, never derived
-contrary(closed_system,        c_closed).     % dummy, never derived
-
-%% -- Kelvin's cooling-chain premises --
-assumption(initial_molten).       weight(initial_molten,       70).  % Earth began molten
-assumption(conductive_cooling).   weight(conductive_cooling,   60).  % heat leaves by conduction
-assumption(no_internal_heat).     weight(no_internal_heat,      5).  % NO internal source -- FALSE
-contrary(initial_molten,     c_molten).        % dummy, never derived
-contrary(conductive_cooling, c_cond).          % dummy, never derived
-contrary(no_internal_heat,   c_noheat).        % dummy, never derived
-
-%% -------------------- ARGUMENTS (rules) --------------------------------------
-
-%% Both arguments are CHAINS (no premise attacks a stance directly). godel otimes=min
-%% is associative, so the chain propagates the WEAKEST premise all the way to the
-%% attack -- which is the whole point of this example: watch strength collapse to 5.
-
-%% Radiometric CHAIN:  leaves -> radiometric_age -> c_young  ("Earth is old").
-%% Built purely from the ALWAYS-IN radiometric leaves, so c_young is PERMANENTLY
-%% active: young_earth is under attack no matter what stance is taken.
-%%   radiometric_age <- decay_constant_known, isotope_ratios, closed_system
-%%                      (otimes=min => min(95,90,80) = 80, still STRONG)
-%%   c_young         <- radiometric_age                          (carries 80)
-head(r_rad1, radiometric_age).
-body(r_rad1, decay_constant_known; r_rad1, isotope_ratios; r_rad1, closed_system).
-head(r_rad2, c_young). body(r_rad2, radiometric_age).
-
-%% Kelvin CHAIN:  molten+conduction -> secular_cooling -> young_age_estimate -> c_old.
-%% This is the young-Earth position's OWN case, deployed only when young_earth is
-%% actually adopted (young_earth is a premise of the last step). Watch the weakest
-%% link drag the strength down as the chain grows:
-%%   secular_cooling    <- initial_molten, conductive_cooling      (min(70,60)     = 60)
-%%   young_age_estimate <- secular_cooling, no_internal_heat       (min(60, 5)     =  5) <- COLLAPSE
-%%       the refuted "no internal heat source" premise (weight 5) poisons the whole chain
-%%   c_old              <- young_age_estimate, young_earth         (min(5,#sup)    =  5)  WEAK attack
-%% Hence the settled consensus (old_earth in, young_earth out) faces NO active attack
-%% and stands at cost 0; "reject both" is not stable (old_earth, left out, would be
-%% unattacked and forced back in).
-head(r_k1, secular_cooling).
-body(r_k1, initial_molten; r_k1, conductive_cooling).
-head(r_k2, young_age_estimate).
-body(r_k2, secular_cooling; r_k2, no_internal_heat).
-head(r_k3, c_old).
-body(r_k3, young_age_estimate; r_k3, young_earth).
 `;
 
-const PLATE_TECTONICS = `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% CONTINENTAL DRIFT / PLATE TECTONICS  vs  FIXISM
-%%
-%% STORY
-%%   Wegener (1912-) argued the continents drift, stacking several INDEPENDENT
-%%   lines of evidence: the coastline + continental-shelf fit, matching fossils
-%%   (Mesosaurus, Glossopteris), matching orogenic rock belts, Permo-Carboniferous
-%%   glacial tillites, and later paleomagnetism and the sea-floor magnetic stripes
-%%   (Vine-Matthews, 1963).  Fixists (Harold Jeffreys) rejected drift on ONE
-%%   quantitative objection: there is NO adequate MECHANISM -- the mantle is too
-%%   rigid and the invoked forces far too weak to move continents.
-%%
-%%   The historically striking fact: plate tectonics was ACCEPTED (~1966-67) on the
-%%   converging evidence BEFORE a fully worked-out driving mechanism was in hand.
-%%   The heavyweight mechanism objection was TOLERATED at acceptance.  So the
-%%   accepted mobilist position DISCARDS a real, decisive objection (paying its
-%%   weight); it is admissible only because the ACCUMULATED evidence outweighs the
-%%   objection budget.  (Contrast Big Bang, where the consensus wins at cost 0.)
-%%
-%% SEMIRING: arctic  (max-plus)   -- in the UI: family=tropical, polarity=higher
-%%   * (+) conjunction = CONSILIENCE: the independent premises of one joint
-%%     argument ADD their support.  Wegener's case is exactly a conjunction of
-%%     independent evidence lines, so its strength is their SUM.
-%%   * (max) alternative derivations = keep the best-supported argument.
-%%   Weights are STRENGTH / lines-of-evidence support (higher = better).
-%%
-%% MONOID: sum   -- extension cost = TOTAL severity of the objections the accepted
-%%   position must dismiss (discarded attacks).  BUDGET beta = how much objection-
-%%   severity the community is willing to tolerate.
-%%
-%% CONSTRAINT: ub  (upper bound)  -- sum of discarded weights must be <= beta.
-%% SEMANTICS: stable.  OPTIMIZATION: minimize (accept the min-cost extension).
-%%
-%% WEIGHTS are a MODELLING ENCODING (defensible small integers ranking the
-%% relative evidential weight of each line), NOT physical constants.
-%%
-%% USAGE (sweep beta; holdout first appears at beta = 19):
-%%   clingo --warn=no-atom-undefined -n 0 -c beta=19 \
-%%     WABA/core/base.lp WABA/semiring/arctic.lp WABA/defaults/legacy.lp \
-%%     WABA/monoid/sum.lp WABA/constraint/ub.lp WABA/filter/projection.lp \
-%%     WABA/semantics/stable.lp  tectonics_final.lp
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+const OUT_OF_AFRICA = `%% HUMAN ORIGINS: recent African origin (accepted) vs multiregional evolution (rival).
+%% Arctic semiring (otimes=+ accumulates independent genetic evidence; oplus=max), sum monoid, ub budget.
+%% Weights = strength of each genetic line of evidence. The accepted theory is resolved at NON-ZERO
+%% cost 8: it must discard the archaic-admixture objection (Neanderthal/Denisovan ancestry), a real
+%% deviation from strict replacement that partially vindicates the multiregional gene-flow idea.
 
-%% ============================================================================
-%% ASSUMPTIONS + CONTRARIES  (contrary is a TOTAL function: exactly one per assumption)
-%% ============================================================================
+%% -- competing theories (1 assumption each) --
+assumption(recent_african_origin).   contrary(recent_african_origin, not_recent_african_origin).
+assumption(multiregional_evolution). contrary(multiregional_evolution, not_multiregional_evolution).
 
-%% -- Rival theories --
-assumption(drift).          contrary(drift,  c_drift).    % mobilism / plate tectonics
-assumption(fixism).         contrary(fixism, c_fixism).   % continents are fixed
+%% -- observations: UNWEIGHTED support assumptions (the genetic datasets) --
+assumption(mtdna_ychrom_coalescence).   contrary(mtdna_ychrom_coalescence, x_coal).
+assumption(heterozygosity_distance_decay). contrary(heterozygosity_distance_decay, x_het).
+assumption(african_basal_diversity).     contrary(african_basal_diversity, x_div).
+assumption(archaic_admixture_signal).    contrary(archaic_admixture_signal, x_adm).
 
-%% -- Independent lines of evidence (unattacked leaves; dummy never-derivable contraries) --
-assumption(fit).            contrary(fit,      c_fit).       % coastline + shelf fit
-assumption(fossils).        contrary(fossils,  c_fossils).   % Mesosaurus / Glossopteris
-assumption(rocks).          contrary(rocks,    c_rocks).     % matching orogenic belts
-assumption(tillites).       contrary(tillites, c_tillites).  % Permo-Carboniferous glacial tillites
-assumption(paleomag).       contrary(paleomag, c_paleomag).  % paleomagnetism (polar wander)
-assumption(stripes).        contrary(stripes,  c_stripes).   % sea-floor magnetic stripes
+%% -- WEIGHTED ARGUMENTS (genetic evidence strength) --
+weight(arg_coalescence, 12).      % mtDNA + Y-chromosome coalescence rooted in Africa (Cann et al. 1987)
+head(d_coal, arg_coalescence). body(d_coal, mtdna_ychrom_coalescence).
+weight(arg_serial_founder, 15).   % heterozygosity decays with distance from Africa (Ramachandran et al. 2005)
+head(d_sf, arg_serial_founder). body(d_sf, heterozygosity_distance_decay).
+weight(arg_african_diversity, 10).% Africa holds the highest basal genetic diversity
+head(d_ad, arg_african_diversity). body(d_ad, african_basal_diversity).
 
-%% -- The fixist mechanism objection premise (unattacked leaf; dummy contrary) --
-assumption(rigid_mantle).   contrary(rigid_mantle, c_rigid_mantle). % "mantle too rigid, forces too weak"
+%% refute the rival: the three lines ACCUMULATE (arctic otimes=+ : 12+15+10 = 37)
+head(r_refute, not_multiregional_evolution).
+body(r_refute, arg_coalescence). body(r_refute, arg_serial_founder). body(r_refute, arg_african_diversity).
 
-%% ============================================================================
-%% WEIGHTS  (arctic = STRENGTH; each line's evidential support, small integers)
-%% ============================================================================
-weight(fit,       2).   % suggestive but qualitative
-weight(fossils,   3).   % biogeographic, strong
-weight(rocks,     2).   % geological correlation
-weight(tillites,  3).   % paleoclimatic, strong
-weight(paleomag,  4).   % quantitative, mid-1950s
-weight(stripes,   5).   % the Vine-Matthews clincher (1963), decisive
-%% Sum of the six lines = 2+3+2+3+4+5 = 19  (arctic (x)=+ : consilience)
+%% residual SELF-ACTIVATED objection (weight 8 < 37): archaic admixture -- Neanderthal (~1.5-2%,
+%% Green et al. 2010) and Denisovan (~4-6% in Melanesians, Reich et al. 2010) ancestry in non-Africans.
+weight(objection_archaic_admixture, 8).
+head(d_obj, objection_archaic_admixture). body(d_obj, archaic_admixture_signal).
+head(r_obj, not_recent_african_origin).
+body(r_obj, recent_african_origin). body(r_obj, objection_archaic_admixture).  % active only when OoA is IN
+head(r_mx, not_recent_african_origin). body(r_mx, multiregional_evolution).
 
-weight(rigid_mantle, 6).   % the single heavyweight mechanism objection
-weight(drift,        1).   % bare hypothesis carries little weight on its own
-weight(fixism,       1).
+budget(beta).
+`;
 
-%% ============================================================================
-%% ARGUMENTS (rules).  Head = derived contrary atom; body = premises.
-%%   arctic:  premises of ONE rule ADD (consilience);  alternative rules -> max.
-%% ============================================================================
+const LIPID_HYPOTHESIS = `%% LIPID HYPOTHESIS: LDL cholesterol is CAUSAL for atherosclerotic cardiovascular disease
+%% (accepted) vs the older "LDL is only a marker / not causal" position (rival).
+%% Arctic semiring (otimes=+ accumulates meta-analytic evidence; oplus=max), sum monoid, ub budget.
+%% Weights = meta-analytic effect strength. The causal theory is resolved at NON-ZERO cost 5: it
+%% must discard the residual-cardiovascular-risk objection (most events still occur despite LDL-lowering).
 
-%% [rev]  DERIVATION CHAIN: the six lines refute fixism through TWO intermediate
-%%        claims (no line attacks a stance directly). arctic otimes=+ is associative,
-%%        so the standing strength is still 2+3+2+3+4+5 = 19.
-%%          continents_were_joined <- fit, fossils, tillites   (⊗=+ 2+3+3 = 8)
-%%              the matching coastlines, fossils and glacial tillites => once one landmass
-%%          seafloor_spreads       <- rocks, paleomag, stripes (⊗=+ 2+4+5 = 11)
-%%              matching rock belts + polar wander + magnetic stripes => the floor spreads
-%%          c_fixism               <- the two claims above     (⊗=+ 8+11 = 19)
-head(r_join, continents_were_joined).
-body(r_join, fit; r_join, fossils; r_join, tillites).
-head(r_spread, seafloor_spreads).
-body(r_spread, rocks; r_spread, paleomag; r_spread, stripes).
-head(r_rev, c_fixism).
-body(r_rev, continents_were_joined; r_rev, seafloor_spreads).
+%% -- competing theories (1 assumption each) --
+assumption(ldl_causal).      contrary(ldl_causal, c_ldl).       % LDL-C causally drives ASCVD (EAS 2017)
+assumption(ldl_marker_only). contrary(ldl_marker_only, c_marker). % LDL is only a correlate, not a cause
 
-%% [mech] The mechanism objection, CHAINED: rigid_mantle first yields the claim
-%%        "no adequate mechanism", which (with drift) bites the mobilist position:
-%%          no_mechanism <- rigid_mantle                       (6)
-%%          c_drift      <- drift, no_mechanism                (⊗=+ 1+6 = 7)
-%%        Modelling choice: the objection is directed AT the act of endorsing drift
-%%        (drift is a premise), so drift's own contrary depends on drift -- a "reject
-%%        BOTH" answer is not stable (drift, left out, would be unattacked and forced
-%%        back in), eliminating the trivial cost-0 skeptical extension while keeping the
-%%        objection a genuine, payable cost.
-head(r_nomech, no_mechanism). body(r_nomech, rigid_mantle).
-head(r_mech, c_drift). body(r_mech, drift; r_mech, no_mechanism).
+%% -- observations: UNWEIGHTED support assumptions (the trial / genetic datasets) --
+assumption(ctt_rct).    contrary(ctt_rct, x_ctt).      % statin RCT meta-analysis (CTT Collaboration)
+assumption(mr_genetic). contrary(mr_genetic, x_mr).    % Mendelian-randomization / genetic datasets
+assumption(pcsk9_rct).  contrary(pcsk9_rct, x_pcsk9).  % PCSK9-inhibitor RCTs (FOURIER)
+assumption(res_risk).   contrary(res_risk, x_res).     % residual-risk / inflammation dataset (CANTOS)
 
-%% [mx]   Rival attack: holding fixism is itself an argument against drift.
-%%        c_drift <- fixism    (strength = 1).  Lets the fixist holdout defeat
-%%        drift (cheaply) when fixism is accepted; combined with [mech] by (+)=max,
-%%        so in the mobilist world c_drift's strength is max(7,-) = 7.
-head(r_mx, c_drift).  body(r_mx, fixism).
+%% -- WEIGHTED ARGUMENTS (meta-analytic effect strength) --
+weight(arg_ctt, 8).    % ~22% fewer major vascular events per 1 mmol/L LDL drop, 170k patients (CTT 2010)
+head(d_ctt, arg_ctt). body(d_ctt, ctt_rct).
+weight(arg_mr, 11).    % lifelong genetically-lower LDL -> proportionally lower ASCVD (strongest CAUSAL evidence)
+head(d_mr, arg_mr). body(d_mr, mr_genetic).
+weight(arg_pcsk9, 6).  % further LDL-lowering on top of statins -> further event reduction (Sabatine 2017)
+head(d_pcsk9, arg_pcsk9). body(d_pcsk9, pcsk9_rct).
 
-%% ----------------------------------------------------------------------------
-%% RESULTING STABLE EXTENSIONS (verified by enumeration):
-%%   {drift in,  fixism out}  discard c_drift@7   cost  7   <-- CONSENSUS (plate tectonics)
-%%   {fixism in, drift  out}  discard c_fixism@19 cost 19   <-- fixist holdout
-%%   {drift in,  fixism in }  discard both         cost 26
-%%   ("reject both" is NOT stable -> no cost-0 degeneracy)
-%% beta sweep:  beta<7 UNSAT;  7<=beta<19 consensus is UNIQUE;
-%%              beta=19 fixist holdout first appears;  min-cost accepted = consensus (7).
-%% ----------------------------------------------------------------------------
+%% refute the rival: the three lines ACCUMULATE (arctic otimes=+ : 8+11+6 = 25)
+head(rref, c_marker). body(rref, arg_ctt). body(rref, arg_mr). body(rref, arg_pcsk9).
+
+%% residual SELF-ACTIVATED objection (weight 5 < 25): residual cardiovascular risk -- ~70-80% of
+%% events still occur despite LDL-lowering, motivating the inflammation hypothesis (Ridker et al. 2017).
+weight(arg_resid, 5).  head(d_resid, arg_resid). body(d_resid, res_risk).
+head(robj, c_ldl). body(robj, ldl_causal). body(robj, arg_resid).  % active only when the causal theory is IN
+head(rmx, c_ldl). body(rmx, ldl_marker_only).
+
+budget(beta).
 `;
 
 export const examples = {
@@ -633,123 +303,56 @@ export const examples = {
             beta: 8
         }
     },
-    probabilistic: {
-        label: 'Weights as Probabilities',
-        description: 'Tropical / min-plus: surprisal encoding (w = -1000·ln p), so β acts as a probability threshold. At β=800 the improbable "slippery" objection (p≈0.45, surprisal 798) can be overridden — two stances at cost 0 and 798.',
-        section: 'curated',
-        source: 'module',
-        moduleKey: 'probabilistic',
-        preset: {
-            semiringFamily: 'tropical',
-            polarity: 'lower',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 800
-        }
-    },
-    big_bang_steady_state: {
-        label: 'Big Bang vs Steady-State',
-        description: 'A real cosmology debate as evidential consilience (Arctic / max-plus): a weight counts independent converging evidence lines and ⊗=+ sums them. Five observations (the CMB, its blackbody spectrum, primordial helium-4 & deuterium, evolving radio-source counts) jointly refute Steady-State with weight 5. Accepted at cost 0: Big Bang — today\'s settled consensus; a Steady-State holdout is admissible only at β=5, the cost of dismissing all five lines. (Tropical-higher = arctic, sum + ub, β=5.)',
+    kpg_impact_vs_deccan: {
+        label: 'K-Pg extinction: impact vs volcanism',
+        description: "A real Earth-science controversy as a theory competition. The Chicxulub asteroid impact (Alvarez et al. 1980) and Deccan Traps volcanism are the two competing triggers of the end-Cretaceous (K-Pg) mass extinction, 66 Ma. Each theory is one assumption; the physical evidence enters as WEIGHTED ARGUMENT atoms whose weights encode the strength of each impact signature (Arctic ⊗=+ accumulates independent lines, so the case against a Deccan-only cause sums to 22): the global iridium anomaly (~30× crustal background; 9), shock-metamorphosed quartz that volcanism cannot produce (7), and the worldwide ejecta layer plus the 180-km Chicxulub crater dated to the boundary (6). Crucially the accepted impact theory does NOT win for free: it must discard a real, still-live objection — the extinction-selectivity / gradual-decline pattern that keeps a Deccan contribution on the table (weight 8; Hull et al. 2020) — so it is resolved at COST 8, below the Deccan holdout's cost 22. This matches the consensus (Schulte et al. 2010, 41-author review): impact primary, volcanism a tolerated contributing factor. β=22 enumerates both extensions.",
         section: 'curated',
         source: 'inline',
-        code: BIG_BANG_STEADY_STATE,
+        code: KPG_IMPACT,
         preset: {
-            semiringFamily: 'tropical',
-            polarity: 'higher',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 5,
-            graphMode: "assumption-branching"
+            semiringFamily: 'tropical', polarity: 'higher',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 22, graphMode: "assumption-branching"
         }
     },
-    smoking_lung_cancer: {
-        label: 'Smoking causes lung cancer',
-        description: "A settled debate as Bradford-Hill CONSILIENCE (Arctic / max-plus): each of eight independent causal criteria is an evidence assumption and ⊗=+ sums them, so the case refuting R.A. Fisher's confounding (\"constitutional\") hypothesis has weight 54. Accepted at cost 0: smoking causes lung cancer (consensus); Fisher's holdout is admissible only at β=54 — the cost of dismissing the entire Bradford-Hill case. (Tropical-higher = arctic, sum + ub, β=54.)",
+    higgs_boson_discovery: {
+        label: 'Higgs boson: 5σ discovery vs the null',
+        description: "The July 2012 Higgs-boson discovery as a statistical argument, showing weights as COMBINED SIGNIFICANCE / p-values under the Tropical semiring (⊗=+ adds surprisal, Fisher-style; ⊕=min keeps the least-surprising proof). The competing hypotheses are 'a new ~125 GeV boson exists' vs the 'background-fluctuation null'. Each experiment's local significance is a weighted argument in units of σ×10: ATLAS 5.9σ → 59 (arXiv:1207.7214) and CMS 5.0σ → 50 (arXiv:1207.7235); combined they give 59+50 = 109 units of surprisal against the null — far past the 5σ discovery threshold, so the null is defeated. The Higgs claim is nonetheless resolved at NON-ZERO cost 8: it must discard the look-elsewhere / trials-factor caveat every local 5σ carries (the global significance is lower, and in 2012 it was not yet confirmed to be THE Standard-Model Higgs). β=109 enumerates both the accepted discovery (cost 8) and the fluctuation holdout (cost 109 = the full surprisal a denier must wave away).",
         section: 'curated',
         source: 'inline',
-        code: SMOKING_LUNG_CANCER,
+        code: HIGGS_DISCOVERY,
         preset: {
-            semiringFamily: 'tropical',
-            polarity: 'higher',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 54,
-            graphMode: "assumption-branching"
+            semiringFamily: 'tropical', polarity: 'lower',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 109, graphMode: "assumption-branching"
         }
     },
-    solar_neutrino: {
-        label: 'Solar neutrino problem',
-        description: "The solar-neutrino deficit as combined statistical significance (Tropical / min-plus): the measured electron-neutrino flux was ~1/3 of the Standard Solar Model. SNO's two channels (electron + total flux) give ⊗=+ additive surprisal (≈5.3σ) refuting \"the SSM is wrong\". Accepted at cost 0: neutrino oscillation / SSM correct (consensus, Nobel 2015); the SSM-error holdout survives only at β=53 (dismissing the SNO result). (Tropical-lower = tropical, sum + ub, β=53.)",
+    out_of_africa: {
+        label: 'Human origins: Out-of-Africa vs multiregional',
+        description: "Human origins as a genetics-weighted theory competition: recent African origin (a single recent African source for modern humans) vs the older multiregional model (parallel regional evolution with gene flow). Genetic evidence enters as WEIGHTED ARGUMENT atoms (Arctic ⊗=+, evidence strength summing to 37): mitochondrial + Y-chromosome coalescence rooted in Africa (Cann et al. 1987; 12), the serial-founder signal — heterozygosity decaying with distance from Africa (Ramachandran et al. 2005; 15) — and Africa's highest basal genetic diversity (10). The accepted theory pays a genuine COST 8: it must discard the archaic-admixture objection — Neanderthal (~1.5-2%; Green et al. 2010) and Denisovan (~4-6% in Melanesians; Reich et al. 2010) ancestry in non-Africans is a real deviation from strict replacement that partly vindicates the multiregional gene-flow idea. So the modern consensus (recent African origin WITH limited archaic admixture) is the min-cost extension at 8, beating the multiregional holdout at 37. β=37 shows both.",
         section: 'curated',
         source: 'inline',
-        code: SOLAR_NEUTRINO,
+        code: OUT_OF_AFRICA,
         preset: {
-            semiringFamily: 'tropical',
-            polarity: 'lower',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 53,
-            graphMode: "assumption-branching"
+            semiringFamily: 'tropical', polarity: 'higher',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 37, graphMode: "assumption-branching"
         }
     },
-    age_of_earth: {
-        label: 'Age of the Earth: Kelvin vs radiometric',
-        description: "A WEAKEST-LINK debate (Gödel / min): Kelvin's 1862 cooling estimate (20–100 Myr) is a conjunction whose weakest premise — \"no internal heat source\" — was refuted by radioactivity, so under ⊗=min his young-Earth argument is weak (strength 5). Radiometric dating gives ~4.54 Gyr. Accepted at cost 0: old Earth (consensus); the young-Earth holdout appears only at β=80 (waiving the strongest radiometric evidence). (Gödel + sum + ub, β=80.)",
+    lipid_hypothesis: {
+        label: 'Lipid hypothesis: LDL causal vs marker-only',
+        description: "The lipid hypothesis — that LDL cholesterol CAUSALLY drives atherosclerotic cardiovascular disease (ASCVD) — versus the older 'LDL is only a marker, not a cause' position, weighted by META-ANALYTIC effect sizes (Arctic ⊗=+, summing to 25). Three argument atoms: the Cholesterol Treatment Trialists' statin meta-analysis (~22% fewer major vascular events per 1 mmol/L LDL reduction, 170,000 patients; CTT 2010; weight 8), Mendelian randomization — lifelong genetically-lower LDL → proportionally lower ASCVD, the strongest CAUSAL evidence (11) — and PCSK9-inhibitor RCTs adding event reduction on top of statins (FOURIER, Sabatine et al. 2017; 6). The causal theory is accepted at NON-ZERO cost 5: it must discard the residual-risk objection — ~70-80% of events still occur despite LDL-lowering, motivating the inflammation hypothesis (CANTOS; Ridker et al. 2017). Consensus (Ference et al. 2017, EAS): LDL is causal, residual risk acknowledged — the min-cost extension at 5, beating the marker-only holdout at 25. β=25 shows both.",
         section: 'curated',
         source: 'inline',
-        code: AGE_OF_EARTH,
+        code: LIPID_HYPOTHESIS,
         preset: {
-            semiringFamily: 'godel',
-            polarity: 'higher',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 80,
-            graphMode: "assumption-branching"
-        }
-    },
-    plate_tectonics: {
-        label: 'Plate tectonics vs fixism',
-        description: "Continental drift as consilience with a TOLERATED objection (Arctic / max-plus): Wegener's converging lines (fossils, rock belts, glacial tillites, paleomagnetism, sea-floor stripes) vs the fixists' \"no adequate mechanism\". Unlike the other debates the accepted plate-tectonics extension pays a NONZERO cost 7 — it discards the mechanism objection, just as history tolerated it before the mechanism was found — yet still wins as the min-cost position (the fixist holdout costs 19). (Tropical-higher = arctic, sum + ub, β=19.)",
-        section: 'curated',
-        source: 'inline',
-        code: PLATE_TECTONICS,
-        preset: {
-            semiringFamily: 'tropical',
-            polarity: 'higher',
-            defaultPolicy: 'legacy',
-            monoid: 'sum',
-            optimization: 'minimize',
-            budgetMode: 'ub',
-            budgetIntent: 'bounded',
-            semantics: 'stable',
-            optMode: 'ignore',
-            beta: 19,
-            graphMode: "assumption-branching"
+            semiringFamily: 'tropical', polarity: 'higher',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 25, graphMode: "assumption-branching"
         }
     },
 };

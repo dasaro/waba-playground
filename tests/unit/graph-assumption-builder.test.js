@@ -128,6 +128,19 @@ test('attack edges carry contrary + targetAssumption for extension-highlight mat
     assert.equal(edge.targetAssumption, 'climate');
 });
 
+test('a weighted intermediate argument shows its weight on the derived node label', () => {
+    // theory competition: arg (weighted) derives the rival's contrary.
+    const g = buildBranchingAssumptionGraph(['t_acc', 't_riv', 'obs'],
+        [{ assumption: 't_acc', contrary: 'c_acc' }, { assumption: 't_riv', contrary: 'c_riv' }, { assumption: 'obs', contrary: 'x' }],
+        [{ id: 'd1', head: 'arg', body: ['obs'] }, { id: 'r1', head: 'c_riv', body: ['arg'] }],
+        { arg: 12 });
+    const argNode = g.visNodes.find((n) => n.isDerived && n.atom === 'arg');
+    assert.ok(argNode, 'the weighted argument must be a derived node');
+    assert.match(argNode.label, /w:\s*12/, 'a weighted argument shows its weight on the label');
+    const claimNode = g.visNodes.find((n) => n.isDerived && n.atom === 'c_riv');
+    assert.equal(claimNode.label, 'c_riv', 'a purely-propagated (unweighted) claim shows no weight');
+});
+
 test('an unattacked assumption (underivable contrary) stays isolated', () => {
     // contrary(a, ca) but ca has no deriving rule and is not an assumption.
     const g = buildBranchingAssumptionGraph(['a'], [{ assumption: 'a', contrary: 'ca' }], [], {});

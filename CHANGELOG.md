@@ -30,6 +30,28 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-2
+
+- **Replaced the scientific examples with literature theory-competitions that resolve at NON-ZERO
+  cost.** Removed `big_bang_steady_state`, `smoking_lung_cancer`, `solar_neutrino`, `age_of_earth`,
+  `plate_tectonics` (all resolved at cost 0, and their chain intermediates were unweighted) and the
+  `probabilistic` demo. Added four new curated examples, each clingo-verified against five criteria:
+  resolved at non-zero cost (no cost-0 extension), some rule bodies are non-assumptions, some rule
+  heads are non-contraries, every non-assumption/non-contrary atom is weighted, and ≥2 stable models.
+  Competing theories map 1:1 to assumptions; evidence enters as **weighted argument atoms** whose
+  weights encode real quantities and accumulate along chains into the rival's refutation. The accepted
+  (consensus) theory wins the min-cost extension only after discarding a genuine tolerated objection:
+  - `kpg_impact_vs_deccan` (Arctic) — Chicxulub impact vs Deccan volcanism; iridium 9 + shocked quartz
+    7 + ejecta/crater 6 = 22 vs Deccan; impact accepted @8 (extinction-selectivity objection). β=22.
+  - `higgs_boson_discovery` (Tropical) — 5σ discovery vs the null; ATLAS 59 + CMS 50 = 109 surprisal;
+    Higgs accepted @8 (look-elsewhere / trials-factor caveat). β=109. The σ/p-value example.
+  - `out_of_africa` (Arctic) — recent African origin vs multiregional; coalescence 12 + serial-founder
+    15 + diversity 10 = 37; OoA accepted @8 (Neanderthal/Denisovan admixture objection). β=37.
+  - `lipid_hypothesis` (Arctic) — LDL causal vs marker-only; CTT 8 + Mendelian-randomization 11 +
+    PCSK9 6 = 25; causal-LDL accepted @5 (residual-risk objection). β=25. Meta-analytic effect sizes.
+  Each carries a detailed, reference-bearing description. The three algebra demos are unchanged.
+- Weighted argument atoms now display their weight on the Assumption-Branching graph node label.
+
 ## 20260706-1
 
 - **Scientific-debate examples now use DERIVATION CHAINS** (no evidence assumption attacks a

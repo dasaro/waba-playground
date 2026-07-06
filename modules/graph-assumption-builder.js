@@ -1,10 +1,10 @@
-import { GraphUtils } from './graph-utils.js?v=20260706-1';
+import { GraphUtils } from './graph-utils.js?v=20260706-2';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
     buildJunctionTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260706-1';
+} from './graph-tooltip-builder.js?v=20260706-2';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
@@ -474,7 +474,10 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
             const w = explicitWeight(weights, atom);
             visNodes.push({
                 id,
-                label: atom,
+                // Show the explicit weight in the label when the intermediate carries one
+                // (a weighted argument atom); leave a purely-propagated claim unlabelled
+                // (its weight is semiring-dependent — the Results panel has it).
+                label: (w === null || w === undefined) ? atom : `${atom}\n(w: ${w})`,
                 shape: 'box',
                 size: 18,
                 color: derivedNodeColor(),
