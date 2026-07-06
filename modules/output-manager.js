@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260706-4';
-import { MetricsManager } from './metrics-manager.js?v=20260706-4';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260706-4';
-import { ParserUtils } from './parser-utils.js?v=20260706-4';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260706-4';
+import { PopupManager } from './popup-manager.js?v=20260706-5';
+import { MetricsManager } from './metrics-manager.js?v=20260706-5';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260706-5';
+import { ParserUtils } from './parser-utils.js?v=20260706-5';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260706-5';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -130,6 +130,25 @@ export class OutputManager {
                 this.log('Try adjusting the budget or framework constraints', 'info');
             }
         } else {
+            // Advisory: the core flags an explicit weight placed on a DERIVED atom whose
+            // semiring-propagated value ended up different — i.e. the declared weight did not
+            // take effect. Weights belong on the leaves; surface it so the modeller can move it.
+            const dominated = new Map();
+            for (const witness of witnesses) {
+                for (const atom of (witness.Value || [])) {
+                    const m = /^weight_on_derived_dominated\(([^,]+),\s*([^,]+),\s*([^)]+)\)$/.exec(atom);
+                    if (m) {
+                        dominated.set(m[1], { declared: m[2].trim(), effective: m[3].trim() });
+                    }
+                }
+            }
+            if (dominated.size > 0) {
+                const list = [...dominated.entries()]
+                    .map(([x, w]) => `${x} (declared ${w.declared} → resolves to ${w.effective})`).join(', ');
+                this.log(`⚠️ Explicit weight on a derived atom had no effect: ${list}.`, 'warning');
+                this.log('In WABA weights belong on the leaves (assumptions / facts); a weight on a derived atom is combined with its derivation via the semiring and can be dominated. Move the weight to a leaf — e.g. a weighted fact — or let it propagate. See README, "Where weights live".', 'info');
+            }
+
             const witnessesWithCosts = witnesses.map((witness) => {
                 const predicates = witness.Value || [];
                 const parsed = this.parseAnswerSet(predicates);

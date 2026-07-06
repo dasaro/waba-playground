@@ -30,6 +30,16 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-5
+
+- **Advisory warning when an explicit weight on a derived atom is dominated.** Synced the WABA core's
+  new `weight_on_derived_dominated/3` diagnostic into the bundle (both filters now `#show` it), and the
+  Results panel now surfaces it: *"Explicit weight on a derived atom had no effect: X (declared D →
+  resolves to E)"* with a note that weights belong on the leaves. This catches the silent domination in
+  Gödel/Bottleneck/Łukasiewicz (an explicit weight on a rule head is combined with its derivation via ⊕
+  and driven to the ⊗-identity), which the modeller previously could only discover by inspecting
+  `supported_with_weight`. Advisory only — never changes a result. Empty for every shipped example.
+
 ## 20260706-4
 
 - **New curated example `testimony_erosion` (Łukasiewicz / bounded-sum) — the erosion algebra.** An
