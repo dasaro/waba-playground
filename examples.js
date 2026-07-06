@@ -13,6 +13,13 @@
 //        higgs_boson_discovery : 5-sigma discovery vs background-fluctuation (Tropical, @8 / @109)
 //        out_of_africa         : recent African origin vs multiregional     (Arctic,   @8 / @37)
 //        lipid_hypothesis      : LDL causal vs LDL-is-only-a-marker         (Arctic,   @5 / @25)
+//  (3) COST/WEAKNESS reasoning: weights read as a COST or WEAKNESS (not a strength) -- the natural home
+//      of the cost-polarity semirings: Tropical (otimes=+ ; cost/improbability/risk ACCUMULATES) and
+//      Bottleneck (otimes=max ; cost = the single WORST component / weakest link). Same nonzero-cost,
+//      weighted-argument, multi-model contract as (2), from non-scientific domains:
+//        detective_locked_house : butler vs intruder -- improbability of coincidences (Tropical,   @5 / @27)
+//        weakest_link_security  : layered vs single barrier -- worst vulnerability   (Bottleneck, @3 / @9)
+//        deorbit_plan_risk      : redundant vs single-string -- accumulated risk     (Tropical,   @5 / @28)
 
 const CONFLICT_CYCLE = `%% THREE-WAY STANDOFF -- the inconsistency budget at work (Gödel / weakest link).
 %%
@@ -245,6 +252,77 @@ head(rmx, c_ldl). body(rmx, ldl_marker_only).
 budget(beta).
 `;
 
+const DETECTIVE_LOCKED_HOUSE = `%% THE LOCKED-HOUSE MURDER: the butler (insider) vs a phantom intruder.
+%% Tropical semiring (otimes=+, oplus=min) -- cost = IMPROBABILITY (surprisal) that ACCUMULATES.
+%% The case against a theory = the SUM of the improbable coincidences it must treat as mere chance.
+%% The insider theory wins at NON-ZERO cost 5 (one residual loose end) vs the intruder's 27.
+
+assumption(insider).       contrary(insider,  c_insider).    % the butler (had a key + the alarm code) did it
+assumption(intruder).      contrary(intruder, c_intruder).   % an outside stranger broke in and framed the butler
+%% observations (unweighted support assumptions):
+assumption(obs_noforce).   contrary(obs_noforce,  x_noforce).    % no forced entry
+assumption(obs_codeused).  contrary(obs_codeused, x_codeused).   % the alarm was disarmed with the valid code
+assumption(obs_nodna).     contrary(obs_nodna,    x_nodna).      % no stranger DNA at the scene
+assumption(obs_footprint). contrary(obs_footprint,x_footprint).  % a smudged partial footprint of unknown shoe
+
+%% WEIGHTED ARGUMENTS = the surprisal (improbability) each observation forces the INTRUDER theory to swallow:
+weight(surprisal_noforce, 9).  head(d1, surprisal_noforce). body(d1, obs_noforce).   % a stranger leaving no forced-entry trace
+weight(surprisal_code,   11).  head(d2, surprisal_code).    body(d2, obs_codeused).  % a stranger knowing the private code
+weight(surprisal_nodna,   7).  head(d3, surprisal_nodna).   body(d3, obs_nodna).     % a violent stranger shedding zero DNA
+%% refute the rival: the coincidences ACCUMULATE (tropical otimes=+ : 9+11+7 = 27)
+head(rref, c_intruder). body(rref, surprisal_noforce). body(rref, surprisal_code). body(rref, surprisal_nodna).
+
+%% residual doubt against the accepted insider theory (self-activated): the one unexplained footprint
+weight(doubt_footprint, 5). head(dobj, doubt_footprint). body(dobj, insider). body(dobj, obs_footprint).
+head(robj, c_insider). body(robj, doubt_footprint).
+head(rmx, c_insider). body(rmx, intruder).   % adopting the rival also indicts the insider theory
+budget(beta).
+`;
+
+const WEAKEST_LINK_SECURITY = `%% WEAKEST-LINK SECURITY: layered defence-in-depth (accepted) vs a single-barrier perimeter (rival).
+%% Bottleneck-cost semiring (otimes=max, oplus=min) -- cost = the WORST component. A system is only as
+%% strong as its WEAKEST LINK, so a design's exposure is its single worst vulnerability, NEVER a sum.
+%% The layered design wins at NON-ZERO cost 3 (a residual insider risk) vs the single barrier's 9.
+
+assumption(layered_defense). weight(layered_defense, 1). contrary(layered_defense, c_layered).
+assumption(single_barrier).  weight(single_barrier, 1).  contrary(single_barrier, c_single).
+%% single_barrier component vulnerabilities (WEIGHTED FACTS; higher severity = weaker point):
+weight(vuln_service_entrance, 9). head(vs1, vuln_service_entrance).  % an unguarded service entrance
+weight(vuln_default_password, 6). head(vs2, vuln_default_password).  % a default admin password
+%% c_single = the design's WORST vulnerability (bottleneck otimes=max : max(9,6)=9)
+head(rs, c_single). body(rs, vuln_service_entrance). body(rs, vuln_default_password).
+%% layered_defense residual worst link (weighted fact):
+weight(vuln_insider_risk, 3). head(vl1, vuln_insider_risk).          % a residual insider risk
+head(rl, c_layered). body(rl, layered_defense). body(rl, vuln_insider_risk).  % self-activated : max(1,3)=3
+head(rmx, c_layered). body(rmx, single_barrier).                     % the rival design also attacks the accepted
+budget(beta).
+`;
+
+const DEORBIT_PLAN_RISK = `%% SPACECRAFT DEORBIT PLAN: a certified redundant plan (accepted) vs a single-string minimal plan (rival).
+%% Tropical semiring (otimes=+, oplus=min) -- cost = FAILURE RISK that ACCUMULATES across steps.
+%% The case against a plan = the SUM of the failure risks it must tolerate. The redundant plan wins at
+%% NON-ZERO cost 5 (a residual sensor-crosscheck risk) vs the single-string plan's 28.
+
+assumption(redundant).     contrary(redundant, c_redundant).       % the certified redundant-thruster plan
+assumption(single_string). contrary(single_string, c_single).      % the single-string minimal plan
+%% observations (unweighted support assumptions):
+assumption(telemetry).     contrary(telemetry, x_telemetry).       % telemetry stream is nominal
+assumption(burn_window).   contrary(burn_window, x_burn).          % the deorbit burn window is open
+
+%% WEIGHTED ARGUMENTS = per-failure-mode risk the single-string plan must tolerate (milli-units):
+weight(risk_valve_leak, 12).    head(dv, risk_valve_leak).     body(dv, telemetry).    % valve leak, unredundant propellant path
+weight(risk_attitude_drift, 9). head(da, risk_attitude_drift). body(da, telemetry).    % attitude drift, no backup star-tracker
+weight(risk_comms_blackout, 7). head(dc, risk_comms_blackout). body(dc, burn_window).  % comms blackout on a single downlink
+%% refute the rival: the failure risks ACCUMULATE (tropical otimes=+ : 12+9+7 = 28)
+head(rref, c_single). body(rref, risk_valve_leak). body(rref, risk_attitude_drift). body(rref, risk_comms_blackout).
+
+%% residual risk against the accepted redundant plan (self-activated): a sensor cross-check can miss a fault
+weight(risk_sensor_crosscheck, 5). head(dobj, risk_sensor_crosscheck). body(dobj, redundant). body(dobj, burn_window).
+head(robj, c_redundant). body(robj, risk_sensor_crosscheck).
+head(rmx, c_redundant). body(rmx, single_string).
+budget(beta).
+`;
+
 export const examples = {
     conflict_cycle: {
         label: 'Three-Way Standoff',
@@ -353,6 +431,45 @@ export const examples = {
             defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 25, graphMode: "assumption-branching"
+        }
+    },
+    detective_locked_house: {
+        label: 'Locked-house murder: butler vs intruder',
+        description: "A murder-mystery as a WABA theory competition, showing weights as IMPROBABILITY (surprisal) under the Tropical semiring (otimes=+ sums independent surprisals, Fisher-style; oplus=min keeps the least-improbable overall account). Two theories explain a killing in a locked house: the butler did it (insider, accepted) or an outside stranger framed him (intruder, rival). Each weight is the improbability the LOSING theory must swallow to dismiss a clue as coincidence. Because independent surprisals add, the case against the intruder theory is the SUM of the coincidences it stacks: a stranger leaving no forced-entry trace (9), knowing the private alarm code (11), and shedding zero DNA at a violent scene (7) -- totalling 27. The insider theory explains all three at once, yet is not free: it carries one unexplained loose end, a smudged partial footprint (5). So it wins at cost 5, not 0 -- a real residual doubt, far below the rival's 27. Lower total surprisal = fewer improbable coincidences = the more parsimonious account -- exactly how a detective ranks explanations (inference to the best explanation / Occam). beta=27 enumerates both the accepted account (cost 5) and the intruder holdout (cost 27).",
+        section: 'curated',
+        source: 'inline',
+        code: DETECTIVE_LOCKED_HOUSE,
+        preset: {
+            semiringFamily: 'tropical', polarity: 'lower',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 27, graphMode: "assumption-branching"
+        }
+    },
+    weakest_link_security: {
+        label: 'Weakest link: defence-in-depth vs single barrier',
+        description: "A security-architecture decision as a WABA theory competition, showing weights as VULNERABILITY (cost/weakness) under the Bottleneck-cost semiring (otimes=max, oplus=min). Two designs compete: layered defence-in-depth (accepted) and a single-barrier perimeter (rival). A weight is the severity of one vulnerability, and -- crucially -- a chain is only as strong as its weakest link, so otimes=max makes a design's exposure equal to its WORST component, never a sum a real attacker could exploit one flaw at a time. The single-barrier design exposes an unguarded service entrance (severity 9) and a default admin password (6); its worst-case exposure is max(9,6)=9. The layered design forces an attacker through many controls, leaving only one residual weak link, insider risk (3), so its exposure is max(1,3)=3. The layered design wins at the NON-ZERO cost 3 rather than 0 -- no architecture is perfectly airtight -- yet is decisively safer than the rival's 9. Bottleneck is exactly right here: security is governed by the single worst breach point, so aggregation must take the maximum, not add severities. beta=9 enumerates both designs.",
+        section: 'curated',
+        source: 'inline',
+        code: WEAKEST_LINK_SECURITY,
+        preset: {
+            semiringFamily: 'godel', polarity: 'lower',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 9, graphMode: "assumption-branching"
+        }
+    },
+    deorbit_plan_risk: {
+        label: 'Deorbit plan: redundant vs single-string (risk)',
+        description: "A reliability-engineering decision as a WABA theory competition, showing weights as accumulated FAILURE RISK under the Tropical semiring (otimes=+ sums independent risks; oplus=min keeps the safest plan). A spacecraft must deorbit via one of two plans: a certified redundant-thruster plan (accepted) or a single-string minimal plan (rival). Each weight is a per-failure-mode risk (milli-units). The case against the single-string plan ACCUMULATES the risks of every failure mode it must tolerate -- a valve leak in an unredundant propellant path (12), uncorrected attitude drift with no backup star-tracker (9), and a comms blackout on a single downlink (7) -- totalling 28. The redundant plan wins, but NOT for free: it still carries a residual risk (its sensor cross-check can miss a fault, 5), so it is accepted at cost 5, not 0 -- a real residual exposure, far below the rival's 28. Tropical is the right algebra because independent failure risks add (a plan is only as safe as the sum of its exposures) and oplus=min selects the minimum-risk plan. beta=28 enumerates both the redundant plan (cost 5) and the single-string holdout (cost 28).",
+        section: 'curated',
+        source: 'inline',
+        code: DEORBIT_PLAN_RISK,
+        preset: {
+            semiringFamily: 'tropical', polarity: 'lower',
+            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
+            optMode: 'ignore', beta: 28, graphMode: "assumption-branching"
         }
     },
 };

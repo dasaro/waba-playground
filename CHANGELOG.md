@@ -30,6 +30,28 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260706-3
+
+- **Three new curated examples where weights read as a COST or WEAKNESS** (not a strength) — the natural
+  home of the cost-polarity semirings, from non-scientific domains. Each is clingo-verified against the
+  same five criteria (non-zero cost / non-assumption bodies / non-contrary heads / weighted intermediate
+  atoms / ≥2 models) and shows the accepted position winning the min-cost extension after discarding a real
+  residual objection:
+  - `detective_locked_house` (**Tropical**, crime) — a locked-house murder: the improbability the intruder
+    theory must treat as coincidence *accumulates* (⊗=+): 9+11+7 = 27; the butler theory accepted @5 (one
+    unexplained footprint). β=27. Weight = surprisal / Occam.
+  - `weakest_link_security` (**Bottleneck-cost**, security) — defence-in-depth vs a single barrier: a design's
+    exposure is its *worst* vulnerability (⊗=max), max(9,6)=9 vs max(1,3)=3; layered accepted @3. β=9.
+    Weight = vulnerability severity / weakest link.
+  - `deorbit_plan_risk` (**Tropical**, aerospace) — redundant vs single-string deorbit: failure risk
+    *accumulates* (⊗=+): 12+9+7 = 28; redundant plan accepted @5 (residual sensor-crosscheck risk). β=28.
+  - Semiring mechanics established + memorialised: bottleneck/Gödel/Łukasiewicz *destroy* a weighted
+    intermediate derived from unweighted supports (the ⊕-combine drags it to the annihilator), so bottleneck
+    weighted atoms are weighted **facts**; tropical self-activation must route the objection through a chain.
+  Design pattern found via a brainstorm+adversarial-vet workflow; every framework independently re-verified
+  in clingo (two workflow candidates were rejected as unnatural; the selected UFO/Occam draft had a cost-0
+  bug and was dropped).
+
 ## 20260706-2
 
 - **Replaced the scientific examples with literature theory-competitions that resolve at NON-ZERO

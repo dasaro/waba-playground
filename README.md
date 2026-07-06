@@ -140,7 +140,21 @@ chains into the rival's refutation. Competing theories map 1:1 to assumptions; e
   25; causal-LDL is accepted at **cost 5** — discarding the residual-risk objection (~70-80% of
   events remain despite LDL-lowering; CANTOS) (arctic + sum + ub, β=25).
 
-These five debate examples open in the **Assumption-Branching** graph view (the Standard
+**Cost/weakness reasoning** — the same non-zero-cost, weighted-argument contract, but the weights read
+as a **cost or weakness** (not a strength), the natural home of the cost-polarity semirings:
+
+- `detective_locked_house` — **Locked-house murder: butler vs intruder** (**Tropical** / surprisal):
+  the improbability each clue forces the intruder theory to treat as coincidence *accumulates* (⊗=+):
+  no forced entry (9) + knowing the alarm code (11) + zero DNA (7) = 27; the insider theory is accepted
+  at **cost 5** — one unexplained footprint (Occam / inference to the best explanation) (β=27).
+- `weakest_link_security` — **Weakest link: defence-in-depth vs single barrier** (**Bottleneck-cost**):
+  a system is only as strong as its weakest link, so a design's exposure is its *worst* component (⊗=max),
+  never a sum — the single barrier's max(9,6)=9 vs the layered design's max(1,3)=**3**, accepted (β=9).
+- `deorbit_plan_risk` — **Deorbit plan: redundant vs single-string** (**Tropical** / risk): a plan's
+  failure risk *accumulates* across steps (⊗=+) — valve leak (12) + attitude drift (9) + comms blackout
+  (7) = 28; the redundant plan is accepted at **cost 5** (a residual sensor-crosscheck risk) (β=28).
+
+The debate and cost/weakness examples open in the **Assumption-Branching** graph view (the Standard
 set-graph is the 2ⁿ power set of assumptions, guarded off above ~8 assumptions).
 
 Earlier examples whose weights/budget did not affect the result (classical
