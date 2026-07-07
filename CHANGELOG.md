@@ -30,6 +30,22 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260707-3
+
+- **GUI polish: four fixes.**
+  - **Advanced (ASP) editor spans its container.** The `<textarea>` had no width, so it fell back to its
+    intrinsic `cols` width (~narrow column); added `width: 100%; box-sizing: border-box`.
+  - **Blocks no longer overflow / resize on load.** A long line (e.g. a rule) forced a `1fr` grid track
+    past its share and pushed the other panel off-screen. Added `min-width: 0` to the panel/config/simple
+    grid items (and `width: 100%` on the textareas) so columns stay proportional regardless of content.
+  - **Syntax-hint boxes no longer cover the field while typing.** The `.comment-hint` and `.config-note`
+    tooltips triggered on `:focus-within` (and full-field hover), so they stayed open over the content
+    while typing. They now appear only when the label's "?" affordance is hovered.
+  - **Graph hover tooltips render as HTML again.** vis.js escapes a string `title` (so the raw
+    `<div class="graph-hover-panel">…` markup showed through); the tooltip builders' HTML is now parsed to
+    a DOM element at the vis boundary. The post-run "State: Active/Discarded/Inactive" row is preserved
+    (the base HTML string is kept on the edge and restyled, then rendered), and reset restores cleanly.
+
 ## 20260707-2
 
 - **Fix: curated-example descriptions now actually display.** Each example in `examples.js` carries a

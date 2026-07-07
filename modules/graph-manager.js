@@ -2,12 +2,38 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260707-2';
-import { ParserUtils } from './parser-utils.js?v=20260707-2';
-import { UIManager } from './ui-manager.js?v=20260707-2';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260707-2';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260707-2';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260707-2';
+import { GraphUtils } from './graph-utils.js?v=20260707-3';
+import { ParserUtils } from './parser-utils.js?v=20260707-3';
+import { UIManager } from './ui-manager.js?v=20260707-3';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260707-3';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260707-3';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260707-3';
+
+// vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
+// The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
+function htmlToElement(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html).trim();
+    return template.content.firstElementChild || document.createTextNode(String(html));
+}
+
+// Initial add: keep the source HTML string in `titleHtml` (so the highlighter can restyle
+// it as a string) and give vis the rendered element as `title`.
+function withElementTitle(item) {
+    if (item && typeof item.title === 'string' && item.title.trim().startsWith('<')) {
+        return { ...item, titleHtml: item.title, title: htmlToElement(item.title) };
+    }
+    return item;
+}
+
+// Update: an edge/node update may carry a fresh HTML-string `title` (e.g. the highlighter
+// injects a State row); render it to an element for vis without disturbing `titleHtml`.
+function toVisTitle(update) {
+    if (update && typeof update.title === 'string' && update.title.trim().startsWith('<')) {
+        return { ...update, title: htmlToElement(update.title) };
+    }
+    return update;
+}
 
 export class GraphManager {
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
@@ -190,7 +216,7 @@ export class GraphManager {
         if (!this.network) return;
         const { nodeUpdates, edgeUpdates } = buildResetUpdates(this.networkData);
         this.networkData.nodes.update(nodeUpdates);
-        this.networkData.edges.update(edgeUpdates);
+        this.networkData.edges.update(edgeUpdates.map(toVisTitle));
     }
 
     highlightExtension(inAssumptions, discardedAttacks, successfulAttacks) {
@@ -207,7 +233,7 @@ export class GraphManager {
             this.networkData.nodes.update(updates.nodeUpdates);
         }
         if (updates.edgeUpdates.length > 0) {
-            this.networkData.edges.update(updates.edgeUpdates);
+            this.networkData.edges.update(updates.edgeUpdates.map(toVisTitle));
         }
     }
 
@@ -218,8 +244,10 @@ export class GraphManager {
     applyGraphData(visNodes, visEdges, isolatedNodes) {
         this.networkData.nodes.clear();
         this.networkData.edges.clear();
-        this.networkData.nodes.add(visNodes);
-        this.networkData.edges.add(visEdges);
+        // vis.js renders a STRING `title` as escaped text (so the raw "<div …>" markup
+        // showed through). Pass a DOM element instead so the tooltip HTML is rendered.
+        this.networkData.nodes.add((visNodes || []).map((node) => withElementTitle(node)));
+        this.networkData.edges.add((visEdges || []).map((edge) => withElementTitle(edge)));
         this.isolatedNodes = isolatedNodes;
 
         if (!visNodes || visNodes.length === 0) {

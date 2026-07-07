@@ -299,6 +299,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+    /* Grid tracks default to min-content; without this a long line (e.g. a rule) forces
+       the column wider than its 1fr share and pushes the other panel off-screen. */
+    min-width: 0;
 }
 
 /* ===================================
@@ -434,6 +437,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     flex-direction: column;
     gap: var(--space-xs);
     position: relative;
+    min-width: 0;
 }
 
 .switch-toggle {
@@ -541,8 +545,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     transform: rotate(45deg);
 }
 
-.config-item:hover .config-note,
-.config-item:focus-within .config-note {
+/* Config help shows on hovering the item, but NOT on :focus-within — otherwise it stayed
+   open while typing in the field (e.g. the budget β input). */
+.config-item:hover .config-note {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
@@ -739,6 +744,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     resize: vertical;
     height: 400px; /* Fixed height with manual resize capability */
     tab-size: 4;
+    /* Textareas default to their `cols` intrinsic width; make it span the container. */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .simple-textarea {
@@ -753,6 +761,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     resize: vertical;
     height: 180px; /* Reduced height for Simple Mode fields */
     tab-size: 4;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .code-editor:focus,
@@ -780,6 +790,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     flex-direction: column;
     gap: var(--space-xs);
     position: relative;
+    min-width: 0;
 }
 
 .simple-field label {
@@ -826,8 +837,10 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     transform: rotate(45deg);
 }
 
-.simple-field:hover .comment-hint,
-.simple-field:focus-within .comment-hint {
+/* Show the syntax hint only when the label (its "?" affordance) is hovered — NOT while
+   the mouse is over the textarea or the field is focused (typing), which kept the box
+   over the content and hurt readability. */
+.simple-field label:hover ~ .comment-hint {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);

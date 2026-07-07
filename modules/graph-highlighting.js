@@ -79,7 +79,7 @@ export function buildResetUpdates(networkData) {
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
             smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 },
-            title: edge.originalTitle || edge.title
+            title: edge.titleHtml !== undefined ? edge.titleHtml : edge.title
         }))
     };
 }
@@ -140,10 +140,11 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             originalColor: edge.originalColor || edge.color,
             originalWidth: edge.originalWidth || edge.width || 2,
             originalDashes: edge.originalDashes !== undefined ? edge.originalDashes : (edge.dashes || false),
-            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 },
-            originalTitle: edge.originalTitle || edge.title
+            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
         };
-        const baseTitle = preserved.originalTitle;
+        // Immutable base tooltip HTML string kept on the edge by graph-manager's
+        // withElementTitle; restyle THIS (a string) so vis re-renders the tooltip as HTML.
+        const baseTitle = edge.titleHtml !== undefined ? edge.titleHtml : edge.title;
 
         // Derivation (support) edges chain evidence -> intermediate claim -> contrary;
         // they are NOT attacks, so keep them at their original neutral styling instead

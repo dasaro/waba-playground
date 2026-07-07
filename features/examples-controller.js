@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260707-2';
-import { wabaModules } from '../waba-modules.js?v=20260707-2';
+import { examples } from '../examples.js?v=20260707-3';
+import { wabaModules } from '../waba-modules.js?v=20260707-3';
 
 // Curated examples carry their prose in a `description` field. The editor's description
 // bar/box is driven by the "% //" special syntax (see editor/simple-format.js), so bridge
