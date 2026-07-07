@@ -1,16 +1,16 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260706-6';
+import { wabaModules } from '../waba-modules.js?v=20260707-1';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260706-6';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260706-6';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260706-6';
+} from '../runtime/config-service.js?v=20260707-1';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260707-1';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260707-1';
 
 export class ClingoManager {
     constructor(runBtn, introStatus = null) {
@@ -84,7 +84,7 @@ export class ClingoManager {
 
         try {
             const startTime = performance.now();
-            const result = normalized.semantics === 'preferred' || normalized.semantics === 'grounded'
+            const result = ['preferred', 'grounded', 'budgeted-preferred'].includes(normalized.semantics)
                 ? await this.runExactSubsetSemantics(framework, normalized, onLog)
                 : await this.runDirect(framework, normalized);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
@@ -105,18 +105,20 @@ export class ClingoManager {
 
     async runExactSubsetSemantics(framework, config, onLog) {
         const filterKind = config.semantics === 'grounded' ? 'subset_minimal_filter' : 'subset_maximal_filter';
+        // budgeted-preferred is subset-maximal over budgeted-admissible; classical preferred/grounded over complete.
+        const candidateSemantics = config.semantics === 'budgeted-preferred' ? 'budgeted-admissible' : 'complete';
         const targetLabel = config.semantics;
-        onLog(`Enumerating complete candidates for exact ${targetLabel} semantics…`, 'info');
+        onLog(`Enumerating ${candidateSemantics} candidates for exact ${targetLabel} semantics…`, 'info');
 
         const candidateConfig = {
             ...config,
-            semantics: 'complete',
+            semantics: candidateSemantics,
             optMode: 'ignore'
         };
         const candidateProgram = buildProgram(framework, candidateConfig, {
             includeObjective: false
         });
-        const candidateResult = await this.runSolver(candidateProgram, 0, ['--opt-mode=ignore'], config.timeout);
+        const candidateResult = await this.runSolver(candidateProgram, 0, buildSolverArgs(candidateConfig), config.timeout);
         this.assertSolverResult(candidateResult);
 
         const candidateWitnesses = candidateResult.Call?.[0]?.Witnesses || [];

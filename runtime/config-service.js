@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260706-6';
+import { wabaModules } from '../waba-modules.js?v=20260707-1';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -26,6 +26,14 @@ const SEMIRING_POLARITY = {
     // accepts it as a supported semiring.
     lukasiewicz: 'higher'
 };
+
+// wABA budgeted-defence (Dunne Def 6 lift). A STRENGTH notion (bigger weight = stronger
+// objection, costlier to overrule), so it needs a strength semiring; a cost semiring inverts it.
+const BUDGETED_DEFENCE_SEMANTICS = new Set(['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred']);
+const STRENGTH_SEMIRINGS = new Set(['godel', 'arctic', 'lukasiewicz', 'tropical_high']);
+export function isBudgetedDefence(semantics) {
+    return BUDGETED_DEFENCE_SEMANTICS.has(semantics);
+}
 
 export function resolveSemiringModuleKey(semiringFamily, polarity) {
     // A canonical family (godel/tropical) MUST be resolved by polarity FIRST: both
@@ -116,6 +124,10 @@ export function validateConfig(config) {
         return `Unsupported semantics "${config.semantics}" in the supported playground surface.`;
     }
 
+    if (isBudgetedDefence(config.semantics) && config.semiringKey && !STRENGTH_SEMIRINGS.has(config.semiringKey)) {
+        return 'Budgeted-defence semantics need a strength semiring (Gödel / Arctic / Łukasiewicz); a cost semiring inverts the inconsistency budget.';
+    }
+
     if (config.semiringKey && !SEMIRING_POLARITY[config.semiringKey]) {
         return `Unsupported semiring "${config.semiringKey}" in the supported playground surface.`;
     }
@@ -157,6 +169,11 @@ export function validateConfig(config) {
  * @returns {'bounded'|'unbounded'|'no_discard'}
  */
 export function resolveBudgetProfile(config) {
+    // Budgeted-defence uses its OWN sum budget inside the module (no monoid/constraint),
+    // so it rides the no-discard profile (base discards pinned off) with beta passed through.
+    if (isBudgetedDefence(config.semantics)) {
+        return 'no_discard';
+    }
     return config.budgetMode === 'none' || config.abaRecovery ? 'no_discard' : 'bounded';
 }
 

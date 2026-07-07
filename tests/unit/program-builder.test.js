@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeConfig } from '../../runtime/config-service.js';
-import { buildProgram } from '../../runtime/program-builder.js';
+import { normalizeConfig, validateConfig, resolveBudgetProfile } from '../../runtime/config-service.js';
+import { buildProgram, buildSolverArgs } from '../../runtime/program-builder.js';
 
 const FRAMEWORK = 'assumption(a). contrary(a, c_a).';
 
@@ -61,4 +61,41 @@ test('buildProgram routes grounded through complete candidates in the browser su
     // ":- out(X), assumption(X), not attacked_by_undefeated(X)." in the current WABA.
     assert.match(program, /:- out\(X\), assumption\(X\), not attacked_by_undefeated\(X\)\./);
     assert.doesNotMatch(program, /subset_minimal_filter/);
+});
+
+test('budgeted-admissible builds the Dunne module on the no-discard profile with beta and --project', () => {
+    const config = normalizeConfig({
+        semiringFamily: 'godel',
+        polarity: 'higher',
+        defaultPolicy: 'aba',
+        budgetMode: 'none',
+        semantics: 'budgeted-admissible',
+        optMode: 'ignore',
+        beta: 7,
+        filterType: 'projection'
+    });
+    assert.equal(validateConfig(config), null);
+    assert.equal(resolveBudgetProfile(config), 'no_discard');
+    const program = buildProgram(FRAMEWORK, config);
+    assert.match(program, /budget\(7\)\./);
+    assert.match(program, /budgeted_full\./);          // the Dunne module marker
+    assert.doesNotMatch(program, /active_monoid/);     // no monoid in budgeted-defence
+    assert.deepEqual(buildSolverArgs(config), ['--opt-mode=ignore', '--project']);
+});
+
+test('budgeted-complete uses the complete_dunne module', () => {
+    const config = normalizeConfig({
+        semiringFamily: 'godel', polarity: 'higher', defaultPolicy: 'aba',
+        budgetMode: 'none', semantics: 'budgeted-complete', optMode: 'ignore', beta: 5, filterType: 'projection'
+    });
+    const program = buildProgram(FRAMEWORK, config);
+    assert.match(program, /:- out\(Y\), assumption\(Y\), not attacked_reduced\(Y\)\./);
+});
+
+test('budgeted-defence rejects a cost semiring (inverts the inconsistency budget)', () => {
+    const config = normalizeConfig({
+        semiringFamily: 'tropical', polarity: 'lower', defaultPolicy: 'aba',
+        budgetMode: 'none', semantics: 'budgeted-admissible', optMode: 'ignore', beta: 7, filterType: 'projection'
+    });
+    assert.match(validateConfig(config), /strength semiring/);
 });

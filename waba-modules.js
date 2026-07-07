@@ -174,13 +174,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -188,12 +190,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -225,8 +244,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -300,13 +321,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -314,12 +337,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -351,8 +391,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 rule_deriv(P, R, X, W) :-
@@ -413,13 +455,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -427,12 +471,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -464,8 +525,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 rule_deriv(P, R, X, W) :-
@@ -531,13 +594,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -545,12 +610,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -582,8 +664,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 rule_deriv(P, R, X, W) :-
@@ -641,13 +725,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -655,12 +741,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -692,8 +795,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 %% Bounded-sum ⊗ (both phases). #sum drops #sup/#inf, so saturate them first:
@@ -763,13 +868,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -777,12 +884,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -814,8 +938,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -894,13 +1020,15 @@ default_assumption_weight(W) :-
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
 %% ============================================================================
-%% Weight propagation over the selected (in) atoms as one parameterized
-%% computation pweight(Phase, X, W):
-%%   support : weights over the selected (in) atoms -> supported_with_weight/2
+%% Weight propagation as one parameterized computation pweight(Phase, X, W):
+%%   support    : weights over the selected (in) atoms       -> supported_with_weight/2
+%%   undefeated : weights over the NOT-DEFEATED atoms        -> undefeated_weight/2
 %%
-%% (Defense semantics — admissible/complete/grounded/preferred — are CLASSICAL and
-%% weight-blind: they use the not-defeated SET directly, so no weight phase is run
-%% for them. See semantics/admissible.lp.)
+%% The undefeated phase is INERT by default. The CLASSICAL defense semantics
+%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on
+%% only by a BUDGETED defense module (semantics/admissible_budgeted.lp), which declares
+%% \`budgeted_defense\` and defines derived_from_undefeated/1 + triggered_by_undefeated/1;
+%% then attack weights over the undefeated set are available for a budgeted discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -908,12 +1036,29 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% support    : weights over the in-set S           (always on)     -> supported_with_weight/2
+%% undefeated : weights over the not-defeated set    (budgeted_defense) -> undefeated_weight/2
+%% maximal    : weights over ALL assumptions in      (budgeted_full)    -> arg_weight/2
+%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
 phase(support).
+phase(undefeated) :- budgeted_defense.
+phase(maximal)    :- budgeted_full.
 
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 %% "selected" = the assumption is committed in this phase (in).
 phase_selected(support, X)  :- in(X).
+
+%% undefeated phase — gated on budgeted_defense so it adds no grounding otherwise.
+phase_active(undefeated, X)    :- budgeted_defense, derived_from_undefeated(X).
+phase_triggered(undefeated, R) :- budgeted_defense, triggered_by_undefeated(R).
+phase_selected(undefeated, X)  :- budgeted_defense, assumption(X), derived_from_undefeated(X).
+
+%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
+%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+phase_active(maximal, X)    :- budgeted_full, arg(X).
+phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
+phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
@@ -945,8 +1090,10 @@ pweight(P, X, W) :-
     oplus(min), derived_atom(X), phase_active(P, X),
     W = #min{ V,R : rule_deriv(P,R,X,V) ; V : direct_weight(P,X,V) }.
 
-%% ---- expose the support phase under its conventional name --------------------
+%% ---- expose the phases under their conventional names ------------------------
 supported_with_weight(X, W) :- pweight(support, X, W).
+undefeated_weight(X, W)     :- pweight(undefeated, X, W).
+arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 otimes_annihilator(A) :- oplus_identity(A).
@@ -1210,6 +1357,124 @@ attacked_by_undefeated(X) :- contrary(X,Y), derived_from_undefeated(Y).
 %% and prevents discard-varied duplicate extensions.
 :- discarded_attack(_,_,_).
 `,
+        "admissible_budgeted": `%% ============================================================================
+%% wABA BUDGETED ADMISSIBLE — a structured lift of the wAAF inconsistency budget.
+%% ============================================================================
+%% Prior weighted-argumentation theory (Dunne, Hunter, McBurney, Parsons &
+%% Wooldridge, "Weighted argument systems", AIJ 2011) budgets defence in ABSTRACT
+%% AFs: disregard a set of PRIMITIVE attacks of total weight <= beta, then apply a
+%% classical semantics. WABA is STRUCTURED — attacks are derived, and an attack's
+%% weight is the SEMIRING-propagated strength of the ARGUMENT that makes it. This
+%% module lifts the inconsistency budget to that setting.
+%%
+%% S is beta-admissible iff:
+%%   (1) S is conflict-free (classically — the budget is spent on DEFENCE, not on
+%%       repairing internal conflict; see the pin below), and
+%%   (2) every member m of S is DEFENDED: each undefeated attacker of m is EITHER
+%%       counter-attacked by S (hence already excluded from the undefeated set) OR
+%%       its attack is DISCARDED, where discards are charged the propagated strength
+%%       of the attacking argument and SUMMED, with the total bounded by beta.
+%% At beta = 0 no discard is affordable, so this is EXACTLY classical admissibility.
+%%
+%% POLARITY: the inconsistency budget is a STRENGTH notion — a bigger weight is a
+%% stronger objection that is harder (costlier) to overrule. So it is defined for the
+%% STRENGTH semirings (oplus = max: godel, arctic, lukasiewicz). For the COST semirings
+%% (oplus = min: tropical, bottleneck_cost) a smaller weight is a *stronger* argument,
+%% so "disregard total-weight <= beta" inverts; that composition is rejected below.
+
+defeated(X) :- attacks_successfully_with_weight(_,X,_).
+1{ in(X); out(X) }1 :- assumption(X).
+:- in(X), defeated(X).
+
+budgeted_defense.   %% switches on the undefeated-set weight phase in semiring/_phase.lp
+
+%% Budget is spent on DEFENCE only: conflict-freeness stays classical (no support-phase
+%% discards). This keeps S internally consistent and the budget's meaning unambiguous.
+:- discarded_attack(_,_,_).
+
+%% Strength polarity only (see header). A cost semiring would invert the budget.
+:- oplus(min).
+
+%% defended / undefeated set: derivable from the not-defeated assumptions.
+derived_from_undefeated(X) :- assumption(X), not defeated(X).
+derived_from_undefeated(X) :- head(R,X), triggered_by_undefeated(R).
+triggered_by_undefeated(R) :- rule(R), derived_from_undefeated(X) : body(R,X).
+
+%% defence-phase attacks: an undefeated argument X for Y's contrary attacks Y, carrying
+%% the semiring weight of X propagated over the undefeated set.
+undefeated_attack(X,Y,W) :- contrary(Y,X), derived_from_undefeated(X), undefeated_weight(X,W).
+
+%% To admit a member Y, every undefeated attacker of Y must be discarded (paid for).
+%% (Counter-attacked attackers are defeated, hence not in the undefeated set, hence free.)
+discarded_defense_attack(X,Y,W) :- undefeated_attack(X,Y,W), in(Y).
+
+%% A maximal-strength (#sup) objection is un-droppable: its target cannot be a member.
+:- discarded_defense_attack(_,_,#sup).
+
+%% INCONSISTENCY BUDGET: total strength of discarded objections <= beta.
+%% beta = 0 forbids any discard, recovering classical admissibility exactly. #sum drops
+%% #sup/#inf; #sup is guarded above, #inf is the weakest objection (oplus-identity 0-bar)
+%% and is free to overrule, as a null-strength attack should be.
+some_defense_discard :- discarded_defense_attack(_,_,_).
+:- some_defense_discard, budget(0).
+:- V = #sum{ W,X,Y : discarded_defense_attack(X,Y,W) }, some_defense_discard, budget(B), B != 0, V > B.
+
+#show discarded_defense_attack/3.
+#show undefeated_attack/3.
+`,
+        "admissible_dunne": `%% ============================================================================
+%% wABA BUDGETED ADMISSIBLE — full structured lift of Dunne et al. (AIJ 2011) Def 6.
+%% ============================================================================
+%% S is beta-admissible iff there is a discard set \`pay\` of attacks with total
+%% propagated strength <= beta such that S is CLASSICALLY admissible in the framework
+%% with \`pay\` removed. ONE shared budget covers BOTH internal conflict repair (paying to
+%% un-defeat a member) AND external defence (paying to overrule an undefeated objection),
+%% exactly as Dunne Def 6 removes any total-weight-<=beta set of edges. beta = 0 => classical.
+%%
+%% Faithfulness in the STRUCTURED setting (vs weighted-ABSTRACT AFs): the discard ranges
+%% over the abstract attacks whose attacker is derivable in the MAXIMAL argument context,
+%% a fixed domain; each attack's cost is the attacker's strength in that context (its
+%% intrinsic strongest form, arg_weight). The reduced framework's defeat + undefeated set
+%% are recomputed over the surviving (unpaid) attacks. Because the discard domain is fixed
+%% (not the removal-dependent undefeated set) the guess-and-check is stratified.
+%%
+%% STRENGTH semirings only (oplus = max: godel/arctic/lukasiewicz); SUM budget.
+
+budgeted_full.                 %% switches on the maximal-context weight phase in _phase.lp
+:- oplus(min).                 %% strength polarity only (a cost semiring would invert the budget)
+:- discarded_attack(_,_,_).    %% use our own single discard set \`pay\`, not base's support discard
+
+%% assumption in/out (base.lp provides supported/attacks; the argumentation choice lives here)
+1 { in(X) ; out(X) } 1 :- assumption(X).
+
+%% maximal argument set (derivable from ALL assumptions) — the FIXED attack domain
+arg(X) :- assumption(X).
+arg(X) :- head(R,X), arg_triggered(R).
+arg_triggered(R) :- rule(R), arg(Z) : body(R,Z).
+
+%% abstract attacks + the single shared discard set
+att(X,Y) :- contrary(Y,X), arg(X).
+{ pay(X,Y) : att(X,Y) }.
+
+%% ---- classical admissibility on the REDUCED framework (attacks minus \`pay\`) ----
+%% conflict-free: no member is defeated by a surviving support attack
+rdefeated(Y) :- supported(X), contrary(Y,X), not pay(X,Y).
+:- in(Y), rdefeated(Y).
+
+%% defended: no member is attacked by a surviving argument in the reduced undefeated set
+runde(X) :- assumption(X), not rdefeated(X).
+runde(X) :- head(R,X), runde(Z) : body(R,Z).
+:- in(Y), contrary(Y,X), runde(X), not pay(X,Y).
+
+%% ---- BUDGET: total strength of paid attacks <= beta (inconsistency budget) ----
+:- pay(X,Y), arg_weight(X,#sup).      %% a maximal-strength attack is un-droppable
+haspay :- pay(_,_).
+:- haspay, budget(0).                 %% beta = 0 forbids any discard => classical admissibility
+:- haspay, V = #sum{ W,X,Y : pay(X,Y), arg_weight(X,W) }, budget(B), B != 0, V > B.
+
+%% \`pay\` is the discard-set witness; it is intentionally NOT #shown so that many discard
+%% sets realising the SAME extension project to one answer (bin/waba runs these with --project).
+`,
         "cf": `defeated(X) :- attacks_successfully_with_weight(_,X,_).
 1{ in(X); out(X) }1 :- assumption(X).
 :- in(X), defeated(X).`,
@@ -1251,6 +1516,72 @@ attacked_by_undefeated(X) :- contrary(X,Y), derived_from_undefeated(Y).
 %% If an assumption is not attacked by any undefeated element, it must be in the extension
 :- out(X), assumption(X), not attacked_by_undefeated(X).
 
+`,
+        "complete_dunne": `%% ============================================================================
+%% wABA BUDGETED COMPLETE — Dunne Def 6 lift of complete semantics.
+%% ============================================================================
+%% A complete extension is a budgeted-admissible S that contains every assumption it
+%% DEFENDS in the reduced framework (attacks minus \`pay\`): if Y has no surviving
+%% reduced-undefeated attacker, Y must be in. beta = 0 recovers classical complete.
+
+%% ============================================================================
+%% wABA BUDGETED ADMISSIBLE — full structured lift of Dunne et al. (AIJ 2011) Def 6.
+%% ============================================================================
+%% S is beta-admissible iff there is a discard set \`pay\` of attacks with total
+%% propagated strength <= beta such that S is CLASSICALLY admissible in the framework
+%% with \`pay\` removed. ONE shared budget covers BOTH internal conflict repair (paying to
+%% un-defeat a member) AND external defence (paying to overrule an undefeated objection),
+%% exactly as Dunne Def 6 removes any total-weight-<=beta set of edges. beta = 0 => classical.
+%%
+%% Faithfulness in the STRUCTURED setting (vs weighted-ABSTRACT AFs): the discard ranges
+%% over the abstract attacks whose attacker is derivable in the MAXIMAL argument context,
+%% a fixed domain; each attack's cost is the attacker's strength in that context (its
+%% intrinsic strongest form, arg_weight). The reduced framework's defeat + undefeated set
+%% are recomputed over the surviving (unpaid) attacks. Because the discard domain is fixed
+%% (not the removal-dependent undefeated set) the guess-and-check is stratified.
+%%
+%% STRENGTH semirings only (oplus = max: godel/arctic/lukasiewicz); SUM budget.
+
+budgeted_full.                 %% switches on the maximal-context weight phase in _phase.lp
+:- oplus(min).                 %% strength polarity only (a cost semiring would invert the budget)
+:- discarded_attack(_,_,_).    %% use our own single discard set \`pay\`, not base's support discard
+
+%% assumption in/out (base.lp provides supported/attacks; the argumentation choice lives here)
+1 { in(X) ; out(X) } 1 :- assumption(X).
+
+%% maximal argument set (derivable from ALL assumptions) — the FIXED attack domain
+arg(X) :- assumption(X).
+arg(X) :- head(R,X), arg_triggered(R).
+arg_triggered(R) :- rule(R), arg(Z) : body(R,Z).
+
+%% abstract attacks + the single shared discard set
+att(X,Y) :- contrary(Y,X), arg(X).
+{ pay(X,Y) : att(X,Y) }.
+
+%% ---- classical admissibility on the REDUCED framework (attacks minus \`pay\`) ----
+%% conflict-free: no member is defeated by a surviving support attack
+rdefeated(Y) :- supported(X), contrary(Y,X), not pay(X,Y).
+:- in(Y), rdefeated(Y).
+
+%% defended: no member is attacked by a surviving argument in the reduced undefeated set
+runde(X) :- assumption(X), not rdefeated(X).
+runde(X) :- head(R,X), runde(Z) : body(R,Z).
+:- in(Y), contrary(Y,X), runde(X), not pay(X,Y).
+
+%% ---- BUDGET: total strength of paid attacks <= beta (inconsistency budget) ----
+:- pay(X,Y), arg_weight(X,#sup).      %% a maximal-strength attack is un-droppable
+haspay :- pay(_,_).
+:- haspay, budget(0).                 %% beta = 0 forbids any discard => classical admissibility
+:- haspay, V = #sum{ W,X,Y : pay(X,Y), arg_weight(X,W) }, budget(B), B != 0, V > B.
+
+%% \`pay\` is the discard-set witness; it is intentionally NOT #shown so that many discard
+%% sets realising the SAME extension project to one answer (bin/waba runs these with --project).
+
+
+%% Y is attacked in the reduced framework iff some surviving (unpaid) reduced-undefeated
+%% argument is its contrary. A defended assumption is one with no such attacker.
+attacked_reduced(Y) :- assumption(Y), contrary(Y,X), runde(X), not pay(X,Y).
+:- out(Y), assumption(Y), not attacked_reduced(Y).
 `,
         "grounded": `%% Grounded Semantics
 %% Minimal complete extension
@@ -1824,11 +2155,15 @@ contrary(assume_auxiliary_h1, excessive_complexity).
             "admissible",
             "complete",
             "grounded",
-            "preferred"
+            "preferred",
+            "budgeted-admissible",
+            "budgeted-complete",
+            "budgeted-preferred"
         ],
         "postFilteredSemantics": [
             "grounded",
-            "preferred"
+            "preferred",
+            "budgeted-preferred"
         ],
         "canonicalSemiring": {
             "godel": {

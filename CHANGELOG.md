@@ -30,6 +30,23 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260707-1
+
+- **New: weighted DEFENCE semantics (wABA budgeted-admissible / -complete / -preferred).** A structured
+  lift of the weighted-abstract-AF inconsistency budget (Dunne et al., "Weighted argument systems",
+  AIJ 2011, Def 6) to assumption-based argumentation, where attacks are *derived* and each attack's cost
+  is the semiring-propagated strength of the attacking argument. Selectable from a new "Budgeted defence"
+  group in the Semantics dropdown. Semantics: *S is β-admissible iff a set of attacks of total strength
+  ≤ β can be discarded so that S is classically admissible in the reduced framework* — one shared budget
+  covers both internal conflict repair and external defence. β = 0 recovers classical admissible/complete
+  exactly. These take **β directly** (their own SUM inconsistency budget — no monoid/budget-mode) and
+  require a **strength** semiring (Gödel / Arctic / Łukasiewicz); a cost semiring inverts the budget and
+  is rejected. budgeted-preferred is subset-maximal filtering over budgeted-admissible candidates.
+  Verified: an independent brute-force Dunne-Def-6 oracle agreed with clingo over ~3,900 differential
+  checks (0 mismatches); β=0 recovers classical admissible 7 / complete 3 on the reference. Gate green:
+  30 unit (3 new) + 5 browser; WABA core regression 37/37. (Budgeted grounded is intentionally not
+  offered — a cross-discard cardinality-minimum extension is ill-defined.)
+
 ## 20260706-6
 
 - **Synced the WABA core soundness fixes (2026-07) into the bundle.** A differential-fuzzing health

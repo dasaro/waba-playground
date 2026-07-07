@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260706-6';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260707-1';
 
 export class ConfigController {
     constructor(dom) {
@@ -86,6 +86,8 @@ export class ConfigController {
         // interaction with discarding (undefeated/affordability vs the budget) is
         // undefined, so we run them with no budget.
         const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(semantics);
+        // Budgeted-defence (Dunne Def 6 lift) uses beta but its OWN sum budget — no monoid/budget-mode.
+        const isBudgetedDefence = ['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred'].includes(semantics);
 
         // Polarity: godel/tropical have higher/lower variants; Łukasiewicz is a
         // standalone family with no polarity, so its selector is disabled.
@@ -118,8 +120,9 @@ export class ConfigController {
             this._savedDefaultPolicy = undefined;
             this._savedBudgetMode = undefined;
         }
-        // Defence semantics run with no budget (see above).
-        if (isDefence && !abaRecovery) {
+        // Classical defence runs with no budget; budgeted-defence carries its own budget
+        // (no monoid/budget-mode). Both pin the base discard set off (constraint = none).
+        if ((isDefence || isBudgetedDefence) && !abaRecovery) {
             this.dom.constraintSelect.value = 'none';
         }
         // Re-read after the block so the monoid/budget enable logic below runs
@@ -152,23 +155,25 @@ export class ConfigController {
         const noDiscard = abaRecovery || budgetMode === 'none';
         // grounded/preferred enumerate ALL complete candidates then subset-filter,
         // so they require Opt-Mode = ignore (enumerate); force and lock it.
-        const forceEnumerate = semantics === 'grounded' || semantics === 'preferred';
+        const forceEnumerate = semantics === 'grounded' || semantics === 'preferred' || semantics === 'budgeted-preferred';
         if (forceEnumerate) {
             this.dom.optModeSelect.value = 'ignore';
         }
 
+        // Budgeted-defence USES beta (its own sum budget) even though the budget mode is none.
+        const betaDisabled = abaRecovery || (budgetMode === 'none' && !isBudgetedDefence);
         this.dom.monoidSelect.disabled = noDiscard;
         this.dom.optimizeSelect.disabled = noDiscard;
         this.dom.optModeSelect.disabled = noDiscard || forceEnumerate;
-        this.dom.constraintSelect.disabled = abaRecovery || isDefence;
-        this.dom.budgetInput.disabled = abaRecovery || budgetMode === 'none';
-        this.dom.budgetInput.style.opacity = (abaRecovery || budgetMode === 'none') ? '0.5' : '1';
+        this.dom.constraintSelect.disabled = abaRecovery || isDefence || isBudgetedDefence;
+        this.dom.budgetInput.disabled = betaDisabled;
+        this.dom.budgetInput.style.opacity = betaDisabled ? '0.5' : '1';
 
         if (this.dom.budgetInputLabel) {
             this.dom.budgetInputLabel.textContent = abaRecovery
                 ? 'Budget Threshold (β disabled by ABA recovery)'
-                : 'Budget Threshold (β)';
-            this.dom.budgetInputLabel.style.opacity = abaRecovery || budgetMode === 'none' ? '0.5' : '1';
+                : (isBudgetedDefence ? 'Budget Threshold (β — inconsistency budget)' : 'Budget Threshold (β)');
+            this.dom.budgetInputLabel.style.opacity = betaDisabled ? '0.5' : '1';
         }
 
         this.updateNumModelsVisibility();
@@ -178,17 +183,24 @@ export class ConfigController {
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
         const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(config.semantics);
+        const isBudgetedDefence = ['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred'].includes(config.semantics);
         const profile = config.abaRecovery
             ? 'ABA recovery / neutral defaults / no-discard'
-            : (config.budgetMode === 'none'
-                ? 'plain / no-discard'
-                : `${config.monoid} + ${config.budgetMode}`);
+            : (isBudgetedDefence
+                ? 'budgeted-defence (β sum inconsistency budget)'
+                : (config.budgetMode === 'none'
+                    ? 'plain / no-discard'
+                    : `${config.monoid} + ${config.budgetMode}`));
         const postFilterCopy = (config.semantics === 'preferred' || config.semantics === 'grounded')
             ? ` Exact ${config.semantics} uses browser-side ${config.semantics === 'grounded' ? 'subset-minimal' : 'subset-maximal'} filtering over complete candidates.`
-            : '';
+            : (config.semantics === 'budgeted-preferred'
+                ? ' Budgeted-preferred is subset-maximal filtering over budgeted-admissible candidates.'
+                : '');
         const defenceCopy = isDefence
             ? ' Defence semantics (admissible/complete/grounded/preferred) run on the no-discard surface.'
-            : '';
+            : (isBudgetedDefence
+                ? ' Budgeted-defence (Dunne Def 6 lift) spends a β-bounded sum inconsistency budget to discard attacks, then applies classical defence; strength semirings only.'
+                : '');
 
         this.dom.supportedSurfaceNote.innerHTML = `
             Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code>, <code>lukasiewicz</code> (families G&ouml;del / Tropical, plus standalone &#321;ukasiewicz).

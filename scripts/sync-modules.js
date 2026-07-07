@@ -43,8 +43,12 @@ const POLICY = {
         godel_low: { family: 'godel', polarity: 'lower' },
         tropical_high: { family: 'tropical', polarity: 'higher' }
     },
-    supportedSemantics: ['cf', 'stable', 'admissible', 'complete', 'grounded', 'preferred'],
-    postFilteredSemantics: ['grounded', 'preferred'],
+    supportedSemantics: [
+        'cf', 'stable', 'admissible', 'complete', 'grounded', 'preferred',
+        // wABA budgeted-defence (Dunne Def 6 lift): weighted admissible/complete/preferred
+        'budgeted-admissible', 'budgeted-complete', 'budgeted-preferred'
+    ],
+    postFilteredSemantics: ['grounded', 'preferred', 'budgeted-preferred'],
     budgetSide: { sum: 'ub', max: 'ub', min: 'lb' }
 };
 

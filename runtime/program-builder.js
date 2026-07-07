@@ -1,5 +1,5 @@
-import { wabaModules } from '../waba-modules.js?v=20260706-6';
-import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective } from './config-service.js?v=20260706-6';
+import { wabaModules } from '../waba-modules.js?v=20260707-1';
+import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260707-1';
 
 export function getCoreModule() {
     return wabaModules.core.base;
@@ -32,6 +32,13 @@ export function getFilterModule(filterType = 'standard') {
 export function getSemanticsModule(semantics) {
     if (semantics === 'preferred' || semantics === 'grounded') {
         return wabaModules.semantics.complete;
+    }
+    // wABA budgeted-defence (Dunne Def 6): map to the self-contained-budget modules.
+    if (semantics === 'budgeted-admissible' || semantics === 'budgeted-preferred') {
+        return wabaModules.semantics.admissible_dunne;
+    }
+    if (semantics === 'budgeted-complete') {
+        return wabaModules.semantics.complete_dunne;
     }
     return wabaModules.semantics[semantics] || wabaModules.semantics.stable;
 }
@@ -82,7 +89,11 @@ export function buildProgram(framework, config, options = {}) {
 export function buildSolverArgs(config) {
     const effectiveOptMode = resolveSolverOptMode(config);
     if (effectiveOptMode === 'ignore') {
-        return ['--opt-mode=ignore'];
+        // Budgeted-defence realises one extension via many discard sets, so project
+        // onto the shown atoms to enumerate each beta-admissible set once.
+        return isBudgetedDefence(config.semantics)
+            ? ['--opt-mode=ignore', '--project']
+            : ['--opt-mode=ignore'];
     }
     return [`--opt-mode=${effectiveOptMode}`, '--quiet=1', '--project'];
 }
