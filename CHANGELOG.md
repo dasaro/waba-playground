@@ -30,6 +30,16 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260707-2
+
+- **Fix: curated-example descriptions now actually display.** Each example in `examples.js` carries a
+  `description` field, but the editor's description bar/box is driven by the `% //` special syntax
+  (`editor/simple-format.js`), and the curated frameworks had no `% //` lines — so the field was never
+  read and the description bar stayed hidden for every example. `loadExample` now bridges the field into
+  the framework as a single `% //` comment line (idempotent — skipped if the code already carries one), so
+  the existing display path renders it and it round-trips through the Simple↔Advanced editor. Covered by a
+  new browser test that asserts the bar shows the prose on example load and updates when the example changes.
+
 ## 20260707-1
 
 - **New: weighted DEFENCE semantics (wABA budgeted-admissible / -complete / -preferred).** A structured

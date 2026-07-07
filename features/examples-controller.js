@@ -1,5 +1,20 @@
-import { examples } from '../examples.js?v=20260707-1';
-import { wabaModules } from '../waba-modules.js?v=20260707-1';
+import { examples } from '../examples.js?v=20260707-2';
+import { wabaModules } from '../waba-modules.js?v=20260707-2';
+
+// Curated examples carry their prose in a `description` field. The editor's description
+// bar/box is driven by the "% //" special syntax (see editor/simple-format.js), so bridge
+// the field into the framework as one "% //" comment line — unless the code already carries
+// its own — keeping examples.js the single source and using the existing display path.
+export function withDescriptionComment(code, description) {
+    if (!description) {
+        return code;
+    }
+    if (/^\s*%\s*\/\//m.test(code)) {
+        return code;
+    }
+    const oneLine = String(description).replace(/\r?\n+/g, ' ').trim();
+    return `% // ${oneLine}\n\n${code}`;
+}
 
 export class ExamplesController {
     constructor(dom, configController, editorController, outputManager) {
@@ -45,10 +60,11 @@ export class ExamplesController {
 
         try {
             const example = examples[exampleName];
-            const clingoCode = this.getExampleCode(exampleName);
-            if (!clingoCode) {
+            const rawCode = this.getExampleCode(exampleName);
+            if (!rawCode) {
                 throw new Error(`Missing example code for ${exampleName}`);
             }
+            const clingoCode = withDescriptionComment(rawCode, example.description);
 
             this.configController.applyConfigToUI(example.preset);
             this.configController.syncUi();

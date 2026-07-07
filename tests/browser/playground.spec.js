@@ -55,6 +55,21 @@ test('curated stable and grounded runs complete without startup errors', async (
     expect(pageErrors).toEqual([]);
 });
 
+test('curated example description renders in the description bar', async ({ page }) => {
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    // The example's prose (examples.js `description`) is bridged into the framework as the
+    // "% //" special syntax and shown in the Simple-editor description bar.
+    await expect(page.locator('#simple-description-bar')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#simple-description-preview')).toContainText('weakest link');
+    const editorValue = await page.locator('#code-editor').inputValue();
+    expect(editorValue.startsWith('% //')).toBe(true);
+
+    // Switching to another example updates the description (no stale text).
+    await page.selectOption('#example-select', 'detective_locked_house');
+    await expect(page.locator('#simple-description-preview')).toContainText('locked house');
+});
+
 test('exact preferred flow renders and graph modes switch without regressions', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
