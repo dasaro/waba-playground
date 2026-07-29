@@ -90,6 +90,40 @@ test('uploading a framework adds a selectable option and loads the code', async 
     expect(pageErrors).toEqual([]);
 });
 
+test('an uploaded framework cannot inject HTML into the results', async ({ page }) => {
+    test.setTimeout(90000);
+    await waitForClingoReady(page);
+
+    // ASP permits quoted-string terms, so an atom name in an uploaded .lp can carry markup.
+    // Regression: solver-derived text was interpolated into innerHTML unescaped, so this
+    // executed on Run (window.__XSS === 1, live <img> nodes in the results and metrics).
+    const payload = '<img src=x onerror=window.__XSS=1>';
+    await page.setInputFiles('#file-upload-input', {
+        name: 'hostile.lp',
+        mimeType: 'text/plain',
+        buffer: Buffer.from(
+            `assumption("${payload}").\nassumption(b).\n`
+            + `contrary("${payload}", cx).\ncontrary(b, cb).\n`
+            + `weight("${payload}", 30). weight(b, 20).\n`
+            + `head(r1, cx). body(r1, b).\nhead(r2, cb). body(r2, "${payload}").\nbudget(beta).\n`
+        )
+    });
+    await page.waitForTimeout(600);
+    await page.selectOption('#constraint-select', 'ub');
+    await page.fill('#budget-input', '100');
+    await page.click('#run-btn');
+    await page.waitForSelector('.answer-header', { timeout: 60000 });
+
+    const probe = await page.evaluate(() => ({
+        executed: window.__XSS === 1,
+        liveNodes: document.querySelectorAll('img[src="x"]').length,
+        shownAsText: document.body.innerText.includes('<img src=x onerror')
+    }));
+    expect(probe.executed).toBe(false);
+    expect(probe.liveNodes).toBe(0);
+    expect(probe.shownAsText).toBe(true);
+});
+
 test('exact preferred flow renders and graph modes switch without regressions', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));

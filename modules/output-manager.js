@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260729-1';
-import { MetricsManager } from './metrics-manager.js?v=20260729-1';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260729-1';
-import { ParserUtils } from './parser-utils.js?v=20260729-1';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260729-1';
+import { PopupManager } from './popup-manager.js?v=20260729-2';
+import { MetricsManager } from './metrics-manager.js?v=20260729-2';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260729-2';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260729-2';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260729-2';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -476,12 +476,12 @@ export class OutputManager {
 
             // In assumptions (green chips)
             parsed.in.forEach(a => {
-                contentHTML += `<span class="chip in"><span class="chip-icon">✓</span>${a}</span>`;
+                contentHTML += `<span class="chip in"><span class="chip-icon">✓</span>${escapeHtml(a)}</span>`;
             });
 
             // Out assumptions (greyed out chips)
             parsed.out.forEach(a => {
-                contentHTML += `<span class="chip out"><span class="chip-icon">✗</span>${a}</span>`;
+                contentHTML += `<span class="chip out"><span class="chip-icon">✗</span>${escapeHtml(a)}</span>`;
             });
 
             contentHTML += '</div>';
@@ -503,10 +503,10 @@ export class OutputManager {
                     // Format as "a1, a2, ..., an ⊢ c [target]"
                     if (supportingAssumptions.length > 0) {
                         const assumptions = supportingAssumptions.join(', ');
-                        contentHTML += `<div class="attack-item">${assumptions} <span class="attack-arrow">⊢</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span></div>`;
+                        contentHTML += `<div class="attack-item">${escapeHtml(assumptions)} <span class="attack-arrow">⊢</span> ${escapeHtml(attackingElement)} <span style="color: var(--text-muted); font-size: 0.9em;">[${escapeHtml(targetAssumption)}]</span></div>`;
                     } else {
                         // Non-derived attack (no supporting assumptions)
-                        contentHTML += `<div class="attack-item">⊤ <span class="attack-arrow">⊢</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span></div>`;
+                        contentHTML += `<div class="attack-item">⊤ <span class="attack-arrow">⊢</span> ${escapeHtml(attackingElement)} <span style="color: var(--text-muted); font-size: 0.9em;">[${escapeHtml(targetAssumption)}]</span></div>`;
                     }
                 }
             });
@@ -531,10 +531,10 @@ export class OutputManager {
                     // Format as "a1, a2, ..., an ⊬ c [target] (w: weight)"
                     if (supportingAssumptions.length > 0) {
                         const assumptions = supportingAssumptions.join(', ');
-                        contentHTML += `<div class="attack-item discarded">${assumptions} <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">${escapeHtml(assumptions)} <span class="attack-arrow">⊬</span> ${escapeHtml(attackingElement)} <span style="color: var(--text-muted); font-size: 0.9em;">[${escapeHtml(targetAssumption)}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
                     } else {
                         // Non-derived attack (no supporting assumptions)
-                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${attackingElement} <span style="color: var(--text-muted); font-size: 0.9em;">[${targetAssumption}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
+                        contentHTML += `<div class="attack-item discarded">⊤ <span class="attack-arrow">⊬</span> ${escapeHtml(attackingElement)} <span style="color: var(--text-muted); font-size: 0.9em;">[${escapeHtml(targetAssumption)}]</span> <span style="color: var(--text-muted)">(w: ${displayValue(weight)})</span></div>`;
                     }
                 }
             });
@@ -550,7 +550,7 @@ export class OutputManager {
                 const weight = parsed.weights.get(atom);
                 const weightDisplay = weight !== undefined ? ` <span style="color: var(--warning-color); font-size: 0.85em;">(w: ${displayValue(weight)})</span>` : '';
                 const atomId = `derived-${answerNumber}-${atom.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                contentHTML += `<span class="chip" style="background: var(--info-color, #3b82f6); border-color: var(--info-color, #3b82f6); cursor: pointer;" id="${atomId}" data-atom="${atom}" data-extension="${answerNumber}">${atom}${weightDisplay}</span>`;
+                contentHTML += `<span class="chip" style="background: var(--info-color, #3b82f6); border-color: var(--info-color, #3b82f6); cursor: pointer;" id="${atomId}" data-atom="${escapeHtml(atom)}" data-extension="${answerNumber}">${escapeHtml(atom)}${weightDisplay}</span>`;
             });
             contentHTML += '</div></div>';
         }
@@ -563,9 +563,9 @@ export class OutputManager {
             parsed.activeContraries.forEach(({ assumption, contrary }) => {
                 const isDefeated = !parsed.in.includes(assumption);
                 contentHTML += `<div style="font-family: monospace; font-size: 0.9em;">`;
-                contentHTML += `<span style="color: var(--warning-color)">${contrary}</span> `;
+                contentHTML += `<span style="color: var(--warning-color)">${escapeHtml(contrary)}</span> `;
                 contentHTML += `<span style="color: var(--text-muted)">attacks</span> `;
-                contentHTML += `<span style="color: ${isDefeated ? 'var(--error-color)' : 'var(--success-color)'}">${assumption}</span>`;
+                contentHTML += `<span style="color: ${isDefeated ? 'var(--error-color)' : 'var(--success-color)'}">${escapeHtml(assumption)}</span>`;
                 contentHTML += isDefeated ? ' <span style="color: var(--error-color)">✗</span>' : '';
                 contentHTML += `</div>`;
             });
@@ -623,7 +623,7 @@ export class OutputManager {
 
         // Join all lines with newlines
         const textualResult = textualLines.join('\n');
-        contentHTML += `<pre class="textual-result-content">${textualResult}</pre>`;
+        contentHTML += `<pre class="textual-result-content">${escapeHtml(textualResult)}</pre>`;
         contentHTML += '</div></div>';
 
         contentHTML += '</div>';

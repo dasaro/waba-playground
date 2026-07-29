@@ -30,6 +30,26 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260729-2
+
+Second health-check pass, from the adversarially-verified findings (77 audited, 60 confirmed).
+
+- **SECURITY - stored XSS from an uploaded framework.** ASP permits quoted-string terms, so an
+  atom name in a `.lp` can carry markup; solver-derived text was interpolated into `innerHTML`
+  unescaped throughout the results and Decision Analysis. Uploading a framework containing
+  `assumption("<img src=x onerror=...>")` executed arbitrary JavaScript as soon as you pressed
+  Run - before the analysis panel was even opened. Added a shared `escapeHtml` in
+  `modules/parser-utils.js` and applied it to every solver-derived interpolation in
+  `output-manager.js` (chips, attack items, derived-atom chips in both attribute and text
+  position, contrary/assumption spans, the textual-result `<pre>`) and `metrics-manager.js`
+  (atom names, extension labels, contraries). CSV export is left unescaped, since it is a data
+  file rather than markup. Verified: the payload now renders as literal text, zero live nodes.
+- **Uploading a .lp while in Simple mode left the Simple panel visible**, so the freshly loaded
+  ASP was hidden and subsequent edits were silently ignored. Assigning `inputMode.value` does
+  not fire `change`, so the visibility handler never ran; it is now applied explicitly.
+
+Gate: sync + freshness, lint, typecheck, 32 unit, 8 browser (1 new).
+
 ## 20260729-1
 
 Health-check release: a full audit of the math core and the web interface (independent

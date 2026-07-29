@@ -1,3 +1,4 @@
+import { escapeHtml } from './parser-utils.js?v=20260729-2';
 /**
  * MetricsManager - Decision-oriented analysis for ranked WABA extensions.
  *
@@ -438,7 +439,7 @@ export class MetricsManager {
         topAtoms.forEach((atomMetric, index) => {
             html += `
                 <div class="analysis-chip-card ${index === 0 ? 'primary' : ''}">
-                    <div class="analysis-chip-name">${atomMetric.atom}</div>
+                    <div class="analysis-chip-name">${escapeHtml(atomMetric.atom)}</div>
                     <div class="analysis-chip-score">${this.formatNumber(atomMetric.decisionScore)} score</div>
                     <div class="analysis-chip-meta">Robustness ${this.formatPercent(atomMetric.robustness)}</div>
                 </div>
@@ -452,7 +453,7 @@ export class MetricsManager {
             html += `
                 <div class="analysis-ranked-item">
                     <div class="analysis-ranked-heading">Level ${extension.levelNumber} · ${this.formatValue(extension.displayScore)}</div>
-                    <div class="analysis-ranked-body">${extension.label}</div>
+                    <div class="analysis-ranked-body">${escapeHtml(extension.label)}</div>
                 </div>
             `;
         });
@@ -489,7 +490,7 @@ export class MetricsManager {
                     ? 'decision-contender'
                     : '';
             html += `<tr class="${rowClass}">`;
-            html += `<td class="atom-name">${index < 3 ? `<span class="analysis-rank-badge">#${index + 1}</span>` : ''}${metric.atom}</td>`;
+            html += `<td class="atom-name">${index < 3 ? `<span class="analysis-rank-badge">#${index + 1}</span>` : ''}${escapeHtml(metric.atom)}</td>`;
             html += `<td class="metric-num">${this.formatNumber(metric.decisionScore)}</td>`;
             html += `<td class="metric-num">${this.formatPercent(metric.robustness)}</td>`;
             html += `<td class="metric-num">${this.formatPercent(metric.acceptanceRate)}</td>`;
@@ -500,7 +501,7 @@ export class MetricsManager {
                 html += `<td class="metric-num">${metric.supportBest !== null ? this.formatValue(metric.supportBest) : '–'}</td>`;
                 html += `<td class="metric-num">${metric.supportWorst !== null ? this.formatValue(metric.supportWorst) : '–'}</td>`;
                 html += `<td class="metric-num ${metric.supportMargin > 0 ? 'metric-positive' : metric.supportMargin < 0 ? 'metric-negative' : ''}">${metric.supportMargin !== null ? this.formatSignedNumber(metric.supportMargin) : '–'}</td>`;
-                html += `<td class="contrary-name">${metric.contrary || '–'}</td>`;
+                html += `<td class="contrary-name">${escapeHtml(metric.contrary || '–')}</td>`;
             }
             html += '</tr>';
         });

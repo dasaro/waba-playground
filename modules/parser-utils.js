@@ -2,6 +2,27 @@
  * ParserUtils - Shared parsing utilities for WABA/ASP code
  * Consolidates duplicate regex-based parsing logic
  */
+
+/**
+ * Escape solver-derived text before it is interpolated into innerHTML.
+ *
+ * ASP permits quoted-string terms, so an atom name in an uploaded .lp can carry raw
+ * markup (e.g. assumption("<img src=x onerror=...>")). Every value that reaches the DOM
+ * through a template literal must go through this first. The quote cases are required,
+ * not cosmetic: atom text is also interpolated into attribute position.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export class ParserUtils {
     /**
      * Parse assumption predicates from ASP code
