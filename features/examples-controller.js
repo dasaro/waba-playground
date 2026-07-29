@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260707-3';
-import { wabaModules } from '../waba-modules.js?v=20260707-3';
+import { examples } from '../examples.js?v=20260729-1';
+import { wabaModules } from '../waba-modules.js?v=20260729-1';
 
 // Curated examples carry their prose in a `description` field. The editor's description
 // bar/box is driven by the "% //" special syntax (see editor/simple-format.js), so bridge
@@ -95,10 +95,11 @@ export class ExamplesController {
         option.textContent = `📁 ${filenameWithoutExt}`;
         option.selected = true;
 
-        if (this.dom.exampleSelect.options.length > 0) {
-            this.dom.exampleSelect.insertBefore(option, this.dom.exampleSelect.options[1]);
-        } else {
-            this.dom.exampleSelect.appendChild(option);
-        }
+        // Insert just after the placeholder. The reference node must be a DIRECT CHILD of
+        // the select: `select.options` flattens the options nested inside the <optgroup>s
+        // that populateExampleSelect builds, so passing options[1] threw NotFoundError and
+        // broke every upload / drag-drop. children[1] is the first <optgroup> (or undefined,
+        // in which case insertBefore(_, null) simply appends).
+        this.dom.exampleSelect.insertBefore(option, this.dom.exampleSelect.children[1] || null);
     }
 }

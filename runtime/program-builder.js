@@ -1,5 +1,5 @@
-import { wabaModules } from '../waba-modules.js?v=20260707-3';
-import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260707-3';
+import { wabaModules } from '../waba-modules.js?v=20260729-1';
+import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260729-1';
 
 export function getCoreModule() {
     return wabaModules.core.base;
@@ -52,12 +52,20 @@ export function buildProgram(framework, config, options = {}) {
     const semanticsKey = options.semantics || config.semantics;
     const includeObjective = options.includeObjective ?? shouldLoadObjective(config);
     const budgetProfile = resolveBudgetProfile(config);
+    // Ground the CONSTANT beta, exactly as bin/waba's `-c beta=N` does. core/base.lp
+    // states `budget(beta).` and the curated frameworks end with `budget(beta).`, so
+    // emitting a `budget(N).` FACT instead would leave `beta` symbolic — and a symbolic
+    // constant outranks every integer in clingo's term order, which makes constraint/lb.lp
+    // (`:- budget_value(C), C < B, budget(B), some_discard.`) reject EVERY discard and
+    // silently collapse lower-bound mode to no-discard. Skip our declaration when the
+    // framework already fixes beta: clingo rejects a redefined constant outright.
+    const frameworkFixesBeta = /^[^%\n]*#const\s+beta\s*=/m.test(framework);
     const parts = [
         '%% Framework',
         framework.trim(),
         '',
         '%% Budget',
-        `budget(${config.beta}).`,
+        frameworkFixesBeta ? '%% (beta fixed by the framework)' : `#const beta = ${config.beta}.`,
         '',
         '%% Core',
         getCoreModule(),

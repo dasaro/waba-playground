@@ -21,6 +21,20 @@ test('computeAggregateFromDiscarded handles sum/max/min', () => {
     assert.equal(computeAggregateFromDiscarded(discarded, 'min'), 3);
 });
 
+test('computeAggregateFromDiscarded matches clingo on infinite weights', () => {
+    // clingo: #sum DROPS #sup/#inf tuples (empty sum = 0); #max/#min KEEP them.
+    // Verified against monoid/{sum,max,min}.lp: sum=5, max=#sup, min=#inf.
+    const mixed = [
+        'discarded_attack(x,a,#sup)',
+        'discarded_attack(y,b,5)',
+        'discarded_attack(z,c,#inf)'
+    ];
+    assert.equal(computeAggregateFromDiscarded(mixed, 'sum'), 5);
+    assert.equal(computeAggregateFromDiscarded(mixed, 'max'), POS_INF);
+    assert.equal(computeAggregateFromDiscarded(mixed, 'min'), NEG_INF);
+    assert.equal(computeAggregateFromDiscarded([], 'sum'), 0);
+});
+
 test('objective tuples preserve sentinel semantics', () => {
     assert.deepEqual(getObjectiveTuple({ monoid: 'max', optimization: 'minimize' }, NEG_INF), [0, 0, 0]);
     assert.deepEqual(getObjectiveTuple({ monoid: 'max', optimization: 'minimize' }, POS_INF), [1, 0, 0]);

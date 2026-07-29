@@ -70,6 +70,26 @@ test('curated example description renders in the description bar', async ({ page
     await expect(page.locator('#simple-description-preview')).toContainText('locked house');
 });
 
+test('uploading a framework adds a selectable option and loads the code', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await waitForClingoReady(page);
+
+    // Regression: the uploaded option was inserted before select.options[1], which lives
+    // inside an <optgroup> and is therefore not a direct child -> insertBefore threw
+    // NotFoundError and every upload / drag-drop failed.
+    await page.setInputFiles('#file-upload-input', {
+        name: 'probe.lp',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('assumption(p). contrary(p, cp).\nassumption(q). contrary(q, cq).\nhead(r1, cp). body(r1, q).\nbudget(beta).\n')
+    });
+
+    await expect(page.locator('#example-select option[value="__uploaded__"]')).toHaveCount(1);
+    await expect(page.locator('#example-select')).toHaveValue('__uploaded__');
+    expect(await page.locator('#code-editor').inputValue()).toContain('assumption(p)');
+    expect(pageErrors).toEqual([]);
+});
+
 test('exact preferred flow renders and graph modes switch without regressions', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));

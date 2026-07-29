@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260707-3';
-import { MetricsManager } from './metrics-manager.js?v=20260707-3';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260707-3';
-import { ParserUtils } from './parser-utils.js?v=20260707-3';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260707-3';
+import { PopupManager } from './popup-manager.js?v=20260729-1';
+import { MetricsManager } from './metrics-manager.js?v=20260729-1';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260729-1';
+import { ParserUtils } from './parser-utils.js?v=20260729-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260729-1';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -433,7 +433,11 @@ export class OutputManager {
         button.classList.add('expanded');
     }
 
-    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = null, budgetValue = null) {
+    // `precomputedCost` defaults to undefined, NOT null: displayResults deliberately passes
+    // null to mean "no cost applies" (no-discard mode, where nothing can be discarded). With
+    // a null default the two were indistinguishable, so the suppression was silently undone
+    // and the cost recomputed from an EMPTY discard set - rendering #inf (max) or #sup (min).
+    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = undefined, budgetValue = null) {
         // witness is an object with Time and Value properties
         // Value is an array of predicate strings
         const predicates = witness.Value || [];
@@ -443,7 +447,7 @@ export class OutputManager {
 
         // Use pre-computed cost if available, otherwise compute it
         let cost;
-        if (precomputedCost !== null) {
+        if (precomputedCost !== undefined) {
             cost = precomputedCost;
         } else {
             const config = this.lastRunConfig || (this.getConfig ? this.getConfig() : {

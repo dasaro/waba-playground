@@ -806,18 +806,23 @@ arg_weight(X, W)            :- pweight(maximal, X, W).
 luk_body_has_sup(P, R) :- body(R, B), pweight(P, B, #sup).
 luk_body_has_inf(P, R) :- body(R, B), pweight(P, B, #inf).
 
+%% #inf is the bounded-sum ANNIHILATOR and takes precedence: the whole product is 0.
 rule_deriv(P, R, X, 0) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
     luk_body_has_inf(P, R).
-rule_deriv(P, R, X, k) :-
-    rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not luk_body_has_inf(P, R), luk_body_has_sup(P, R).
+
+%% Otherwise SUBSTITUTE each #sup premise by the grid top k and take the bounded sum.
+%% (clingo's #sum silently drops #sup, so the NS*k term adds those premises back in.)
+%% Substituting -- rather than short-circuiting the whole rule to k -- is what preserves
+%% the otimes-IDENTITY law: k (x) w = max(0, k+w-k) = w, so an identity-valued premise
+%% leaves its co-premises untouched instead of inflating the derivation to maximal strength.
 rule_deriv(P, R, X, M) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not luk_body_has_inf(P, R), not luk_body_has_sup(P, R),
-    S = #sum{ V,B : body(R,B), pweight(P,B,V) },
-    N = #count{ B : body(R,B) },
-    M = #max{ 0 ; S-(N-1)*k }.
+    not luk_body_has_inf(P, R),
+    S  = #sum{ V,B : body(R,B), pweight(P,B,V) },
+    NS = #count{ B : body(R,B), pweight(P,B,#sup) },
+    N  = #count{ B : body(R,B) },
+    M  = #max{ 0 ; S + NS*k - (N-1)*k }.
 `,
         "tropical": `%% Tropical / min-plus semiring (additive family).
 %% Semiring: (ℤ ∪ {+∞}, ⊕=min, ⊗=+, 0̄=#sup, 1̄=0) — cost polarity.

@@ -30,6 +30,47 @@ Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts up
 - [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
 - changed module import references across the app
 
+## 20260729-1
+
+Health-check release: a full audit of the math core and the web interface (independent
+differential oracles plus a 14-dimension adversarial code audit) found and fixed the
+following. Each fix is covered by a new regression test.
+
+- **CRITICAL - lower-bound budget mode was dead.** `buildProgram` injected `budget(N).` as a
+  FACT but never grounded the *constant* `beta`, so `core/base.lp`'s `budget(beta).` (and
+  every curated framework's trailing `budget(beta).`) stayed symbolic. A symbolic constant
+  outranks every integer in clingo's term order, so `constraint/lb.lp`
+  (`:- budget_value(C), C < B, budget(B), some_discard.`) rejected **every** discard and
+  silently collapsed `min + lb` to no-discard. The program now emits `#const beta = N.`,
+  exactly as `bin/waba` passes `-c beta=N` (and yields to a framework that fixes `beta`
+  itself, since clingo rejects a redefined constant). Verified: lb went from 0 discards to
+  the correct 1; `ub` unchanged.
+- **Łukasiewicz semiring soundness (synced from the core).** A `#sup` premise short-circuited
+  a whole rule derivation to `k` instead of being substituted into the bounded sum, breaking
+  the ⊗-identity law (`k ⊗ 300` gave 1000, not 300) and *inflating* weak arguments to maximal
+  strength. Reachable in ordinary use because the `aba` default policy makes an unweighted
+  assumption `#sup`.
+- **File upload / drag-drop was completely broken.** The uploaded option was inserted before
+  `select.options[1]`, which lives inside an `<optgroup>` and so is not a direct child of the
+  select - `insertBefore` threw `NotFoundError` on every upload.
+- **Displayed cost could disagree with the solver.** `computeAggregateFromDiscarded`'s `sum`
+  branch propagated `#sup`/`#inf`, while `monoid/sum.lp` (clingo `#sum`) *drops* them - so the
+  Cost badge and the numeric post-filter ranking could show a total the solver never computed.
+- **No-discard mode showed an infinite cost.** `null` was used both as "suppress the cost" and
+  as `appendAnswerSet`'s "not provided" default, so the deliberate suppression was undone and
+  the cost recomputed from an empty discard set, rendering `#inf` (max) / `#sup` (min).
+- **Switching examples kept the previous run's extensions on screen**, attributing them to the
+  newly loaded framework. The example path now clears results like the upload path already did.
+- **`sync:check` could not detect a stale bundle** - it validated shape only, never comparing
+  against the WABA sources, which is why a superseded copy of a semiring could ship. It now
+  diffs every bundled module against `WABA_ROOT` (skipping cleanly when that tree is absent or
+  is not the generator, so the default path never fails spuriously).
+- Corrected the `weakest_link_security` description, which called ⊗=max "aggregation" - WABA's
+  term for the monoid (here `sum`); the maximum is taken by the semiring over a design's
+  vulnerabilities.
+
+Gate: sync + freshness, lint, typecheck, 32 unit, 7 browser (2 new).
+
 ## 20260707-3
 
 - **GUI polish: four fixes.**

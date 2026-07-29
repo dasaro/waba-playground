@@ -58,18 +58,12 @@ export function computeAggregateFromDiscarded(discardedAttacks, monoid) {
         .map((match) => normalizeAggregateValue(match[1]));
 
     if (monoid === 'sum') {
-        return weights.reduce((total, value) => {
-            if (value === POS_INF) {
-                return POS_INF;
-            }
-            if (value === NEG_INF) {
-                return NEG_INF;
-            }
-            if (total === POS_INF || total === NEG_INF) {
-                return total;
-            }
-            return total + value;
-        }, 0);
+        // monoid/sum.lp is `budget_value(C) :- C = #sum{ W,X,Y : discarded_attack(X,Y,W) }`,
+        // and clingo's #sum silently DROPS tuples whose weight is #sup/#inf (an empty sum is 0).
+        // Propagating the infinity instead would report a cost the solver never computed.
+        return weights
+            .filter((value) => value !== POS_INF && value !== NEG_INF)
+            .reduce((total, value) => total + value, 0);
     }
 
     if (monoid === 'max') {
