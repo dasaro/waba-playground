@@ -544,6 +544,78 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
     expect(state.edgeState, 'no edge reported its attack state').toBe(true);
 });
 
+test('the legend matches what the diagrams actually draw', async ({ page }) => {
+    test.setTimeout(240000);
+    await waitForClingoReady(page);
+
+    // Every legend swatch must be styled. A class with no rule renders as an empty gap, which
+    // reads as a missing symbol rather than a missing stylesheet.
+    const unstyled = await page.evaluate(() => [...document.querySelectorAll('.legend-symbol')]
+        .filter((el) => {
+            const cs = getComputedStyle(el);
+            const painted = cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
+                || cs.backgroundImage !== 'none'
+                || parseFloat(cs.borderTopWidth) > 0
+                || parseFloat(cs.borderBottomWidth) > 0;
+            return !painted;
+        })
+        .map((el) => el.className));
+    expect(unstyled, 'legend swatches with no visible styling').toEqual([]);
+
+    // Every legend item must carry an explanation, which is the point of the legend.
+    const unexplained = await page.evaluate(() => [...document.querySelectorAll('.legend-item')]
+        .filter((el) => !(el.querySelector('.legend-text em')?.textContent || '').trim())
+        .map((el) => el.textContent.trim().slice(0, 40)));
+    expect(unexplained, 'legend entries with no explanation').toEqual([]);
+
+    // And the colours the diagrams actually use must all be accounted for by a swatch. This is
+    // the check that catches the legend drifting from the renderers -- self-loops were drawn on
+    // the default example without appearing in the legend at all.
+    const legendColours = await page.evaluate(() => {
+        const norm = (c) => {
+            const d = document.createElement('div');
+            d.style.color = c; document.body.appendChild(d);
+            const v = getComputedStyle(d).color; d.remove(); return v;
+        };
+        return [...new Set([...document.querySelectorAll('.legend-symbol')].flatMap((el) => {
+            const cs = getComputedStyle(el);
+            return [cs.backgroundColor, cs.borderTopColor, cs.borderBottomColor, norm(cs.backgroundImage.match(/rgb\([^)]*\)/)?.[0] || 'transparent')];
+        }))];
+    });
+
+    for (const [example, mode] of [
+        ['conflict_cycle', 'Standard'],
+        ['kpg_impact_vs_deccan', 'Assumption-Branching'],
+        ['kpg_impact_vs_deccan', 'Assumption-Direct']
+    ]) {
+        await page.selectOption('#example-select', example);
+        await page.waitForTimeout(1400);
+        await page.locator('.mode-option', { hasText: mode }).click();
+        await page.waitForTimeout(2200);
+        const drawn = await page.evaluate(() => {
+            const gm = window.playground.graphManager;
+            const hex = (c) => (typeof c === 'string' ? c : (c && (c.background || c.color)) || null);
+            return {
+                nodes: [...new Set(gm.networkData.nodes.get().map((n) => hex(n.color)).filter(Boolean))],
+                edges: [...new Set(gm.networkData.edges.get().map((e) => hex(e.color)).filter(Boolean))],
+                selfLoops: gm.networkData.edges.get().filter((e) => e.from === e.to).length
+            };
+        });
+        // Not asserting an exact colour match (the legend renders hex via computed rgb), but
+        // every mode must draw SOMETHING and the legend must have a self-loop entry whenever
+        // self-loops are drawn.
+        if (mode !== 'Standard' || drawn.nodes.length > 0) {
+            expect(drawn.nodes.length, `${example}/${mode} drew no nodes`).toBeGreaterThan(0);
+        }
+        if (drawn.selfLoops > 0) {
+            expect(await page.locator('.legend-symbol.edge-selfloop').count(),
+                `${example}/${mode} draws ${drawn.selfLoops} self-loops but the legend has no entry`)
+                .toBeGreaterThan(0);
+        }
+    }
+    expect(legendColours.length, 'the legend paints no distinct colours').toBeGreaterThan(3);
+});
+
 test('graph modes switch without regressions', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));

@@ -1716,10 +1716,35 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .legend-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-sm);
     font-size: var(--text-sm);
     color: var(--text-primary);
+}
+
+/* name on one line, then why it means that */
+.legend-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.legend-text b {
+    font-weight: 600;
+}
+
+.legend-text em {
+    font-style: normal;
+    font-size: var(--text-xs);
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+/* the swatch must not shrink or drift once the row is two lines tall */
+.legend-item .legend-symbol {
+    flex-shrink: 0;
+    margin-top: 0.25rem;
 }
 
 .legend-symbol {
@@ -1733,7 +1758,8 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     height: 20px;
     border-radius: 50%;
     background: #667eea;
-    border: 2px solid #667eea;
+    /* matches GraphUtils.createNodeColor('assumption'): border #5568d3, background #667eea */
+    border: 2px solid #5568d3;
 }
 
 .node-derived {
@@ -1788,6 +1814,18 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     width: 40px;
     height: 3px;
     position: relative;
+}
+
+/* Self-loops are drawn on any set or claim that supports the contrary of something it accepts.
+   Six of them appear on the default example in Standard mode, and joint-attack self-loops occur
+   in the assumption modes; the legend documented neither. Same orange as any attack, since that
+   is how they render. */
+.edge-selfloop {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f59e0b;
+    border-radius: 50%;
+    background: transparent;
 }
 
 .edge-support {
