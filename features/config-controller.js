@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-1';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-2';
 
 export class ConfigController {
     constructor(dom) {
@@ -183,36 +183,17 @@ export class ConfigController {
         const config = this.getCurrentConfig();
         const isDefence = ['admissible', 'complete', 'preferred'].includes(config.semantics);
         const READING = {
-            'sum-ub': 'total conceded ≤ β',
-            'max-ub': 'worst single concession ≤ β',
-            'min-lb': 'every concession ≥ β'
+            'sum-ub': 'The concessions must sum to no more than β.',
+            'max-ub': 'No single concession may exceed β.',
+            'min-lb': 'Every concession must be worth at least β.'
         };
-        const budgetLabel = config.abaRecovery
-            ? 'no discarding (ABA recovery)'
-            : (isDefence
-                ? 'defence budget: total conceded ≤ β'
-                : (READING[this.dom.budgetSelect.value] || 'no discarding'));
-
-        if (this.dom.supportedSurfaceNote) {
-            this.dom.supportedSurfaceNote.innerHTML = `
-                Five algebras &mdash; <code>godel</code>, <code>arctic</code>, <code>lukasiewicz</code> (strength);
-                <code>tropical</code>, <code>bottleneck_cost</code> (cost).
-                Five semantics, all budgeted. Reading: <code>${budgetLabel}</code>.
-                ${isDefence
-                    ? 'Under a cost algebra a defence budget reverses direction, so recovery arrives at a β above every attack weight rather than at 0.'
-                    : ''}
-            `;
-        }
         if (this.dom.budgetIntentNote) {
             this.dom.budgetIntentNote.textContent = config.abaRecovery
                 ? 'Every discard is forbidden, so this is plain ABA.'
                 : (isDefence
-                    ? 'This semantics supplies its own budget; the reading selector does not apply.'
-                    : 'Only the three canonical pairings are offered, so an invalid one is unreachable.');
-        }
-        if (this.dom.implementationNote) {
-            this.dom.implementationNote.textContent =
-                'Runs the canonical WABA modules directly via clingo-WASM.';
+                    ? 'This semantics carries its own budget (the objections it declines to answer must sum to no more than β), so this control does not apply.'
+                    : (READING[this.dom.budgetSelect.value]
+                        || 'Nothing may be conceded, so this is plain ABA.'));
         }
     }
 

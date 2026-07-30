@@ -1,4 +1,4 @@
-import { escapeHtml } from './parser-utils.js?v=20260730-1';
+import { escapeHtml } from './parser-utils.js?v=20260730-2';
 /**
  * MetricsManager - Decision-oriented analysis for ranked WABA extensions.
  *

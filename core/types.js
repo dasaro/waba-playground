@@ -73,9 +73,7 @@
  * @property {HTMLInputElement} timeoutInput
  * @property {HTMLElement} semiringAliasNote
  * @property {HTMLElement} semanticsNote
- * @property {HTMLElement} supportedSurfaceNote
  * @property {HTMLElement} budgetIntentNote
- * @property {HTMLElement} implementationNote
  * @property {HTMLInputElement[]} graphModeRadios
  * @property {HTMLSelectElement} inputMode
  * @property {HTMLElement} simpleMode
