@@ -2343,7 +2343,12 @@ button:focus-visible,
    unable to wrap, grew to their longest line and were clipped by the viewport. Matching its
    specificity is enough now that style.css loads after the vis sheet. */
 div.vis-network div.vis-tooltip {
-    position: fixed;
+    /* MUST stay `absolute`. vis appends the tooltip inside its own container and sets inline
+       left/top in CONTAINER-relative coordinates. Overriding to `fixed` reinterprets those same
+       numbers against the viewport, so the panel is displaced by exactly the container's page
+       offset -- it appeared at the top-left of the page while the hovered node was bottom-right.
+       The old rule also said `fixed`, but it never applied: vis's own selector outranked it. */
+    position: absolute;
     z-index: 10000;
     max-width: 22rem;
     padding: 0;

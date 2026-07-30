@@ -544,6 +544,49 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
     expect(state.edgeState, 'no edge reported its attack state').toBe(true);
 });
 
+test('the hover panel appears next to the node it describes', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await page.waitForTimeout(1600);
+
+    const probe = await page.evaluate(async () => {
+        const gm = window.playground.graphManager;
+        const net = gm.network;
+        const id = gm.networkData.nodes.getIds()[0];
+        // vis reports node positions in CONTAINER coordinates
+        const dom = net.canvasToDOM(net.getPositions([id])[id]);
+        const container = document.getElementById('cy');
+        const rect = container.getBoundingClientRect();
+        const point = { x: rect.left + dom.x, y: rect.top + dom.y };
+        const canvas = container.querySelector('canvas');
+        const move = () => canvas.dispatchEvent(new MouseEvent('mousemove',
+            { clientX: point.x, clientY: point.y, bubbles: true }));
+        move();
+        await new Promise((r) => setTimeout(r, 900));
+        move();
+        await new Promise((r) => setTimeout(r, 900));
+        const tip = container.querySelector('.vis-tooltip');
+        if (!tip) return { found: false };
+        const t = tip.getBoundingClientRect();
+        return {
+            found: true,
+            position: getComputedStyle(tip).position,
+            distance: Math.hypot(t.left - point.x, t.top - point.y),
+            // vis writes container-relative offsets; they are only correct under `absolute`
+            inlineLeft: tip.style.left,
+            containerOffset: Math.round(rect.left)
+        };
+    });
+
+    expect(probe.found, 'no tooltip appeared on hover').toBe(true);
+    // The regression this guards: overriding vis's `absolute` to `fixed` reinterprets its
+    // container-relative left/top against the viewport, throwing the panel to the top-left of
+    // the page while the node sits elsewhere.
+    expect(probe.position, 'vis positions its tooltip with container-relative offsets').toBe('absolute');
+    expect(probe.distance, `panel landed ${Math.round(probe.distance)}px from its node`).toBeLessThan(250);
+});
+
 test('the legend matches what the diagrams actually draw', async ({ page }) => {
     test.setTimeout(240000);
     await waitForClingoReady(page);

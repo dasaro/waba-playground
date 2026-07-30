@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260730-12';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-12';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260730-13';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-13';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
