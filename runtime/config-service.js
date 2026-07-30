@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260730-13';
+import { wabaModules } from '../waba-modules.js?v=20260730-15';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -110,7 +110,16 @@ export function normalizeConfig(config = {}) {
     const semantics = config.semantics || 'stable';
     const optMode = config.optMode || 'ignore';
     const filterType = config.filterType || 'projection';
-    const beta = Number.isFinite(config.beta) ? config.beta : parseInt(config.beta || config.budget || '0', 10) || 0;
+    const requestedBeta = Number.isFinite(config.beta)
+        ? config.beta
+        : parseInt(config.beta || config.budget || '0', 10) || 0;
+    // ABA recovery means NOTHING may be conceded. constraint/no_discard.lp pins the base
+    // discard set, but the defence semantics price their own `pay` set, which it does not touch
+    // -- so a left-over beta was still being spent and recovery returned 7 extensions instead of
+    // 1 on the default example. Zeroed here, at the one point every config passes through, so a
+    // preset or a restored config cannot bypass it either. bin/waba refuses the combination
+    // outright (`--aba-recovery cannot be combined with ... --beta`).
+    const beta = abaRecovery ? 0 : requestedBeta;
     const numModels = Number.isFinite(config.numModels) ? config.numModels : parseInt(config.numModels || '0', 10) || 0;
     const timeout = Number.isFinite(config.timeout) ? config.timeout : 60000;
     const lukK = Number.isFinite(config.lukK) ? config.lukK : parseInt(config.lukK || '10', 10) || 10;

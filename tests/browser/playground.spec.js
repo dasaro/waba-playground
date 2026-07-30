@@ -544,6 +544,77 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
     expect(state.edgeState, 'no edge reported its attack state').toBe(true);
 });
 
+test('a timed-out run does not poison the session', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+
+    // Rejecting the timeout race does not stop clingo; the abandoned solve keeps the single WASM
+    // worker, and the queue used to advance on the timeout rather than on the solver. One
+    // timeout then made every later run time out, including frameworks that solve in
+    // milliseconds on a fresh page.
+    const probe = await page.evaluate(async () => {
+        const cm = window.playground.clingoManager;
+        const heavy = Array.from({ length: 20 }, (_, i) => `assumption(a${i}). contrary(a${i}, c${i}).`).join('\n');
+        const light = 'assumption(x). contrary(x, cx).\nassumption(y). contrary(y, cy).\nhead(r1, cx). body(r1, y).';
+        const cfg = (over) => ({
+            semiring: 'godel', defaultPolicy: 'neutral', semantics: 'cf', budgetMode: 'none',
+            optMode: 'ignore', beta: 0, filterType: 'projection', timeout: 3000, ...over
+        });
+        let timedOut = false;
+        try { await cm.runWABA(heavy, cfg({}), () => {}); } catch { timedOut = true; }
+        let after = null;
+        try {
+            const r = await cm.runWABA(light, cfg({ timeout: 20000 }), () => {});
+            after = { result: r?.result?.Result, extensions: r?.result?.Call?.[0]?.Witnesses?.length ?? 0 };
+        } catch (e) { after = { error: e.message }; }
+        return { timedOut, after };
+    });
+
+    expect(probe.timedOut, 'the heavy framework was expected to exceed its timeout').toBe(true);
+    expect(probe.after.error, 'the run after a timeout failed').toBeUndefined();
+    expect(probe.after.extensions, 'the solver did not recover after a timeout').toBeGreaterThan(0);
+});
+
+test('ABA recovery actually recovers classical ABA for the defence semantics', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await page.waitForTimeout(1500);
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'admissible');
+    // the preset carries beta = 8, which is what used to leak through
+    await expect(page.locator('#budget-input')).toHaveValue('8');
+
+    const runCount = async () => {
+        await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+        await page.click('#run-btn');
+        await page.waitForFunction(() => document.querySelectorAll('.answer-header').length > 0
+            || /UNSATISFIABLE|No extensions/i.test(document.getElementById('output').textContent || ''),
+            null, { timeout: 90000 });
+        return page.locator('.answer-header').count();
+    };
+
+    const budgeted = await runCount();
+    expect(budgeted).toBeGreaterThan(1);
+
+    // The defence semantics price their own `pay` set, which constraint/no_discard.lp does not
+    // touch, so disabling the beta box was not enough -- beta kept being spent and recovery
+    // returned 7 extensions where classical ABA has 1.
+    await page.locator('label.switch-toggle[for="aba-recovery-toggle"] .switch-slider').click();
+    await expect(page.locator('#aba-recovery-toggle')).toBeChecked();
+    const recovered = await runCount();
+    expect(recovered, 'ABA recovery did not return the classical answer').toBe(1);
+
+    // and the config it produces must be one the app accepts
+    const state = await page.evaluate(async () => {
+        const cfg = window.playground.configController.getCurrentConfig();
+        const { validateConfig } = await import('./runtime/config-service.js');
+        return { beta: cfg.beta, error: validateConfig(cfg) };
+    });
+    expect(state.beta, 'ABA recovery must zero beta').toBe(0);
+    expect(state.error, 'ABA recovery produced a config the app rejects').toBeNull();
+});
+
 test('the hover panel appears next to the node it describes', async ({ page }) => {
     test.setTimeout(120000);
     await waitForClingoReady(page);

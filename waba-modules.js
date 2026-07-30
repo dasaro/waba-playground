@@ -42,6 +42,24 @@ multi_weight(X) :- weight(X,V1), weight(X,V2), V1 != V2.
 :- multi_weight(_).
 
 %% ====================
+%% INTEGRALITY GUARD (a weight must be a number the budget can add up)
+%% ====================
+%% A weight/2 whose value is not an integer is SILENTLY DROPPED by the monoid aggregates:
+%% #sum/#max/#min ignore a tuple whose weight term is not integral. The attack it belongs to then
+%% costs nothing, so it can be discarded at ANY budget -- verified: a framework weighted
+%% \`weight(wa,"heavy")\` admits 2 models at beta=0 under (sum,ub) where the same framework
+%% weighted \`weight(wa,7)\` admits 1. That is a soundness hole, not a modelling choice, so it is
+%% rejected here alongside the other well-formedness conditions rather than mis-priced.
+%%
+%% The two infinity SENTINELS stay legal: semiring identities are #sup/#inf, arg_weight can
+%% legitimately be infinite, and the budget guards handle both ends explicitly.
+integral_weight(X) :- weight(X,W), W = W + 0.
+sentinel_weight(X) :- weight(X,#sup).
+sentinel_weight(X) :- weight(X,#inf).
+non_numeric_weight(X) :- weight(X,_), not integral_weight(X), not sentinel_weight(X).
+:- non_numeric_weight(_).
+
+%% ====================
 %% FLATNESS GUARD
 %% ====================
 %% WABA's weighted/budgeted semantics is defined for FLAT ABA frameworks: no

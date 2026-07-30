@@ -1,7 +1,7 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260730-13';
+import { wabaModules } from '../waba-modules.js?v=20260730-15';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
@@ -9,10 +9,10 @@ import {
     isBudgetedDefence,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260730-13';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-13';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-13';
-import { ParserUtils } from './parser-utils.js?v=20260730-13';
+} from '../runtime/config-service.js?v=20260730-15';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-15';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-15';
+import { ParserUtils } from './parser-utils.js?v=20260730-15';
 
 // Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.
@@ -133,12 +133,47 @@ export class ClingoManager {
             return null;
         }
 
-        // The probe must not be blocked by the module's own bound while we search for the
-        // minimum. A strength bound is `sum <= beta` and additionally forbids ANY payment at
-        // beta = 0, so the probe needs a large beta; a cost bound is `min >= beta`, which is
-        // vacuous at 0. Either way the #minimize, not beta, decides the answer.
-        const probeBeta = config.polarity === 'lower' ? 0 : 1000000;
+        // The two polarities ask DIFFERENT questions of the module:
+        //
+        //   strength (oplus = max): it bounds `#sum{paid} <= beta`, so S holds for every
+        //       beta >= the least total it can concede. beta* = that minimum.
+        //   cost (oplus = min): it bounds `#min{paid} >= beta`, so a BIGGER beta is more
+        //       restrictive and S holds for every beta <= the largest floor it can achieve.
+        //       beta* = that maximum.
+        //
+        // The strength side is a plain #minimize and is verified exact. The cost side is not: a
+        // #maximize over the computed #min got the answer wrong three different ways (it ignores
+        // that a pay-free model dominates, and it does not reliably find the best floor). Rather
+        // than keep guessing at an encoding, the cost side BINARY-SEARCHES the real module -- it
+        // asks the actual semantics whether S survives at a given beta, so it cannot disagree
+        // with it by construction.
+        const isCost = config.polarity === 'lower';
         const costs = new Map();
+
+        // Search ceiling: no threshold can exceed the total declared weight.
+        const declared = [...framework.matchAll(/\bweight\s*\(\s*[^,]+,\s*(-?\d+)\s*\)/g)]
+            .map((m) => Number(m[1]))
+            .filter((n) => Number.isFinite(n));
+        const ceiling = declared.length > 0
+            ? declared.reduce((a, b) => a + Math.abs(b), 0) + 1
+            : 1000;
+
+        // One solve per extension for strength, ~log2(ceiling) for cost. Uncapped this was 2^n
+        // probes on a wide framework, which froze the page behind a modal overlay.
+        const PRICING_CAP = 24;
+        let priced = 0;
+
+        const holdsAt = async (pins, beta) => {
+            const program = `${buildProgram(framework, { ...config, beta })}
+%% Pin this extension and ask the module whether it survives at this beta
+${pins}
+`;
+            const probe = await this.runSolver(
+                program, 1,
+                buildSolverArgs({ ...config, beta, optMode: 'ignore' }), config.timeout
+            );
+            return probe?.Result === 'SATISFIABLE';
+        };
 
         for (const witness of witnesses) {
             const inSet = new Set((witness.Value || [])
@@ -149,25 +184,60 @@ export class ClingoManager {
             if (costs.has(key)) {
                 continue;
             }
+            if (priced >= PRICING_CAP) {
+                onLog(`Priced the first ${PRICING_CAP} extensions; the rest are shown without a β*.`, 'info');
+                break;
+            }
+            priced += 1;
 
             const pins = assumptions
                 .map((a) => (inSet.has(a) ? `:- not in(${a}).` : `:- in(${a}).`))
                 .join('\n');
-            const program = `${buildProgram(framework, { ...config, beta: probeBeta })}
+
+            try {
+                if (!isCost) {
+                    // Least beta admitting S: minimise what it must concede.
+                    const program = `${buildProgram(framework, { ...config, beta: ceiling })}
 %% Pin this extension and minimise what it must concede
 ${pins}
 #minimize { W,X,Y : pay(X,Y), arg_weight(X,W) }.
 `;
-            try {
-                const probe = await this.runSolver(
-                    program, 1, ['-c', `beta=${probeBeta}`, '--opt-mode=opt', '--quiet=1'], config.timeout
-                );
-                const probeWitnesses = probe?.Call?.[0]?.Witnesses || [];
-                const last = probeWitnesses[probeWitnesses.length - 1];
-                const value = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : null;
-                // An extension needing no concession yields no `pay` atom, so clingo reports no
-                // objective at all rather than 0. That IS zero, not "unknown".
-                costs.set(key, typeof value === 'number' ? value : 0);
+                    // buildSolverArgs, NOT a hand-rolled list: it is the only place `-c k` is
+                    // added, so hand-rolling left every Lukasiewicz probe at the module's default
+                    // k = 1000 regardless of the k control.
+                    const probe = await this.runSolver(
+                        program, 1,
+                        [...buildSolverArgs({ ...config, beta: ceiling, optMode: 'ignore' })
+                            .filter((a) => !a.startsWith('--opt-mode')), '--opt-mode=opt', '--quiet=1'],
+                        config.timeout
+                    );
+                    const witnessesOut = probe?.Call?.[0]?.Witnesses || [];
+                    const last = witnessesOut[witnessesOut.length - 1];
+                    const raw = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : null;
+                    costs.set(key, typeof raw === 'number' ? raw : 0);
+                    continue;
+                }
+
+                // Cost: greatest beta at which S still holds. Monotone (a bigger beta is strictly
+                // more restrictive), so binary search is exact.
+                if (!(await holdsAt(pins, 0))) {
+                    continue;                       // holds nowhere; nothing meaningful to show
+                }
+                if (await holdsAt(pins, ceiling)) {
+                    costs.set(key, Infinity);       // survives however tight the floor gets
+                    continue;
+                }
+                let lo = 0;                          // known to hold
+                let hi = ceiling;                    // known not to hold
+                while (hi - lo > 1) {
+                    const mid = Math.floor((lo + hi) / 2);
+                    if (await holdsAt(pins, mid)) {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
+                }
+                costs.set(key, lo);
             } catch (error) {
                 onLog(`Could not price extension {${key}}: ${error.message}`, 'warning');
             }
@@ -300,11 +370,40 @@ ${wabaModules.semantics[filterKind]}
         }
     }
 
+    /**
+     * Restarts the WASM worker. Needed because a timed-out solve is NOT cancelled by rejecting
+     * the race: clingo keeps chewing on the abandoned program and owns the single worker.
+     */
+    async restartSolver() {
+        const wasmUrl = this.resolveWasmUrl();
+        if (typeof clingo !== 'undefined' && typeof clingo.restart === 'function') {
+            await clingo.restart(wasmUrl);
+        } else if (typeof clingo !== 'undefined' && typeof clingo.init === 'function') {
+            await clingo.init(wasmUrl);
+        }
+    }
+
+    /**
+     * Races a solve against the timeout, and on timeout ACTUALLY cancels it.
+     *
+     * Rejecting the race used to leave the solve running. Since the queue chained on this
+     * wrapper rather than on the solve, the next task started while the abandoned one still had
+     * the worker -- so one timeout made every later run time out too, including frameworks that
+     * solve in 200ms on a fresh page. Measured: after a single timeout, inflight stayed at 1 and
+     * the following run reached inflight 2 and never returned.
+     */
     async runWithTimeout(promise, timeoutMs, timeoutMessage) {
         let timeoutHandle;
+        let timedOut = false;
         const timeoutPromise = new Promise((_, reject) => {
-            timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+            timeoutHandle = setTimeout(() => {
+                timedOut = true;
+                reject(new Error(timeoutMessage));
+            }, timeoutMs);
         });
+
+        // The abandoned solve must never surface as an unhandled rejection.
+        promise.catch(() => undefined);
 
         try {
             const result = await Promise.race([promise, timeoutPromise]);
@@ -312,6 +411,15 @@ ${wabaModules.semantics[filterKind]}
             return result;
         } catch (error) {
             clearTimeout(timeoutHandle);
+            if (timedOut) {
+                // Free the worker before returning control, so the queue hands the next task a
+                // solver that is actually idle.
+                try {
+                    await this.restartSolver();
+                } catch {
+                    // Best effort: a failed restart is still better than leaving it wedged.
+                }
+            }
             throw error;
         }
     }

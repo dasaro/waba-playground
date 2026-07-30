@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-13';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-13';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-13';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-13';
+import { PopupManager } from './popup-manager.js?v=20260730-15';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-15';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-15';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-15';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -140,7 +140,7 @@ export class OutputManager {
                     ? defenceCosts.get(parsed.in.slice().sort().join(','))
                     : undefined;
                 const cost = defenceCost !== undefined
-                    ? displayValue(defenceCost)
+                    ? (defenceCost === Infinity ? 'any β' : displayValue(defenceCost))
                     : ((config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
                         ? null
                         : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization));
@@ -164,7 +164,9 @@ export class OutputManager {
                     // extension needing the smallest budget comes first. Before this they were
                     // emitted in solver order, e.g. 0, 8, 8, 16, 3, 5, 5, 3.
                     objectiveTuple: defenceCost !== undefined
-                        ? [0, 0, defenceCost]
+                        // Best first: the cheapest beta* under a strength bound, the largest
+                        // surviving beta* under a cost bound.
+                        ? [0, 0, config.polarity === 'lower' ? -defenceCost : defenceCost]
                         : getObjectiveTuple(
                             { ...config, optimization: config.budgetMode === 'lb' ? 'maximize' : 'minimize' },
                             aggregateValue
@@ -631,7 +633,10 @@ export class OutputManager {
     costLabel() {
         const config = this.lastRunConfig || this.readConfig();
         if (['admissible', 'complete', 'preferred'].includes(config.semantics)) {
-            return 'β* needed';
+            // Strength bounds the SUM above, so beta* is the least budget that admits the
+            // extension. Cost bounds the MIN below, so a bigger beta is more restrictive and
+            // beta* is the largest budget it survives. Different quantities, different words.
+            return config.polarity === 'lower' ? 'β* up to' : 'β* needed';
         }
         return {
             sum: 'Σ conceded',

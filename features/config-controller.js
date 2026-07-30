@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-13';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-15';
 
 export class ConfigController {
     constructor(dom) {
@@ -43,6 +43,7 @@ export class ConfigController {
             budgetMode,
             semantics: this.dom.semanticsSelect.value,
             optMode,
+            // normalizeConfig zeroes this under ABA recovery, so the raw field is read here.
             beta: parseInt(this.dom.budgetInput.value, 10) || 0,
             lukK: parseInt(this.dom.lukKInput?.value, 10) || 10,
             numModels: parseInt(this.dom.numModelsInput.value, 10) || 0,
@@ -76,7 +77,7 @@ export class ConfigController {
             });
         }
         // A freshly applied config supersedes any held ABA-recovery snapshot.
-        this._saved = undefined;
+        this._savedPolicy = undefined;
         this._savedReading = undefined;
     }
 
@@ -156,26 +157,28 @@ export class ConfigController {
         }
 
         // ABA recovery pins transparent defaults and forbids discarding.
+        // Only the delta policy is snapshotted here; the budget reading is handled by the single
+        // snapshot below, so the two cannot restore different values.
         if (abaRecovery) {
-            if (this._saved === undefined) {
-                this._saved = {
-                    policy: this.dom.defaultPolicySelect.value,
-                    budget: this.dom.budgetSelect.value
-                };
+            if (this._savedPolicy === undefined) {
+                this._savedPolicy = this.dom.defaultPolicySelect.value;
             }
             this.dom.defaultPolicySelect.value = 'neutral';
-            this.dom.budgetSelect.value = 'none';
-        } else if (this._saved !== undefined) {
-            this.dom.defaultPolicySelect.value = this._saved.policy;
-            this.dom.budgetSelect.value = this._saved.budget;
-            this._saved = undefined;
+        } else if (this._savedPolicy !== undefined) {
+            this.dom.defaultPolicySelect.value = this._savedPolicy;
+            this._savedPolicy = undefined;
         }
 
         // A defence semantics owns its budget, so the reading selector is not applicable.
         // Snapshot the user's choice while it is pinned, or switching to admissible and back
         // silently leaves the reading on "No discarding" -- and then cf/stable report no cost,
         // which looks like the cost regression all over again.
-        if (isDefence && !abaRecovery) {
+        if (isDefence || abaRecovery) {
+            // Snapshot before the FIRST pin, whichever of the two pins it. The restore arm
+            // previously lacked this guard, so toggling ABA recovery while a defence semantics
+            // was selected ran after the recovery block and un-pinned the budget it had just
+            // set -- yielding a config validateConfig rejects ("ABA recovery cannot be combined
+            // with a bounded budget mode") while the greyed select still displayed the offender.
             if (this._savedReading === undefined) {
                 this._savedReading = this.dom.budgetSelect.value;
             }
