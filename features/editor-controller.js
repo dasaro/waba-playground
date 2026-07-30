@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260730-7';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-7';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260730-8';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-8';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
@@ -179,7 +179,9 @@ export class EditorController {
         // Simple->Advanced switch regenerates valid ASP from the fields instead.
         this.store.setState({ originalWabaContent: null });
         this.populateSimpleFields({
-            description: '',
+            // .waba now carries the description as a "% //" line, like .lp does; it used to be
+            // discarded here, so exporting and re-importing lost it.
+            description: parsed.description || '',
             assumptions: parsed.assumptions.join('\n'),
             rules: parsed.rules.join('\n'),
             contraries: parsed.contraries.join('\n'),

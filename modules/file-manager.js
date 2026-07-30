@@ -3,7 +3,8 @@
  */
 export class FileManager {
     constructor(fileUploadBtn, fileUploadInput, inputMode, simpleMode, editor,
-                assumptionsInput, rulesInput, contrariesInput, weightsInput) {
+                assumptionsInput, rulesInput, contrariesInput, weightsInput,
+                descriptionInput = null) {
         this.fileUploadBtn = fileUploadBtn;
         this.fileUploadInput = fileUploadInput;
         this.inputMode = inputMode;
@@ -13,6 +14,7 @@ export class FileManager {
         this.rulesInput = rulesInput;
         this.contrariesInput = contrariesInput;
         this.weightsInput = weightsInput;
+        this.descriptionInput = descriptionInput;
     }
 
     // ===================================
@@ -73,6 +75,15 @@ export class FileManager {
         // Generate .waba format from Simple Mode fields
         let content = '';
 
+        // Description. The .lp export preserves it as a "% //" line (see
+        // features/editor/simple-format.js); .waba dropped it silently, so exporting and
+        // re-importing lost the modeller's own notes. Same convention here, one line per
+        // source line, so both formats survive a round trip.
+        const description = this.descriptionInput?.value.trim();
+        if (description) {
+            content += description.split('\n').map((line) => `% // ${line}`).join('\n') + '\n\n';
+        }
+
         // Assumptions
         const assumptions = this.assumptionsInput.value.trim();
         if (assumptions) {
@@ -103,7 +114,14 @@ export class FileManager {
     convertLpToWaba(clingoCode) {
         // Parse .lp format and convert to .waba Simple Mode format
         const preprocessed = clingoCode.replace(/\.\s+/g, '.\n');
-        const lines = preprocessed.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('%'));
+        const allLines = preprocessed.split('\n').map(l => l.trim());
+        // Capture the description BEFORE dropping comments: "% //" is the description
+        // convention in both formats, and the blanket comment filter below used to discard it,
+        // so converting an .lp to .waba silently lost it.
+        const descriptionLines = allLines
+            .filter((l) => l.startsWith('% //'))
+            .map((l) => l.slice(4).trim());
+        const lines = allLines.filter(l => l && !l.startsWith('%'));
 
         const assumptions = [];
         const weights = [];
@@ -172,6 +190,10 @@ export class FileManager {
         // Generate .waba format
         let content = '';
 
+        if (descriptionLines.length > 0) {
+            content += descriptionLines.map((line) => `% // ${line}`).join('\n') + '\n\n';
+        }
+
         if (assumptions.length > 0) {
             content += '% Assumptions:\n' + assumptions.join('\n') + '\n\n';
         }
@@ -237,6 +259,9 @@ export class FileManager {
                 this.rulesInput.value = parsed.rules.join('\n');
                 this.contrariesInput.value = parsed.contraries.join('\n');
                 this.weightsInput.value = parsed.weights.join('\n');
+                if (this.descriptionInput) {
+                    this.descriptionInput.value = parsed.description || '';
+                }
 
                 // Generate ASP code and update graph
                 const aspCode = parseSimpleABA();
@@ -265,9 +290,17 @@ export class FileManager {
         const rules = [];
         const contraries = [];
         const weights = [];
+        const descriptionLines = [];
 
         for (const line of lines) {
-            // Skip empty lines and comments (% is ASP/WABA standard)
+            // "% //" carries the description, as in the .lp format. Checked BEFORE the blanket
+            // comment skip below, which is what used to discard it.
+            if (line.startsWith('% //')) {
+                descriptionLines.push(line.slice(4).trim());
+                continue;
+            }
+
+            // Skip empty lines and other comments (% is ASP/WABA standard)
             if (!line || line.startsWith('%')) continue;
 
             // Check for rule: "a <- b,d" (ASCII) or "a ← b,d" (Unicode arrow, as
@@ -313,6 +346,6 @@ export class FileManager {
             console.warn(`Unrecognized .waba line format: "${line}"`);
         }
 
-        return { assumptions, rules, contraries, weights };
+        return { assumptions, rules, contraries, weights, description: descriptionLines.join('\n').trim() };
     }
 }
