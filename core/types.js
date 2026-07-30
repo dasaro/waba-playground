@@ -100,8 +100,6 @@
  * @property {HTMLElement} themeIcon
  * @property {HTMLButtonElement} fontIncreaseBtn
  * @property {HTMLButtonElement} fontDecreaseBtn
- * @property {HTMLElement | null} analysisPanel
- * @property {HTMLElement} exportSection
  * @property {HTMLElement | null} graphEmptyState
  * @property {HTMLElement | null} outputEmptyState
  * @property {HTMLElement | null} introStatus

@@ -59,8 +59,6 @@ export function createDomRegistry(doc = document) {
         themeIcon: byId('theme-icon'),
         fontIncreaseBtn: byId('font-increase-btn'),
         fontDecreaseBtn: byId('font-decrease-btn'),
-        analysisPanel: byId('analysis-panel'),
-        exportSection: byId('export-section'),
         graphEmptyState: byId('graph-empty-state'),
         outputEmptyState: byId('output-empty-state'),
         introStatus: byId('intro-status'),

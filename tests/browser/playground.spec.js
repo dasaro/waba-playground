@@ -102,6 +102,45 @@ test('choosing an algebra preselects the budget reading for its polarity', async
     }
 });
 
+test('extensions are ordered best-first, in the direction the bound implies', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+
+    const costsInOrder = async () => {
+        await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+        await page.click('#run-btn');
+        await page.waitForFunction(() => document.querySelectorAll('.answer-header').length > 0,
+            null, { timeout: 90000 });
+        return page.locator('.extension-cost-badge').evaluateAll(
+            (els) => els.map((el) => parseInt(el.textContent.replace(/[^0-9-]/g, ''), 10))
+        );
+    };
+
+    // Upper bound: the aggregate is a price, so cheapest first.
+    await page.selectOption('#semiring-select', 'godel');
+    await page.fill('#budget-input', '30');
+    const ub = await costsInOrder();
+    expect(ub.length).toBeGreaterThan(1);
+    expect(ub, 'sum <= beta should ascend').toEqual([...ub].sort((a, b) => a - b));
+
+    // Lower bound: the aggregate is a quality FLOOR, so the largest least-concession is the
+    // best extension and the order must invert.
+    await page.selectOption('#semiring-select', 'bottleneck_cost');
+    await expect(page.locator('#budget-select')).toHaveValue('min-lb');
+    const lb = await costsInOrder();
+    expect(lb.length).toBeGreaterThan(1);
+    expect(lb, 'min >= beta should descend').toEqual([...lb].sort((a, b) => b - a));
+
+    // Defence semantics have no monoid aggregate; they rank by the probed beta*, ascending.
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'admissible');
+    await page.fill('#budget-input', '30');
+    const def = await costsInOrder();
+    expect(def.length).toBeGreaterThan(1);
+    expect(def, 'beta* should ascend').toEqual([...def].sort((a, b) => a - b));
+});
+
 test('the Standard set-graph refuses frameworks with too many candidate sets', async ({ page }) => {
     await waitForClingoReady(page);
 
@@ -144,10 +183,15 @@ test('every semantics reports a per-extension cost', async ({ page }) => {
 
 test('collapsible panels toggle cleanly', async ({ page }) => {
     await waitForClingoReady(page);
-    await expect(page.locator('#analysis-export-png-proxy')).toBeVisible();
-    await expect(page.locator('[data-panel="analysis"]')).toContainText('Decision Analysis');
+    // The Analysis & Export panel was removed: its Decision Analysis view was deprecated and
+    // its PNG/PDF buttons were proxies that clicked the graph toolbar's real ones.
+    await expect(page.locator('[data-panel="analysis"]')).toHaveCount(0);
+    await expect(page.locator('#metrics-toggle-btn')).toHaveCount(0);
+    // the graph toolbar still owns the real exports
+    await expect(page.locator('#export-png-btn')).toBeVisible();
+    await expect(page.locator('#export-pdf-btn')).toBeVisible();
 
-    for (const panelId of ['config', 'output', 'analysis']) {
+    for (const panelId of ['config', 'output', 'graph']) {
         const panel = page.locator(`.panel[data-panel="${panelId}"]`);
         const toggle = panel.locator('.panel-toggle');
         await toggle.click();
@@ -313,14 +357,18 @@ test('a budgeted stable run honours the reading and the optimisation direction',
     expect(pageErrors).toEqual([]);
 });
 
-test('analysis panel renders decision metrics and version check passes', async ({ page }) => {
+test('the extension download survives the removal of the analysis panel', async ({ page }) => {
     await waitForClingoReady(page);
 
     await page.selectOption('#example-select', 'conflict_cycle');
     await page.click('#run-btn');
-    await expect(page.locator('#metrics-toggle-btn')).toBeVisible({ timeout: 60000 });
-    await page.click('#metrics-toggle-btn');
-    await expect(page.locator('#metrics-display')).toBeVisible();
+    await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
+
+    // It used to be appended into the Analysis & Export panel; it now sits at the top of the
+    // output pane, alongside the extensions it downloads.
+    const download = page.locator('#download-all-extensions-btn');
+    await expect(download).toBeVisible();
+    expect(await download.evaluate((el) => el.closest('[data-panel]')?.getAttribute('data-panel'))).toBe('output');
 
     await page.goto('/version-check.html');
     await expect(page.locator('#status')).toContainText('Modules loaded successfully', { timeout: 60000 });

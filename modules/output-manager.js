@@ -1,11 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-4';
-import { MetricsManager } from './metrics-manager.js?v=20260730-4';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-4';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-4';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-4';
+import { PopupManager } from './popup-manager.js?v=20260730-5';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-5';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-5';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-5';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -40,41 +39,6 @@ export class OutputManager {
         // attack back to its supporting assumptions.
         this.frameworkRules = new Map();
         this.frameworkAssumptions = new Set();
-        this.renderAnalysisHome();
-    }
-
-    renderAnalysisHome() {
-        const exportSection = this.dom.exportSection;
-        if (!exportSection) {
-            return;
-        }
-
-        exportSection.innerHTML = `
-            <div class="analysis-empty-state">
-                <div class="analysis-empty-card">
-                    <h4>Decision Analysis</h4>
-                    <p>Run a framework to populate ranked extensions, best-assumption summaries, and CSV export.</p>
-                </div>
-                <div class="analysis-empty-card">
-                    <h4>Graph Export</h4>
-                    <p>The current graph view can always be exported from here, even before a solver run.</p>
-                    <div class="analysis-button-group">
-                        <button type="button" id="analysis-export-png-proxy" class="analysis-action-btn analysis-action-btn-secondary">💾 Export PNG</button>
-                        <button type="button" id="analysis-export-pdf-proxy" class="analysis-action-btn analysis-action-btn-secondary">📄 Export PDF</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const pngProxy = this.dom.document.getElementById('analysis-export-png-proxy');
-        if (pngProxy && this.dom.exportPngBtn) {
-            pngProxy.addEventListener('click', () => this.dom.exportPngBtn.click());
-        }
-
-        const pdfProxy = this.dom.document.getElementById('analysis-export-pdf-proxy');
-        if (pdfProxy && this.dom.exportPdfBtn) {
-            pdfProxy.addEventListener('click', () => this.dom.exportPdfBtn.click());
-        }
     }
 
     // ===================================
@@ -186,7 +150,25 @@ export class OutputManager {
                     parsed,
                     cost,
                     aggregateValue,
-                    objectiveTuple: getObjectiveTuple(config, aggregateValue)
+                    defenceCost,
+                    // BEST FIRST, and "best" is set by the BOUND, not by the user's
+                    // optimisation direction. Under an upper bound (`sum`/`max` + ub) the
+                    // aggregate is a price, so smaller is better. Under a lower bound
+                    // (`min` + lb) it is a quality FLOOR -- a bigger least-concession means
+                    // only easy objections were given up -- so bigger is better and the order
+                    // has to invert. It previously always sorted ascending, which listed the
+                    // weakest extension first for every cost algebra.
+                    //
+                    // For the defence semantics the monoid aggregate does not exist (no
+                    // discarded_attack/3), so their key is the probed β*, ascending: the
+                    // extension needing the smallest budget comes first. Before this they were
+                    // emitted in solver order, e.g. 0, 8, 8, 16, 3, 5, 5, 3.
+                    objectiveTuple: defenceCost !== undefined
+                        ? [0, 0, defenceCost]
+                        : getObjectiveTuple(
+                            { ...config, optimization: config.budgetMode === 'lb' ? 'maximize' : 'minimize' },
+                            aggregateValue
+                        )
                 };
             });
 
@@ -216,9 +198,8 @@ export class OutputManager {
             // Store witnesses for download
             this.storedWitnesses = witnessesWithCosts;
 
-            // Add download and metrics buttons if there are extensions
+            // Offer a download of everything that was found
             this.addDownloadButton();
-            this.addMetricsButton();
         }
 
         // Display statistics
@@ -240,27 +221,13 @@ export class OutputManager {
         // Create download button with unified styling
         const button = document.createElement('button');
         button.id = 'download-all-extensions-btn';
-        button.className = 'analysis-action-btn';
+        button.className = 'clear-btn';
         button.innerHTML = '💾 Download All Extensions';
         button.addEventListener('click', () => this.downloadAllExtensions());
 
-        // Get or create button group container
-        let buttonGroup = this.dom.document.getElementById('analysis-button-group');
-        const exportSection = this.dom.exportSection;
-
-        if (!buttonGroup && exportSection) {
-            buttonGroup = document.createElement('div');
-            buttonGroup.id = 'analysis-button-group';
-            buttonGroup.className = 'analysis-button-group';
-            exportSection.appendChild(buttonGroup);
-        }
-
-        if (buttonGroup) {
-            buttonGroup.appendChild(button);
-        } else {
-            // Fallback: insert at top of output if export section not found
-            this.output.insertBefore(button, this.output.firstChild);
-        }
+        // Lives at the top of the output pane, alongside the extensions it downloads. It used
+        // to be appended into the Analysis & Export panel, which has been removed.
+        this.output.insertBefore(button, this.output.firstChild);
     }
 
     downloadAllExtensions() {
@@ -327,123 +294,6 @@ export class OutputManager {
 
         link.click();
         URL.revokeObjectURL(url);
-    }
-
-    addMetricsButton() {
-        // Check if button already exists
-        if (this.dom.document.getElementById('metrics-toggle-btn')) {
-            return;
-        }
-
-        // Create metrics toggle button with unified styling
-        const button = document.createElement('button');
-        button.id = 'metrics-toggle-btn';
-        button.className = 'analysis-action-btn';
-        button.innerHTML = '<span class="toggle-icon">▶</span> Show Decision Analysis';
-        button.addEventListener('click', () => this.toggleMetrics(button));
-
-        // Add to the same button group as download button
-        let buttonGroup = this.dom.document.getElementById('analysis-button-group');
-        const exportSection = this.dom.exportSection;
-
-        if (!buttonGroup && exportSection) {
-            buttonGroup = document.createElement('div');
-            buttonGroup.id = 'analysis-button-group';
-            buttonGroup.className = 'analysis-button-group';
-            exportSection.appendChild(buttonGroup);
-        }
-
-        if (buttonGroup) {
-            buttonGroup.appendChild(button);
-        } else {
-            // Fallback: insert after download button if button group not found
-            const downloadBtn = this.dom.document.getElementById('download-all-extensions-btn');
-            if (downloadBtn && downloadBtn.nextSibling) {
-                this.output.insertBefore(button, downloadBtn.nextSibling);
-            } else {
-                this.output.insertBefore(button, this.output.firstChild);
-            }
-        }
-    }
-
-    toggleMetrics(button) {
-        const metricsDiv = this.dom.document.getElementById('metrics-display');
-
-        if (metricsDiv) {
-            // Toggle visibility
-            const isHidden = metricsDiv.style.display === 'none';
-            metricsDiv.style.display = isHidden ? 'block' : 'none';
-            button.innerHTML = isHidden
-                ? '<span class="toggle-icon">▼</span> Hide Decision Analysis'
-                : '<span class="toggle-icon">▶</span> Show Decision Analysis';
-            button.classList.toggle('expanded', isHidden);
-        } else {
-            // Compute and display metrics for the first time
-            this.displayMetrics(button);
-        }
-    }
-
-    displayMetrics(button) {
-        if (!this.storedWitnesses || this.storedWitnesses.length === 0) {
-            return;
-        }
-
-        // Build config for metrics computation
-        const config = this.lastRunConfig || this.readConfig();
-
-        // Compute metrics with config
-        const metricsData = MetricsManager.computeMetrics(this.storedWitnesses, config);
-
-        if (!metricsData) {
-            this.log('⚠️ Could not compute metrics', 'warning');
-            return;
-        }
-
-        // Store metrics data for CSV export
-        this.storedMetricsData = metricsData;
-
-        // Create metrics display div
-        let metricsDiv = this.dom.document.getElementById('metrics-display');
-        if (!metricsDiv) {
-            metricsDiv = document.createElement('div');
-            metricsDiv.id = 'metrics-display';
-            metricsDiv.style.display = 'block';
-
-            // Insert into export section after button group
-            const exportSection = this.dom.exportSection;
-            const buttonGroup = this.dom.document.getElementById('analysis-button-group');
-
-            if (exportSection && buttonGroup && buttonGroup.parentNode === exportSection) {
-                // Insert after button group
-                if (buttonGroup.nextSibling) {
-                    exportSection.insertBefore(metricsDiv, buttonGroup.nextSibling);
-                } else {
-                    exportSection.appendChild(metricsDiv);
-                }
-            } else {
-                // Fallback: insert after button
-                if (button.nextSibling) {
-                    button.parentNode.insertBefore(metricsDiv, button.nextSibling);
-                } else {
-                    button.parentNode.appendChild(metricsDiv);
-                }
-            }
-        }
-
-        // Render metrics HTML
-        metricsDiv.innerHTML = MetricsManager.formatMetricsHTML(metricsData);
-
-        // Wire up CSV export button
-        const csvButton = this.dom.document.getElementById('export-metrics-csv-btn');
-        if (csvButton) {
-            csvButton.addEventListener('click', () => {
-                MetricsManager.downloadMetricsCSV(this.storedMetricsData);
-            });
-        }
-
-        // Update button text
-        button.innerHTML = '<span class="toggle-icon">▼</span> Hide Decision Analysis';
-        button.classList.add('expanded');
     }
 
     // `precomputedCost` defaults to undefined, NOT null: displayResults deliberately passes
@@ -857,9 +707,6 @@ export class OutputManager {
         this.output.innerHTML = '';
         this.stats.innerHTML = '';
 
-        // Clear analysis panel section
-        this.renderAnalysisHome();
-
         // Restore the output empty-state placeholder after clearing (the old
         // window.showOutputEmptyState global never existed, so the panel was left blank).
         const emptyState = this.dom.document.getElementById('output-empty-state');
@@ -878,7 +725,6 @@ export class OutputManager {
 
         // Clear stored data
         this.storedWitnesses = null;
-        this.storedMetricsData = null;
         this.activeExtensionId = null;
 
         // Reset graph highlighting

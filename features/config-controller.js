@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-4';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-5';
 
 export class ConfigController {
     constructor(dom) {
@@ -77,6 +77,7 @@ export class ConfigController {
         }
         // A freshly applied config supersedes any held ABA-recovery snapshot.
         this._saved = undefined;
+        this._savedReading = undefined;
     }
 
     populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
@@ -171,8 +172,17 @@ export class ConfigController {
         }
 
         // A defence semantics owns its budget, so the reading selector is not applicable.
+        // Snapshot the user's choice while it is pinned, or switching to admissible and back
+        // silently leaves the reading on "No discarding" -- and then cf/stable report no cost,
+        // which looks like the cost regression all over again.
         if (isDefence && !abaRecovery) {
+            if (this._savedReading === undefined) {
+                this._savedReading = this.dom.budgetSelect.value;
+            }
             this.dom.budgetSelect.value = 'none';
+        } else if (this._savedReading !== undefined) {
+            this.dom.budgetSelect.value = this._savedReading;
+            this._savedReading = undefined;
         }
 
         const budgetActive = !abaRecovery && (isDefence || this.dom.budgetSelect.value !== 'none');

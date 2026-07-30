@@ -6,7 +6,7 @@ export class DocsController {
     }
 
     init() {
-        ['config', 'editor', 'graph', 'output', 'analysis'].forEach((panelId) => {
+        ['config', 'editor', 'graph', 'output'].forEach((panelId) => {
             this.panelManager.registerPanel(panelId, true);
         });
 
