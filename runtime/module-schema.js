@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260730-34';
+import { wabaModules } from '../waba-modules.js?v=20260730-36';
 
 const REQUIRED_SECTIONS = ['core', 'semiring', 'defaults', 'monoid', 'optimize', 'constraint', 'filter', 'semantics', 'examples', 'metadata'];
 const REQUIRED_METADATA_KEYS = [

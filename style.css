@@ -2285,6 +2285,154 @@ button:focus-visible,
     animation: modalFadeIn 0.2s ease-out;
 }
 
+/* ===================================
+   Documentation sheet
+   ===================================
+   Sixteen of the modal's twenty-seven classes had NO rule anywhere in this file -- including
+   `.doc-tabs`, `.doc-tab`, `.modal-content-large` and every table class -- so the tab bar fell
+   back to the browser's default button chrome (white chips overflowing the dark modal) and the
+   "large" modal was never large. The four tabs are gone; this styles the one sheet that
+   replaced them. */
+
+.modal-content-large {
+    max-width: 940px;
+}
+
+.doc-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.doc-block h3 {
+    margin: 0 0 var(--space-xs);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--text-lg);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+}
+
+.doc-ext {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+}
+
+.doc-intro {
+    margin: 0 0 var(--space-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+/* Example beside its explanation, so neither has to be read twice. Collapses to one column
+   when there is not room for both. */
+.doc-split {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.2fr);
+    gap: var(--space-lg);
+    align-items: start;
+}
+
+.doc-split pre {
+    margin: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-xs);
+    line-height: 1.7;
+    overflow-x: auto;
+}
+
+.doc-split pre b {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.doc-defs {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px var(--space-md);
+    align-items: baseline;
+    font-size: var(--text-sm);
+}
+
+.doc-defs dt {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.doc-defs dd {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+
+.doc-table th {
+    text-align: left;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.doc-table td {
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    vertical-align: top;
+}
+
+.doc-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.doc-table td:first-child {
+    color: var(--text-primary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.doc-foot {
+    margin: var(--space-sm) 0 0;
+    font-size: var(--text-xs);
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+.doc-pointer {
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--primary-color);
+    background: var(--bg-tertiary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+@media (max-width: 720px) {
+    .doc-split {
+        grid-template-columns: 1fr;
+    }
+}
+
 @keyframes modalFadeIn {
     from {
         opacity: 0;

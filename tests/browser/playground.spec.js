@@ -841,6 +841,59 @@ test('fullscreen gives the graph the height it gains', async ({ page }) => {
     expect(back.cy, 'and it must go back').toBe(windowed.cy);
 });
 
+test('the reference sheet is actually styled, and matches the control surface',
+    async ({ page }) => {
+        test.setTimeout(120000);
+        await waitForClingoReady(page);
+        await page.click('#syntax-guide-btn');
+        await expect(page.locator('#syntax-guide-modal')).toBeVisible();
+
+        // The four tabs are gone. They were the visible failure: `.doc-tabs`, `.doc-tab`,
+        // `.modal-content-large` and every table class had NO rule anywhere in style.css --
+        // 16 of the modal's 27 classes -- so the tab bar fell back to the browser's default
+        // button chrome and the "large" modal was never large.
+        await expect(page.locator('.doc-tab')).toHaveCount(0);
+
+        // Guard the root cause, not the symptom: every class the sheet uses must resolve to
+        // something. A class with no rule looks like a layout bug, not a missing stylesheet.
+        const unstyled = await page.evaluate(() => {
+            const sheet = document.querySelector('#syntax-guide-modal');
+            const used = new Set();
+            sheet.querySelectorAll('[class]').forEach((el) =>
+                el.classList.forEach((c) => used.add(c)));
+            const declared = new Set();
+            for (const ss of document.styleSheets) {
+                let rules;
+                try { rules = ss.cssRules; } catch { continue; }
+                for (const r of rules) {
+                    (r.selectorText || '').split(',').forEach((sel) => {
+                        for (const m of sel.matchAll(/\.([\w-]+)/g)) declared.add(m[1]);
+                    });
+                }
+            }
+            return [...used].filter((c) => !declared.has(c));
+        });
+        expect(unstyled, 'reference-sheet classes with no CSS rule').toEqual([]);
+
+        // Keep the tables honest: the algebra rows must be exactly the algebras on offer.
+        const blockByHeading = (heading) => page.locator('.doc-block')
+            .filter({ has: page.locator('h3', { hasText: heading }) });
+        const listed = await blockByHeading('Algebras')
+            .locator('.doc-table tbody td:first-child').allTextContents();
+        const offered = await page.locator('#semiring-select option').allTextContents();
+        expect(listed.length, 'one row per selectable algebra').toBe(offered.length);
+        for (const name of listed) {
+            expect(offered.join(' | ').toLowerCase(),
+                `${name} is documented but not selectable`)
+                .toContain(name.trim().toLowerCase().replace('bottleneck-cost', 'bottleneck'));
+        }
+
+        // ...and the budget readings must be the ones the control actually offers.
+        const readings = await blockByHeading('Budget')
+            .locator('.doc-table tbody td:first-child').allTextContents();
+        expect(readings.length).toBe(await page.locator('#budget-select option').count());
+    });
+
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));

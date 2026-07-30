@@ -117,8 +117,6 @@
  * @property {HTMLElement | null} isolatedAssumptionsBanner
  * @property {HTMLElement | null} isolatedAssumptionsList
  * @property {HTMLElement[]} panelToggles
- * @property {HTMLElement[]} docTabs
- * @property {HTMLElement[]} docTabContents
  * @property {(panelId: string) => HTMLElement | null} getPanel
  */
 

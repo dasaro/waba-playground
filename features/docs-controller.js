@@ -18,10 +18,6 @@ export class DocsController {
             }
         });
 
-        this.dom.docTabs.forEach((tab) => {
-            tab.addEventListener('click', () => this.switchDocTab(tab.dataset.tab));
-        });
-
         this.dom.panelToggles.forEach((button) => {
             button.addEventListener('click', (event) => {
                 const panel = event.target.closest('.panel');
@@ -57,23 +53,5 @@ export class DocsController {
             this.dom.graphLegend.setAttribute('hidden', '');
             this.dom.legendToggleBtn.setAttribute('aria-expanded', 'false');
         }
-    }
-
-    switchDocTab(targetTab) {
-        this.dom.docTabs.forEach((tab) => {
-            const isActive = tab.dataset.tab === targetTab;
-            tab.classList.toggle('active', isActive);
-            tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-        });
-
-        this.dom.docTabContents.forEach((content) => {
-            const isActive = content.id === `tab-${targetTab}`;
-            content.classList.toggle('active', isActive);
-            if (isActive) {
-                content.removeAttribute('hidden');
-            } else {
-                content.setAttribute('hidden', '');
-            }
-        });
     }
 }

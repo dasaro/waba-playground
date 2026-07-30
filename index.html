@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260730-34">
+    <link rel="stylesheet" href="style.css?v=20260730-36">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-34"></script>
+    <script src="modules/prism-waba.js?v=20260730-36"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-34"></script>
-    <script src="clingo.web.js?v=20260730-34"></script>
+    <script src="modules/wasm-config.js?v=20260730-36"></script>
+    <script src="clingo.web.js?v=20260730-36"></script>
 </head>
 <body>
     <div class="container">
@@ -43,7 +43,7 @@
                 <button id="theme-toggle-btn" class="link-btn theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
                     <span id="theme-icon" aria-hidden="true">🌙</span>
                 </button>
-                <button id="syntax-guide-btn" class="link-btn" title="WABA Syntax Guide" aria-label="Open WABA syntax guide">
+                <button id="syntax-guide-btn" class="link-btn" title="Reference" aria-label="Open the WABA reference">
                     <span aria-hidden="true">📖</span>
                 </button>
             </div>
@@ -514,390 +514,118 @@ c_a: 70"></textarea>
     <div id="syntax-guide-modal" class="modal" role="dialog" aria-labelledby="syntax-guide-title" aria-hidden="true" hidden>
         <div class="modal-content modal-content-large">
             <div class="modal-header">
-                <h2 id="syntax-guide-title">📚 WABA Playground Documentation</h2>
+                <h2 id="syntax-guide-title">Reference</h2>
                 <button id="syntax-guide-close" class="modal-close" aria-label="Close documentation">&times;</button>
             </div>
 
-            <!-- Tab Navigation -->
-            <div class="doc-tabs" role="tablist">
-                <button class="doc-tab active" role="tab" aria-selected="true" aria-controls="tab-getting-started" data-tab="getting-started">
-                    🚀 Getting Started
-                </button>
-                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-syntax" data-tab="syntax">
-                    📝 Framework Syntax
-                </button>
-                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-config" data-tab="config">
-                    ⚙️ Configuration
-                </button>
-                <button class="doc-tab" role="tab" aria-selected="false" aria-controls="tab-results" data-tab="results">
-                    📊 Understanding Results
-                </button>
-            </div>
-
             <div class="modal-body">
-                <!-- Getting Started Tab -->
-                <div id="tab-getting-started" class="doc-tab-content active" role="tabpanel">
-                    <h3>Welcome to WABA Playground! 👋</h3>
-                    <p><strong>WABA</strong> (Weighted Assumption-Based Argumentation) extends flat ABA with weights on the leaves of a derivation. An ordered semiring propagates them, and a set of assumptions is accepted only if the objections it concedes fit an inconsistency budget β.</p>
+                <div class="doc-sheet">
 
-                    <div class="doc-card">
-                        <h4>🎯 Quick Start Workflow</h4>
-                        <ol class="workflow-steps">
-                            <li><strong>Configure:</strong> Pick an algebra (how weights propagate) and a semantics; the budget reading is preselected to match the algebra</li>
-                            <li><strong>Define Framework:</strong> Load an example or write your own in Simple/Advanced mode</li>
-                            <li><strong>Run:</strong> Click "▶️ Run WABA" to compute extensions</li>
-                            <li><strong>Explore:</strong> View results and interact with the argumentation graph</li>
-                        </ol>
-                    </div>
+                    <section class="doc-block">
+                        <h3>Simple format <span class="doc-ext">.waba</span></h3>
+                        <div class="doc-split">
+                            <pre><code>% a comment
 
-                    <div class="doc-card">
-                        <h4>💡 Key Concepts</h4>
-                        <dl class="concept-list">
-                            <dt>Assumptions</dt>
-                            <dd>Defeasible statements that can be in or out of extensions</dd>
-
-                            <dt>Weights</dt>
-                            <dd>Positive integer costs/rewards assigned to arguments</dd>
-
-                            <dt>Attacks</dt>
-                            <dd>Relations where one argument challenges another</dd>
-
-                            <dt>Extensions</dt>
-                            <dd>Consistent sets of assumptions that defend themselves from attacks</dd>
-
-                            <dt>Budget</dt>
-                            <dd>Maximum cost allowed for discarding attacks (optional)</dd>
-                        </dl>
-                    </div>
-
-                    <div class="doc-card">
-                        <h4>📂 File Formats</h4>
-                        <p>Upload your frameworks in two formats:</p>
-                        <ul>
-                            <li><strong>.waba</strong> - Simple, human-readable format (recommended for beginners)</li>
-                            <li><strong>.lp</strong> - Advanced ASP format with full expressiveness</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Framework Syntax Tab -->
-                <div id="tab-syntax" class="doc-tab-content" role="tabpanel" hidden>
-                    <h3>Framework Syntax</h3>
-
-                    <div class="syntax-section">
-                        <h4>📄 Simple Mode (.waba Format)</h4>
-                        <p>Simple Mode uses a structured text format with four sections. Comments use <code>%</code>.</p>
-
-                        <details class="syntax-details" open>
-                            <summary><strong>1. Assumptions</strong></summary>
-                            <pre><code>a
-b
-c</code></pre>
-                            <p>One assumption per line. These are defeasible atoms that can be in or out of extensions.</p>
-                        </details>
-
-                        <details class="syntax-details">
-                            <summary><strong>2. Rules</strong></summary>
-                            <pre><code>conclusion ← premise1, premise2
-attack ← a</code></pre>
-                            <p>One rule per line using <code>←</code> (or <code>&lt;-</code>) to separate head from body.</p>
-                        </details>
-
-                        <details class="syntax-details">
-                            <summary><strong>3. Contraries (Attacks)</strong></summary>
-                            <pre><code>a: attack_element
-b: conclusion</code></pre>
-                            <p>Format: <code>attacked: attacker</code><br>
-                            <strong>⚠️ Direction:</strong> <code>attacker</code> attacks <code>attacked</code> (not the reverse)</p>
-                        </details>
-
-                        <details class="syntax-details">
-                            <summary><strong>4. Weights</strong></summary>
-                            <pre><code>a: 80
-b: 60
-attack_element: 70</code></pre>
-                            <p>Format: <code>atom: weight</code>. Assigns positive integer weights. An atom you leave out is <em>not</em> weighted 1 — an unweighted assumption takes δ, the default set by the <strong>Unweighted assumptions (δ)</strong> control: <code>neutral</code> gives it the algebra's ⊗-identity (no effect on a derivation), <code>aba</code> gives it <code>#sup</code> (un-droppable, recovering plain ABA).</p>
-                        </details>
-
-                        <details class="syntax-details">
-                            <summary><strong>Complete .waba Example</strong></summary>
-                            <pre><code>% Medical triage example
+<b>assumptions</b>
 a
 b
 
-attack_element ← a
+<b>rules</b>
+c &#8592; a, b
 
-b: attack_element
+<b>contraries</b>
+b: c
 
+<b>weights</b>
 a: 80
-b: 60
-attack_element: 70</code></pre>
-                        </details>
-                    </div>
+b: 60</code></pre>
+                            <dl class="doc-defs">
+                                <dt>Assumptions</dt>
+                                <dd>One per line. Defeasible: each is in or out of an extension.</dd>
+                                <dt>Rules</dt>
+                                <dd><code>head &#8592; body</code>. The body may be empty (a fact).</dd>
+                                <dt>Contraries</dt>
+                                <dd><code>attacked: attacker</code>. <strong>The attacker is on the right.</strong> Every assumption needs exactly one.</dd>
+                                <dt>Weights</dt>
+                                <dd><code>atom: n</code>, a positive integer. An atom you omit takes δ, set by the <em>Unweighted assumptions</em> control — never 1.</dd>
+                            </dl>
+                        </div>
+                    </section>
 
-                    <div class="syntax-section">
-                        <h4>⚡ Advanced Mode (.lp Format)</h4>
-                        <p>Advanced Mode uses Answer Set Programming (ASP) syntax with WABA predicates.</p>
+                    <section class="doc-block">
+                        <h3>Advanced format <span class="doc-ext">.lp</span></h3>
+                        <div class="doc-split">
+                            <pre><code>% the same framework in ASP
 
-                        <details class="syntax-details">
-                            <summary><strong>Predicates Reference</strong></summary>
-                            <table class="syntax-table">
-                                <tr>
-                                    <th>Predicate</th>
-                                    <th>Syntax</th>
-                                    <th>Description</th>
-                                </tr>
-                                <tr>
-                                    <td><code>assumption</code></td>
-                                    <td><code>assumption(a).</code></td>
-                                    <td>Declares a defeasible assumption</td>
-                                </tr>
-                                <tr>
-                                    <td><code>weight</code></td>
-                                    <td><code>weight(a, 80).</code></td>
-                                    <td>Assigns weight to an atom</td>
-                                </tr>
-                                <tr>
-                                    <td><code>head/body</code></td>
-                                    <td><code>head(r1, c). body(r1, a).</code></td>
-                                    <td>Defines inference rules</td>
-                                </tr>
-                                <tr>
-                                    <td><code>contrary</code></td>
-                                    <td><code>contrary(a, c).</code></td>
-                                    <td>c attacks a</td>
-                                </tr>
-                                <tr>
-                                    <td><code>budget</code></td>
-                                    <td><code>budget(100).</code></td>
-                                    <td><strong>Ignored.</strong> β comes only from the Inconsistency budget control, passed as <code>-c beta</code>, which overrides any <code>#const</code> or <code>budget/1</code> in the framework.</td>
-                                </tr>
-                            </table>
-                        </details>
+assumption(a).  assumption(b).
+weight(a, 80).  weight(b, 60).
 
-                        <details class="syntax-details">
-                            <summary><strong>Complete .lp Example</strong></summary>
-                            <pre><code>% Assumptions
-assumption(a).
-assumption(b).
+head(r1, c).  body(r1, a).  body(r1, b).
 
-% Weights
-weight(a, 80).
-weight(b, 60).
-weight(attack_element, 70).
+contrary(b, c).</code></pre>
+                            <dl class="doc-defs">
+                                <dt><code>assumption/1</code></dt>
+                                <dd>Declares a defeasible atom.</dd>
+                                <dt><code>weight/2</code></dt>
+                                <dd>At most one per atom; a duplicate is rejected.</dd>
+                                <dt><code>head/2</code>, <code>body/2</code></dt>
+                                <dd>A rule, keyed by its own identifier.</dd>
+                                <dt><code>contrary/2</code></dt>
+                                <dd><code>contrary(a, c)</code> means <em>c attacks a</em>.</dd>
+                                <dt><code>budget/1</code></dt>
+                                <dd><strong>Ignored.</strong> β comes only from the budget control, passed as <code>-c beta</code>.</dd>
+                            </dl>
+                        </div>
+                        <p class="doc-foot">The framework must be <strong>flat</strong>: an assumption may never be a rule head. Rules may not be circular.</p>
+                    </section>
 
-% Rules
-head(r1, attack_element).
-body(r1, a).
-
-% Contraries
-contrary(b, attack_element).</code></pre>
-                            <p class="config-note">No <code>budget/1</code> fact: β is set by the Inconsistency budget control, not by the framework.</p>
-                        </details>
-                    </div>
-                </div>
-
-                <!-- Configuration Tab -->
-                <div id="tab-config" class="doc-tab-content" role="tabpanel" hidden>
-                    <h3>Configuration Options</h3>
-
-                    <div class="config-section">
-                        <h4>🔢 Semiring (Weight Propagation)</h4>
-                        <p>Controls how weights propagate through inference rules.</p>
-
-                        <table class="config-table">
-                            <thead>
-                                <tr>
-                                    <th>Semiring</th>
-                                    <th>Conjunction (⊗)</th>
-                                    <th>Disjunction (⊕)</th>
-                                    <th>Use Case</th>
-                                </tr>
-                            </thead>
+                    <section class="doc-block">
+                        <h3>Algebras</h3>
+                        <p class="doc-intro">How a weight propagates along a derivation. ⊗ combines the premises of one rule; ⊕ combines rival derivations of the same atom.</p>
+                        <table class="doc-table">
+                            <thead><tr><th>Algebra</th><th>⊗</th><th>⊕</th><th>Reads a weight as</th></tr></thead>
                             <tbody>
-                                <tr>
-                                    <td><strong>Gödel</strong></td>
-                                    <td>min</td>
-                                    <td>max</td>
-                                    <td>Higher-is-better fuzzy reasoning</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Bottleneck-cost</strong> (Gödel lower)</td>
-                                    <td>max</td>
-                                    <td>min</td>
-                                    <td>Lower-is-better worst-case cost</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Arctic</strong> (Tropical higher)</td>
-                                    <td>+</td>
-                                    <td>max</td>
-                                    <td>Higher-is-better accumulated reward</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Tropical</strong> (Tropical lower)</td>
-                                    <td>+</td>
-                                    <td>min</td>
-                                    <td>Lower-is-better additive cost / shortest path</td>
-                                </tr>
+                                <tr><td>Gödel</td><td>min</td><td>max</td><td><b>strength</b> — only as strong as its weakest premise</td></tr>
+                                <tr><td>Arctic</td><td>+</td><td>max</td><td><b>strength</b> — independent premises accumulate</td></tr>
+                                <tr><td>Łukasiewicz</td><td>max(0, a+b−k)</td><td>max</td><td><b>strength</b> — a long chain erodes toward 0</td></tr>
+                                <tr><td>Tropical</td><td>+</td><td>min</td><td><b>cost</b> — cheaply derived means well supported</td></tr>
+                                <tr><td>Bottleneck-cost</td><td>max</td><td>min</td><td><b>cost</b> — costs as much as its dearest premise</td></tr>
                             </tbody>
                         </table>
-                        <p class="config-note">Five algebras. Four form a 2&times;2 over &otimes; (idempotent / additive) and polarity (&oplus; = max is <em>strength</em>, &oplus; = min is <em>cost</em>): <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code>. <code>lukasiewicz</code> sits outside it (bounded sum). <code>godel_low</code> and <code>tropical_high</code> are polarity-dual aliases of <code>bottleneck_cost</code> and <code>arctic</code>.</p>
-                    </div>
+                        <p class="doc-foot">Polarity is a property of the algebra, not a separate control. <code>godel_low</code> and <code>tropical_high</code> are aliases for Bottleneck-cost and Arctic in saved configurations.</p>
+                    </section>
 
-                    <div class="config-section">
-                        <h4>📊 Budget reading (β)</h4>
-                        <p>How the objections an extension concedes are priced against the budget. Monoid and bound are no longer separate controls: only the three <em>canonical</em> pairings are offered, so an incoherent one is unreachable rather than merely discouraged.</p>
-
-                        <table class="config-table">
-                            <thead>
-                                <tr>
-                                    <th>Reading</th>
-                                    <th>Aggregate</th>
-                                    <th>Weights mean</th>
-                                    <th>Accepts when</th>
-                                </tr>
-                            </thead>
+                    <section class="doc-block">
+                        <h3>Budget (β)</h3>
+                        <p class="doc-intro">What the objections an extension concedes cost against the budget. Only the three coherent pairings are offered.</p>
+                        <table class="doc-table">
+                            <thead><tr><th>Reading</th><th>Accepts when</th><th>Suits</th></tr></thead>
                             <tbody>
-                                <tr>
-                                    <td><strong>Sum &le; β</strong></td>
-                                    <td>&Sigma; of conceded weights</td>
-                                    <td>strength — bigger is harder to overrule</td>
-                                    <td>the total conceded is at most β</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Max &le; β</strong></td>
-                                    <td>max of conceded weights</td>
-                                    <td>strength</td>
-                                    <td>no single concession exceeds β</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Min &ge; β</strong></td>
-                                    <td>min of conceded weights</td>
-                                    <td>weakness — bigger is easier to concede</td>
-                                    <td>every concession is worth at least β</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>No discarding</strong></td>
-                                    <td>&mdash;</td>
-                                    <td>&mdash;</td>
-                                    <td>nothing may be conceded, i.e. plain ABA</td>
-                                </tr>
+                                <tr><td>Sum ≤ β</td><td>the total conceded is at most β</td><td>strength algebras</td></tr>
+                                <tr><td>Max ≤ β</td><td>no single concession exceeds β</td><td>strength algebras</td></tr>
+                                <tr><td>Min ≥ β</td><td>every concession is worth at least β</td><td>cost algebras</td></tr>
+                                <tr><td>No discarding</td><td>nothing may be conceded</td><td>plain ABA</td></tr>
                             </tbody>
                         </table>
-                        <p class="config-note">Choosing an algebra preselects the reading that matches its polarity: strength algebras get <strong>Sum &le; β</strong>, cost algebras get <strong>Min &ge; β</strong>. The boundary is non-strict, so an extension costing exactly β survives. Note that <strong>Sum &le; β</strong> with β = 0 is <em>not</em> the same as no discarding: an attack whose propagated weight is 0 is still discardable. Use <em>ABA recovery</em> for exact recovery.</p>
-                    </div>
+                        <p class="doc-foot">The boundary is non-strict: an extension costing exactly β survives. <strong>Sum ≤ β with β = 0 is not plain ABA</strong> — an attack of weight 0 is still discardable. Use <em>ABA recovery</em> for that. Under a cost algebra a bigger β is more <em>restrictive</em>, not less.</p>
+                    </section>
 
-                    <div class="config-section">
-                        <h4>🎯 Semantics</h4>
-                        <p>Which sets of assumptions count as acceptable. All five consume the weights; none is weight-blind.</p>
-
-                        <table class="config-table">
-                            <thead>
-                                <tr>
-                                    <th>Semantics</th>
-                                    <th>Description</th>
-                                    <th>How β applies</th>
-                                </tr>
-                            </thead>
+                    <section class="doc-block">
+                        <h3>Semantics</h3>
+                        <table class="doc-table">
+                            <thead><tr><th>Semantics</th><th>A set is accepted when</th></tr></thead>
                             <tbody>
-                                <tr>
-                                    <td><strong>Conflict-free</strong></td>
-                                    <td>No supported attack between selected assumptions</td>
-                                    <td>via the budget reading</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Stable</strong></td>
-                                    <td>Conflict-free, and every assumption left out is attacked</td>
-                                    <td>via the budget reading</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Admissible</strong></td>
-                                    <td>Conflict-free and defends every member</td>
-                                    <td>internal: one shared <code>pay</code> set covers internal conflict and undefended attack</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Complete</strong></td>
-                                    <td>Admissible, and contains everything it defends</td>
-                                    <td>internal, as admissible</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Preferred</strong></td>
-                                    <td>The subset-maximal admissible sets</td>
-                                    <td>internal, as admissible</td>
-                                </tr>
+                                <tr><td>Conflict-free</td><td>it supports no attack on its own members</td></tr>
+                                <tr><td>Stable</td><td>conflict-free, and it attacks everything it leaves out</td></tr>
+                                <tr><td>Admissible</td><td>conflict-free, and it answers every attack on itself</td></tr>
+                                <tr><td>Complete</td><td>admissible, and it contains everything it defends</td></tr>
+                                <tr><td>Preferred</td><td>it is a subset-maximal admissible set</td></tr>
                             </tbody>
                         </table>
-                        <p class="config-note">The last three are a structured lift of the Dunne et&nbsp;al. (AIJ 2011) inconsistency budget, so they take β directly and the budget-reading control does not apply to them. Their bound direction follows the algebra's polarity: under a strength algebra the conceded weights must sum to at most β, so plain ABA is recovered at β = 0; under a cost algebra the smallest concession must be at least β, so recovery arrives at a β above every attack weight.</p>
-                    </div>
+                        <p class="doc-foot">All five consume the weights. The last three carry their own budget (a structured lift of Dunne et&nbsp;al., AIJ 2011), so they take β directly and the budget-reading control does not apply.</p>
+                    </section>
 
-                    <div class="config-section">
-                        <h4>🎚️ Results</h4>
-                        <dl class="config-dl">
-                            <dt><strong>All extensions</strong></dt>
-                            <dd>Enumerate every extension the budget admits. This is the only option for <em>Preferred</em>, which is computed by subset-maximal filtering over enumerated candidates and therefore needs them all.</dd>
-
-                            <dt><strong>Cheapest only</strong> / <strong>Dearest only</strong></dt>
-                            <dd>Keep just the optimum of the aggregate named by the budget reading. Available only when a budget reading is active — with nothing conceded there is nothing to optimise.</dd>
-                        </dl>
-                    </div>
-
-                </div>
-
-                <!-- Understanding Results Tab -->
-                <div id="tab-results" class="doc-tab-content" role="tabpanel" hidden>
-                    <h3>Understanding Results</h3>
-
-                    <div class="results-section">
-                        <h4>📋 The extension card</h4>
-                        <p>Each answer set is one extension. Cards are sorted best-first: under a strength algebra the cheapest concession comes first, under a cost algebra the best-supported does.</p>
-
-                        <dl class="results-dl">
-                            <dt><strong>Extension <em>n</em></strong></dt>
-                            <dd>Click the header to colour that extension into the graph; click it again to clear.</dd>
-
-                            <dt><strong>The badge</strong></dt>
-                            <dd>Names its own aggregate rather than saying &ldquo;Cost&rdquo;, because what the number measures depends on the run: <code>&Sigma; conceded</code>, <code>worst conceded</code> or <code>least conceded</code> for the <code>sum</code>, <code>max</code> and <code>min</code> monoids. Under a defence semantics no monoid runs, so the badge instead reports the probed &beta;*: <code>&beta;* needed</code> (the least budget that admits the set) under a strength algebra, <code>&beta;* up to</code> (the largest budget it survives) under a cost one.</dd>
-
-                            <dt><strong>Assumptions</strong></dt>
-                            <dd>A green <span class="chip in"><span class="chip-icon">&#10003;</span>chip</span> per accepted assumption, a grey <span class="chip out"><span class="chip-icon">&#10007;</span>chip</span> per rejected one.</dd>
-
-                            <dt><strong>Discarded Attacks</strong></dt>
-                            <dd>Written <code>a1, a2 &#8892; c [t]</code>: the assumptions on the left derive the objection <code>c</code> against <code>t</code>, and this set declined to answer it &mdash; at the weight shown. These are what the budget buys. A <code>&#8868;</code> on the left means the objection needs no assumption at all. The supporting assumptions are reconstructed from your framework source, because the witness does not carry them.</dd>
-
-                            <dt><strong>Textual Result</strong></dt>
-                            <dd>Collapsed by default: the raw <code>in/1</code>, <code>discarded_attack/3</code> and <code>budget_value/1</code> atoms as clingo reported them, plus the computed <code>cost/1</code>. That is the whole witness &mdash; the output filter is always <code>projection</code>, which shows nothing else.</dd>
-                        </dl>
-                    </div>
-
-                    <div class="results-section">
-                        <h4>📈 Execution stats</h4>
-                        <p>One line under the cards: how many extensions were found, how long the solve took, which algebra ran, and the reading the budget was given &mdash; <code>sum of concessions &le; &beta;</code> for a bounded run, or <code>unanswered objections &le; &beta;</code> under a defence semantics. Note the direction follows the algebra's polarity: under a <em>cost</em> algebra (Tropical, Bottleneck-cost) the defence bound reverses to <code>every unanswered objection &ge; &beta;</code>, so a <strong>bigger &beta; is more restrictive</strong>, not more permissive. Whenever nothing is priced at all &mdash; ABA recovery, or no discarding on a conflict-based semantics &mdash; the algebra is flagged <em>unused</em>, because changing it cannot change a single extension.</p>
-                    </div>
-
-                    <div class="results-section">
-                        <h4>🗺️ Argumentation graph</h4>
-                        <p>The <strong>📖 Legend</strong> button above the graph documents every node, edge and state <em>for the view you are currently in</em> &mdash; Standard, Assumption-level and Branching draw different things, so the legend switches with the mode rather than describing all three at once. Hover any node or edge for its own summary.</p>
-                    </div>
-
-                    <div class="results-section">
-                        <h4>🎮 Graph interaction</h4>
-                        <ul class="interaction-list">
-                            <li><strong>Click an extension card</strong> &mdash; colour that extension into the graph</li>
-                            <li><strong>Hover a node or edge</strong> &mdash; weight, role and state</li>
-                            <li><strong>Click a node or edge</strong> &mdash; pin that summary as a popup</li>
-                            <li><strong>Drag</strong> &mdash; rearrange; <strong>scroll or pinch</strong> &mdash; zoom</li>
-                            <li><strong>Reset Layout</strong> &mdash; restore the physics layout</li>
-                        </ul>
-                    </div>
-
-                    <div class="results-section">
-                        <h4>💾 Export</h4>
-                        <ul>
-                            <li><strong>Export .lp / Export .waba</strong> (Editor panel) &mdash; the current framework</li>
-                            <li><strong>💾 PNG / 📄 PDF</strong> (Graph panel) &mdash; the graph as drawn</li>
-                            <li><strong>💾 Download All Extensions</strong> (Results panel, after a run) &mdash; every extension found, one per line</li>
-                        </ul>
-                    </div>
+                    <p class="doc-pointer">Every control carries its own note beneath it, and <strong>📖 Legend</strong> above the graph explains what is drawn in the current view.</p>
                 </div>
             </div>
         </div>
@@ -905,6 +633,6 @@ contrary(b, attack_element).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-34"></script>
+    <script type="module" src="app.js?v=20260730-36"></script>
 </body>
 </html>

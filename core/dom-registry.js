@@ -76,8 +76,6 @@ export function createDomRegistry(doc = document) {
         isolatedAssumptionsBanner: byId('isolated-assumptions-banner'),
         isolatedAssumptionsList: byId('isolated-assumptions-list'),
         panelToggles: Array.from(doc.querySelectorAll('.panel-toggle')),
-        docTabs: Array.from(doc.querySelectorAll('.doc-tab')),
-        docTabContents: Array.from(doc.querySelectorAll('.doc-tab-content')),
         getPanel(panelId) {
             return doc.querySelector(`[data-panel="${panelId}"]`);
         }
