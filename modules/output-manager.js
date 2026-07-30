@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260729-2';
-import { MetricsManager } from './metrics-manager.js?v=20260729-2';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260729-2';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260729-2';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260729-2';
+import { PopupManager } from './popup-manager.js?v=20260730-1';
+import { MetricsManager } from './metrics-manager.js?v=20260730-1';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-1';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-1';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -32,9 +32,6 @@ export class OutputManager {
         this.output = dom.output;
         this.stats = dom.stats;
         this.semiringSelect = dom.semiringSelect;
-        this.monoidSelect = dom.monoidSelect;
-        this.optimizeSelect = dom.optimizeSelect;
-        this.polaritySelect = dom.polaritySelect;
         this.getConfig = getConfig;
         this.activeExtensionId = null;  // Track currently highlighted extension
         // Static framework structure (rules + assumptions) for attack provenance,
@@ -82,18 +79,35 @@ export class OutputManager {
 
     // ===================================
     // Display Results
+    /**
+     * The effective run config. Every control now lives behind ConfigController, so there is
+     * no per-select fallback to reconstruct; without a config we report the no-discard shape.
+     */
+    readConfig() {
+        return this.getConfig
+            ? this.getConfig()
+            : { monoid: 'sum', optimization: 'minimize', budgetMode: 'none', budgetIntent: 'no_discard' };
+    }
+
+    semiringLabel() {
+        const select = this.semiringSelect;
+        return select?.options?.[select.selectedIndex]?.text || select?.value || 'godel';
+    }
+
+    static describeReading(config) {
+        if (config.abaRecovery) return 'no discarding (ABA recovery)';
+        if (config.budgetMode === 'none') return 'no discarding';
+        const bound = config.budgetMode === 'lb' ? '\u2265' : '\u2264';
+        return `${config.monoid} of concessions ${bound} \u03b2`;
+    }
+
     // ===================================
     displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '') {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
                             result.Result === 'OPTIMUM FOUND';
-        const config = effectiveConfig || (this.getConfig ? this.getConfig() : {
-            monoid: this.monoidSelect?.value || 'sum',
-            optimization: this.optimizeSelect?.value || 'minimize',
-            budgetMode: 'none',
-            budgetIntent: 'no_discard'
-        });
+        const config = effectiveConfig || this.readConfig();
         this.lastRunConfig = config;
 
         // Parse the static framework structure for attack provenance. In projection
@@ -206,9 +220,8 @@ export class OutputManager {
             <strong>Execution Stats:</strong>
             ${witnesses.length} extension(s) found |
             Computed in ${elapsed}s |
-            Semiring: ${this.semiringSelect.options[this.semiringSelect.selectedIndex].text} |
-            Monoid: ${this.monoidSelect.options[this.monoidSelect.selectedIndex].text} |
-            Mode: ${config.budgetMode === 'none' ? 'no-discard' : config.budgetMode}
+            Algebra: ${this.semiringLabel()} |
+            Reading: ${OutputManager.describeReading(config)}
         `;
     }
 
@@ -370,13 +383,7 @@ export class OutputManager {
         }
 
         // Build config for metrics computation
-        const config = this.lastRunConfig || (this.getConfig ? this.getConfig() : {
-            polarity: this.polaritySelect?.value || 'higher',
-            monoid: this.monoidSelect?.value || 'sum',
-            optimization: this.optimizeSelect?.value || 'minimize',
-            budgetMode: 'none',
-            budgetIntent: 'no_discard'
-        });
+        const config = this.lastRunConfig || this.readConfig();
 
         // Compute metrics with config
         const metricsData = MetricsManager.computeMetrics(this.storedWitnesses, config);
@@ -450,12 +457,7 @@ export class OutputManager {
         if (precomputedCost !== undefined) {
             cost = precomputedCost;
         } else {
-            const config = this.lastRunConfig || (this.getConfig ? this.getConfig() : {
-                monoid: this.monoidSelect?.value || 'sum',
-                optimization: this.optimizeSelect?.value || 'minimize',
-                budgetMode: 'none',
-                budgetIntent: 'no_discard'
-            });
+            const config = this.lastRunConfig || this.readConfig();
             const aggregateValue = parsed.budgetValueRaw !== null
                 ? normalizeAggregateValue(parsed.budgetValueRaw)
                 : computeAggregateFromDiscarded(parsed.discarded, config.monoid);

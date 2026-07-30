@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260729-2">
+    <link rel="stylesheet" href="style.css?v=20260730-1">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,11 +18,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260729-2"></script>
+    <script src="modules/prism-waba.js?v=20260730-1"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260729-2"></script>
-    <script src="clingo.web.js?v=20260729-2"></script>
+    <script src="modules/wasm-config.js?v=20260730-1"></script>
+    <script src="clingo.web.js?v=20260730-1"></script>
 </head>
 <body>
     <div class="container">
@@ -80,102 +80,77 @@
                     <div class="panel-content" id="panel-config-content">
                     <div class="config-grid">
                         <div class="config-item">
-                            <label for="semiring-select">Semiring Family</label>
+                            <label for="semiring-select"><span class="label-with-help">Algebra <span class="help-dot" aria-hidden="true">?</span></span></label>
                             <select id="semiring-select" class="select">
-                                <option value="godel">Gödel</option>
-                                <option value="tropical">Tropical</option>
-                                <option value="lukasiewicz">Łukasiewicz</option>
+                                <optgroup label="Strength (⊕ = max: a bigger weight is a harder objection)">
+                                    <option value="godel" selected>Gödel &nbsp;— ⊗ = min (weakest link)</option>
+                                    <option value="arctic">Arctic &nbsp;— ⊗ = + (evidence accumulates)</option>
+                                    <option value="lukasiewicz">Łukasiewicz &nbsp;— ⊗ = bounded sum (erosion)</option>
+                                </optgroup>
+                                <optgroup label="Cost (⊕ = min: a smaller weight is better supported)">
+                                    <option value="tropical">Tropical &nbsp;— ⊗ = + (cost accumulates)</option>
+                                    <option value="bottleneck_cost">Bottleneck &nbsp;— ⊗ = max (worst case)</option>
+                                </optgroup>
                             </select>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="polarity-select"><span class="label-with-help">Polarity <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <select id="polarity-select" class="select">
-                                <option value="higher">Higher is better</option>
-                                <option value="lower">Lower is better</option>
-                            </select>
-                            <div id="semiring-alias-note" class="config-note">Canonical ordered-semiring view.</div>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="default-policy-select"><span class="label-with-help">Default Policy <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <select id="default-policy-select" class="select">
-                                <option value="legacy" selected>Legacy</option>
-                                <option value="aba">ABA</option>
-                                <option value="neutral">Neutral</option>
-                            </select>
-                            <div class="config-note">Matches the wrapper surface. ABA recovery forces this to neutral and disables bounded controls.</div>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="aba-recovery-toggle"><span class="label-with-help">ABA Recovery <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <label class="switch-toggle" for="aba-recovery-toggle">
-                                <input type="checkbox" id="aba-recovery-toggle" aria-label="Toggle ABA recovery">
-                                <span class="switch-slider" aria-hidden="true"></span>
-                                <span class="switch-copy">Neutral defaults + no-discard</span>
-                            </label>
-                            <div class="config-note">This mirrors <code>--aba-recovery</code>: neutral defaults, no-discard, and no objective/budget/β combination.</div>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="monoid-select">Monoid</label>
-                            <select id="monoid-select" class="select">
-                                <option value="sum">SUM</option>
-                                <option value="max">MAX</option>
-                                <option value="min">MIN</option>
-                            </select>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="optimize-select">Optimization</label>
-                            <select id="optimize-select" class="select">
-                                <option value="minimize">Minimize aggregate</option>
-                                <option value="maximize">Maximize aggregate</option>
-                            </select>
-                        </div>
-
-                        <div class="config-item">
-                            <label for="constraint-select">Budget Mode</label>
-                            <select id="constraint-select" class="select">
-                                <option value="none" selected>None</option>
-                                <option value="ub">Upper bound</option>
-                                <option value="lb">Lower bound</option>
-                            </select>
+                            <div id="semiring-alias-note" class="config-note">Chooses how declared leaf weights propagate along derivations.</div>
                         </div>
 
                         <div class="config-item">
                             <label for="semantics-select">Semantics</label>
                             <select id="semantics-select" class="select">
-                                <optgroup label="Classical">
-                                    <option value="cf">Conflict-free</option>
-                                    <option value="stable" selected>Stable</option>
-                                    <option value="admissible">Admissible</option>
-                                    <option value="complete">Complete</option>
-                                    <option value="grounded">Grounded</option>
-                                    <option value="preferred">Preferred</option>
-                                </optgroup>
-                                <optgroup label="Budgeted defence (β, strength semirings)">
-                                    <option value="budgeted-admissible">Budgeted admissible</option>
-                                    <option value="budgeted-complete">Budgeted complete</option>
-                                    <option value="budgeted-preferred">Budgeted preferred</option>
-                                </optgroup>
+                                <option value="cf">Conflict-free</option>
+                                <option value="stable" selected>Stable</option>
+                                <option value="admissible">Admissible</option>
+                                <option value="complete">Complete</option>
+                                <option value="preferred">Preferred</option>
+                            </select>
+                            <div id="semantics-note" class="config-note">All five are budgeted; β relaxes them.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="budget-select"><span class="label-with-help">Budget reading <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <select id="budget-select" class="select">
+                                <option value="none" selected>No discarding — classical ABA</option>
+                                <option value="sum-ub">Total conceded ≤ β</option>
+                                <option value="max-ub">Worst single concession ≤ β</option>
+                                <option value="min-lb">Every concession ≥ β</option>
+                            </select>
+                            <div id="budget-intent-note" class="config-note">Only the three canonical pairings are offered.</div>
+                        </div>
+
+                        <div class="config-item" id="luk-k-container" style="display:none">
+                            <label for="luk-k-input"><span class="label-with-help">Łukasiewicz bound k <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <input type="number" id="luk-k-input" class="select" value="10" min="1" max="1000000">
+                            <div class="config-note">⊗ is max(0, a+b−k). With k far above your weights every derivation erodes to 0, so keep k near their scale.</div>
+                        </div>
+
+                        <div class="config-item">
+                            <label for="results-select">Results</label>
+                            <select id="results-select" class="select">
+                                <option value="all" selected>All extensions</option>
+                                <option value="min">Cheapest only</option>
+                                <option value="max">Dearest only</option>
                             </select>
                         </div>
 
                         <div class="config-item">
-                            <label for="opt-mode-select">Opt Mode</label>
-                            <select id="opt-mode-select" class="select">
-                                <option value="ignore" selected>Enumerate all surviving extensions</option>
-                                <option value="optN">Keep only optimal extensions</option>
+                            <label for="default-policy-select"><span class="label-with-help">Unweighted assumptions (δ) <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <select id="default-policy-select" class="select">
+                                <option value="legacy" selected>Legacy</option>
+                                <option value="aba">Un-overrulable (δ = ⊤)</option>
+                                <option value="neutral">Transparent (δ = ⊗-identity)</option>
                             </select>
+                            <div class="config-note">What an assumption weighs when the modeller gave it no weight. This changes which budgets recover classical ABA.</div>
                         </div>
 
                         <div class="config-item">
-                            <label for="show-select">Show</label>
-                            <select id="show-select" class="select">
-                                <option value="projection" selected>Projection</option>
-                                <option value="standard">Standard</option>
-                            </select>
+                            <label for="aba-recovery-toggle"><span class="label-with-help">ABA recovery <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label class="switch-toggle" for="aba-recovery-toggle">
+                                <input type="checkbox" id="aba-recovery-toggle" aria-label="Toggle ABA recovery">
+                                <span class="switch-slider" aria-hidden="true"></span>
+                                <span class="switch-copy">Forbid every discard</span>
+                            </label>
+                            <div class="config-note">Mirrors <code>--aba-recovery</code>: transparent δ and no discarding, so the result is plain ABA.</div>
                         </div>
 
                         <div class="config-item">
@@ -217,16 +192,10 @@
                         <div class="config-item">
                             <label><span class="label-with-help">Implementation Note <span class="help-dot" aria-hidden="true">?</span></span></label>
                             <div id="implementation-note" class="config-note">
-                                Runs the mature WABA modules (semiring × monoid × budget × semantics) directly via clingo-WASM.
+                                Runs the canonical WABA modules directly via clingo-WASM.
                             </div>
                         </div>
 
-                        <div class="config-item">
-                            <label><span class="label-with-help">Runtime Note <span class="help-dot" aria-hidden="true">?</span></span></label>
-                            <div id="budget-intent-note" class="config-note">
-                                Budget mode is disabled, so the playground matches the wrapper no-discard surface.
-                            </div>
-                        </div>
                     </div>
                     </div>
                 </section>
@@ -1019,6 +988,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260729-2"></script>
+    <script type="module" src="app.js?v=20260730-1"></script>
 </body>
 </html>

@@ -1,18 +1,18 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260729-2';
-import { FontManager } from '../modules/font-manager.js?v=20260729-2';
-import { UIManager } from '../modules/ui-manager.js?v=20260729-2';
-import { PanelManager } from '../modules/panel-manager.js?v=20260729-2';
-import { FileManager } from '../modules/file-manager.js?v=20260729-2';
-import { GraphManager } from '../modules/graph-manager.js?v=20260729-2';
-import { PopupManager } from '../modules/popup-manager.js?v=20260729-2';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260729-2';
-import { OutputManager } from '../modules/output-manager.js?v=20260729-2';
-import { ExportManager } from '../modules/export-manager.js?v=20260729-2';
-import { MetricsManager } from '../modules/metrics-manager.js?v=20260729-2';
-import { ConfigController } from './config-controller.js?v=20260729-2';
-import { DocsController } from './docs-controller.js?v=20260729-2';
-import { EditorController } from './editor-controller.js?v=20260729-2';
-import { ExamplesController } from './examples-controller.js?v=20260729-2';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-1';
+import { FontManager } from '../modules/font-manager.js?v=20260730-1';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-1';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-1';
+import { FileManager } from '../modules/file-manager.js?v=20260730-1';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-1';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-1';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-1';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-1';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-1';
+import { MetricsManager } from '../modules/metrics-manager.js?v=20260730-1';
+import { ConfigController } from './config-controller.js?v=20260730-1';
+import { DocsController } from './docs-controller.js?v=20260730-1';
+import { EditorController } from './editor-controller.js?v=20260730-1';
+import { ExamplesController } from './examples-controller.js?v=20260730-1';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -130,21 +130,27 @@ export class PlaygroundController {
 
         this.initDragAndDrop();
 
-        [this.dom.semiringSelect, this.dom.polaritySelect, this.dom.defaultPolicySelect, this.dom.abaRecoveryToggle].forEach((element) => {
+        // Controls that change the propagated WEIGHTS, so the graph must be rebuilt.
+        // filter(Boolean) so one absent control degrades that listener instead of
+        // aborting the whole wire-up with a TypeError.
+        [
+            this.dom.semiringSelect,
+            this.dom.defaultPolicySelect,
+            this.dom.abaRecoveryToggle,
+            this.dom.lukKInput
+        ].filter(Boolean).forEach((element) => {
             element.addEventListener('change', () => {
                 this.configController.syncUi();
                 this.pendingGraphUpdate = this.regenerateGraph();
             });
         });
 
+        // Controls that only change which extensions are reported.
         [
-            this.dom.monoidSelect,
-            this.dom.optimizeSelect,
-            this.dom.constraintSelect,
             this.dom.semanticsSelect,
-            this.dom.optModeSelect,
-            this.dom.showSelect
-        ].forEach((element) => {
+            this.dom.budgetSelect,
+            this.dom.resultsSelect
+        ].filter(Boolean).forEach((element) => {
             element.addEventListener('change', () => this.configController.syncUi());
         });
 

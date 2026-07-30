@@ -1,16 +1,21 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260729-2';
+import { wabaModules } from '../waba-modules.js?v=20260730-1';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260729-2';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260729-2';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260729-2';
+} from '../runtime/config-service.js?v=20260730-1';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-1';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-1';
+
+// Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
+// Both come from the bundle so they track the .lp module set automatically.
+const DERIVED_SEMANTICS = wabaModules.metadata.derivedSemantics || {};
+const POST_FILTERED = new Set(wabaModules.metadata.postFilteredSemantics || []);
 
 export class ClingoManager {
     constructor(runBtn, introStatus = null) {
@@ -84,7 +89,7 @@ export class ClingoManager {
 
         try {
             const startTime = performance.now();
-            const result = ['preferred', 'grounded', 'budgeted-preferred'].includes(normalized.semantics)
+            const result = POST_FILTERED.has(normalized.semantics)
                 ? await this.runExactSubsetSemantics(framework, normalized, onLog)
                 : await this.runDirect(framework, normalized);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
@@ -104,9 +109,12 @@ export class ClingoManager {
     }
 
     async runExactSubsetSemantics(framework, config, onLog) {
-        const filterKind = config.semantics === 'grounded' ? 'subset_minimal_filter' : 'subset_maximal_filter';
-        // budgeted-preferred is subset-maximal over budgeted-admissible; classical preferred/grounded over complete.
-        const candidateSemantics = config.semantics === 'budgeted-preferred' ? 'budgeted-admissible' : 'complete';
+        // preferred = the subset-MAXIMAL beta-admissible sets, matching bin/waba's
+        // POST_FILTER_SEMANTICS/SUBSET_FILTER pair. The candidate semantics comes from the
+        // bundle's derivedSemantics map rather than a local guess, so the two-pass shape
+        // cannot disagree with the CLI about what is being maximised over.
+        const filterKind = 'subset_maximal_filter';
+        const candidateSemantics = DERIVED_SEMANTICS[config.semantics] || 'admissible';
         const targetLabel = config.semantics;
         onLog(`Enumerating ${candidateSemantics} candidates for exact ${targetLabel} semantics…`, 'info');
 
@@ -135,8 +143,7 @@ export class ClingoManager {
             return [`candidate(${modelId}).`, ...members].join('\n');
         }).join('\n');
 
-        const filterDescription = filterKind === 'subset_minimal_filter' ? 'subset-minimal' : 'subset-maximal';
-        onLog(`Filtering ${filterDescription} complete candidates…`, 'info');
+        onLog(`Filtering subset-maximal ${candidateSemantics} candidates…`, 'info');
         const subsetProgram = `
 ${candidateFacts}
 ${wabaModules.semantics[filterKind]}

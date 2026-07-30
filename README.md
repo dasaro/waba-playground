@@ -19,36 +19,37 @@ The app remains GitHub-Pages compatible:
 
 ## Supported Surface
 
-The main UI exposes only the mature WABA contract:
+The UI offers one control per real choice, and nothing that can be set to an
+unsupported combination. Seven controls, down from eleven:
 
-- semiring family: `godel`, `tropical` (each with a polarity), plus standalone `lukasiewicz`
-- polarity: `higher`, `lower` (ignored for `lukasiewicz`, which has no variants)
-- effective semiring keys: `godel`, `bottleneck_cost`, `arctic`, `tropical`, `lukasiewicz`
-- default policy: `legacy`, `aba`, `neutral`
-- ABA recovery: `neutral` defaults + `no_discard`
-- monoid: `sum`, `max`, `min`
-- optimization: `minimize`, `maximize`
-- budget mode: `none`, `ub`, `lb`
-- semantics: `cf`, `stable`, `admissible`, `complete`, `grounded`, `preferred`
-  (the four defence semantics run on the no-discard surface)
-- output filter: `projection`, `standard`
-- opt mode: `ignore`, `optN`
+| control | options | notes |
+|---|---|---|
+| Algebra | `godel`, `arctic`, `lukasiewicz` (strength); `tropical`, `bottleneck_cost` (cost) | named directly; the polarity is a property of the algebra, not a separate knob |
+| Łukasiewicz bound `k` | integer | shown only for `lukasiewicz`; passed as `-c k=N` |
+| Semantics | `cf`, `stable`, `admissible`, `complete`, `preferred` | all five are budgeted; `preferred` is post-filtered |
+| Unweighted assumptions (δ) | `legacy`, `aba`, `neutral` | which default weight an unweighted assumption carries |
+| ABA recovery | on/off | pins transparent δ and forbids every discard |
+| Budget reading | none, total ≤ β, worst ≤ β, every ≥ β | exactly the three canonical (monoid, bound) pairings |
+| Results | all, cheapest, dearest | enumerate or optimise |
+| β | integer | the inconsistency budget |
 
-Family/polarity is a thin selector over the direct semiring module keys:
+Only the canonical pairings are offered, so an unsupported one is unreachable rather
+than merely discouraged:
 
-- `godel + higher` -> `godel`
-- `godel + lower` -> `bottleneck_cost`
-- `tropical + higher` -> `arctic`
-- `tropical + lower` -> `tropical`
-- `lukasiewicz` (no polarity) -> `lukasiewicz`
+- `sum + ub` — total conceded ≤ β
+- `max + ub` — worst single concession ≤ β
+- `min + lb` — every concession ≥ β
 
-Bounded presets intentionally match the mature WABA support policy:
+The five algebras are the direct module keys; `godel_low` and `tropical_high` remain as
+aliases for `bottleneck_cost` and `arctic` in saved configurations.
 
-- `sum + ub`
-- `max + ub`
-- `min + lb`
+`admissible`, `complete` and `preferred` carry their own SUM inconsistency budget inside
+the module (the Dunne et al. lift), so they take β directly and the budget-reading control
+is disabled for them. Under a cost algebra the bound direction reverses, so classical
+recovery arrives at a β above every attack weight rather than at β = 0.
 
-When `budget mode = none`, the browser matches the wrapper's `no_discard` surface. The Monoid / Optimization / Opt-Mode controls only apply when a budget mode (discarding) is active. There is no separate “minimum β exploration” mode anymore.
+β is passed to the solver as `-c beta=N`, exactly as `bin/waba` does, so it overrides a
+framework that declares its own `#const beta`. The output filter is always `projection`.
 
 The startup configuration is wrapper-aligned:
 
@@ -71,11 +72,11 @@ The analysis panel is now decision-oriented rather than witness-oriented.
 
 This makes the panel more useful for “best course of action” or “best assumption” workflows, where the main question is which assumptions survive in the strongest ranked alternatives.
 
-`grounded` and `preferred` are exact. The browser does not use `asprin`; it performs the same plain-`clingo` multi-pass flow as the mature CLI surface:
+`preferred` is exact. The browser does not use `asprin`; it performs the same plain-`clingo`
+multi-pass flow as the CLI surface:
 
-1. enumerate feasible `complete` candidates
-2. filter them with `semantics/subset_minimal_filter.lp` for grounded or `semantics/subset_maximal_filter.lp` for preferred
-3. if `optN` is requested in a bounded run, apply numeric objective ranking after subset filtering
+1. enumerate the `admissible` candidates
+2. filter them with `semantics/subset_maximal_filter.lp`
 
 ## Synced Modules
 
@@ -88,7 +89,7 @@ This makes the panel more useful for “best course of action” or “best assu
 - `optimize/*.lp`
 - `constraint/{ub,lb,no_discard}.lp`
 - `filter/{standard,projection}.lp`
-- `semantics/{cf,stable,admissible,complete,subset_minimal_filter,subset_maximal_filter}.lp`
+- `semantics/{cf,stable,admissible,complete,subset_maximal_filter}.lp`
 - curated public example `.lp` files
 
 Sync fails hard on missing files. There are no placeholder fallbacks.

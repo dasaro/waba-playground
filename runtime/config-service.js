@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260729-2';
+import { wabaModules } from '../waba-modules.js?v=20260730-1';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -27,13 +27,21 @@ const SEMIRING_POLARITY = {
     lukasiewicz: 'higher'
 };
 
-// wABA budgeted-defence (Dunne Def 6 lift). A STRENGTH notion (bigger weight = stronger
-// objection, costlier to overrule), so it needs a strength semiring; a cost semiring inverts it.
-const BUDGETED_DEFENCE_SEMANTICS = new Set(['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred']);
-const STRENGTH_SEMIRINGS = new Set(['godel', 'arctic', 'lukasiewicz', 'tropical_high']);
+// wABA budgeted DEFENCE (Dunne et al. AIJ 2011 Def 6, lifted to structured ABA). These take
+// beta directly -- their own SUM inconsistency budget lives inside the module -- and compose
+// with no_discard, so they take no monoid/bound pairing. Mirrors bin/waba's set of the same
+// name. Any semantics that is not directly budgeted (cf/stable) is one of these.
+const DIRECTLY_BUDGETED_SEMANTICS = new Set(['cf', 'stable']);
 export function isBudgetedDefence(semantics) {
-    return BUDGETED_DEFENCE_SEMANTICS.has(semantics);
+    return SUPPORTED_SEMANTICS.has(semantics) && !DIRECTLY_BUDGETED_SEMANTICS.has(semantics);
 }
+
+// Reverse of metadata.canonicalSemiring: module key -> the family it is the variant of.
+const SEMIRING_FAMILY_OF = Object.fromEntries(
+    Object.entries(wabaModules.metadata.canonicalSemiring).flatMap(
+        ([family, byPolarity]) => Object.values(byPolarity).map((key) => [key, family])
+    )
+);
 
 export function resolveSemiringModuleKey(semiringFamily, polarity) {
     // A canonical family (godel/tropical) MUST be resolved by polarity FIRST: both
@@ -71,11 +79,19 @@ export function deriveObjectiveParts(objective = DEFAULT_OBJECTIVE) {
  * @returns {import('../core/types.js').EffectiveConfig}
  */
 export function normalizeConfig(config = {}) {
-    const semiringFamily = config.semiringFamily || config.semiring || 'godel';
-    const requestedPolarity = config.polarity || 'higher';
-    // Both families support both polarities (godel: higher=godel/lower=bottleneck_cost;
-    // tropical: higher=arctic/lower=tropical), resolved via metadata.canonicalSemiring.
-    const polarity = requestedPolarity;
+    // The control surface names the algebra directly. A direct module key must never be
+    // re-resolved through canonicalSemiring: 'tropical' is BOTH a family name and a module
+    // key, so resolving it as a family with the default 'higher' polarity would silently
+    // hand back arctic. Only an explicit semiringFamily takes the resolution path (kept so
+    // saved/legacy configs still load).
+    const explicitFamily = config.semiringFamily || null;
+    const semiringKey = explicitFamily
+        ? resolveSemiringModuleKey(explicitFamily, config.polarity || 'higher')
+        : (config.semiring || 'godel');
+    const polarity = explicitFamily
+        ? (config.polarity || 'higher')
+        : (SEMIRING_POLARITY[semiringKey] || 'higher');
+    const semiringFamily = explicitFamily || SEMIRING_FAMILY_OF[semiringKey] || semiringKey;
     const abaRecovery = Boolean(config.abaRecovery);
     const defaultPolicy = abaRecovery ? 'neutral' : (config.defaultPolicy || 'legacy');
     const objective = config.objective || DEFAULT_OBJECTIVE;
@@ -90,7 +106,7 @@ export function normalizeConfig(config = {}) {
     const beta = Number.isFinite(config.beta) ? config.beta : parseInt(config.beta || config.budget || '0', 10) || 0;
     const numModels = Number.isFinite(config.numModels) ? config.numModels : parseInt(config.numModels || '0', 10) || 0;
     const timeout = Number.isFinite(config.timeout) ? config.timeout : 60000;
-    const semiringKey = resolveSemiringModuleKey(semiringFamily, polarity);
+    const lukK = Number.isFinite(config.lukK) ? config.lukK : parseInt(config.lukK || '10', 10) || 10;
     const aliasLabel = getAliasLabel(semiringFamily, polarity);
 
     return {
@@ -111,7 +127,8 @@ export function normalizeConfig(config = {}) {
         filterType,
         beta,
         numModels,
-        timeout
+        timeout,
+        lukK
     };
 }
 
@@ -122,10 +139,6 @@ export function normalizeConfig(config = {}) {
 export function validateConfig(config) {
     if (!SUPPORTED_SEMANTICS.has(config.semantics)) {
         return `Unsupported semantics "${config.semantics}" in the supported playground surface.`;
-    }
-
-    if (isBudgetedDefence(config.semantics) && config.semiringKey && !STRENGTH_SEMIRINGS.has(config.semiringKey)) {
-        return 'Budgeted-defence semantics need a strength semiring (Gödel / Arctic / Łukasiewicz); a cost semiring inverts the inconsistency budget.';
     }
 
     if (config.semiringKey && !SEMIRING_POLARITY[config.semiringKey]) {

@@ -1,40 +1,69 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260729-2';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-1';
 
 export class ConfigController {
     constructor(dom) {
         this.dom = dom;
     }
 
+    /** 'none' | 'sum-ub' | 'max-ub' | 'min-lb'  ->  [monoid, budgetMode] */
+    static readBudget(value) {
+        if (!value || value === 'none') return ['sum', 'none'];
+        const [monoid, bound] = value.split('-');
+        return [monoid, bound];
+    }
+
+    /** 'all' | 'min' | 'max'  ->  { optMode, optimization } */
+    static readResults(value) {
+        if (value === 'min') return { optMode: 'optN', optimization: 'minimize' };
+        if (value === 'max') return { optMode: 'optN', optimization: 'maximize' };
+        return { optMode: 'ignore', optimization: 'minimize' };
+    }
+
+    static writeBudget(monoid, budgetMode) {
+        return budgetMode === 'none' || !budgetMode ? 'none' : `${monoid}-${budgetMode}`;
+    }
+
+    static writeResults(optMode, optimization) {
+        if (optMode !== 'optN') return 'all';
+        return optimization === 'maximize' ? 'max' : 'min';
+    }
+
     getCurrentConfig() {
+        // The two composite selectors below replaced five interlocking ones. `budget-select`
+        // offers only the three canonical (monoid, bound) pairings, so an invalid pairing is
+        // now unreachable rather than something syncUi had to disable after the fact.
+        const [monoid, budgetMode] = ConfigController.readBudget(this.dom.budgetSelect.value);
+        const { optMode, optimization } = ConfigController.readResults(this.dom.resultsSelect.value);
         return normalizeConfig({
-            semiringFamily: this.dom.semiringSelect.value,
-            polarity: this.dom.polaritySelect.value,
+            semiring: this.dom.semiringSelect.value,
             defaultPolicy: this.dom.defaultPolicySelect.value,
             abaRecovery: this.dom.abaRecoveryToggle.checked,
-            monoid: this.dom.monoidSelect.value,
-            optimization: this.dom.optimizeSelect.value,
-            budgetMode: this.dom.constraintSelect.value,
+            monoid,
+            optimization,
+            budgetMode,
             semantics: this.dom.semanticsSelect.value,
-            optMode: this.dom.optModeSelect.value,
+            optMode,
             beta: parseInt(this.dom.budgetInput.value, 10) || 0,
+            lukK: parseInt(this.dom.lukKInput?.value, 10) || 10,
             numModels: parseInt(this.dom.numModelsInput.value, 10) || 0,
             timeout: (parseInt(this.dom.timeoutInput.value, 10) || 60) * 1000,
-            filterType: this.dom.showSelect.value
+            filterType: 'projection'
         });
     }
 
     applyConfigToUI(config) {
-        this.dom.semiringSelect.value = config.semiringFamily;
-        this.dom.polaritySelect.value = config.polarity;
+        this.dom.semiringSelect.value = config.semiringKey || config.semiring || 'godel';
         this.dom.defaultPolicySelect.value = config.defaultPolicy;
         this.dom.abaRecoveryToggle.checked = Boolean(config.abaRecovery);
-        this.dom.monoidSelect.value = config.monoid;
-        this.dom.optimizeSelect.value = config.optimization;
-        this.dom.constraintSelect.value = config.budgetMode;
         this.dom.semanticsSelect.value = config.semantics;
-        this.dom.optModeSelect.value = config.optMode;
+        this.dom.budgetSelect.value = ConfigController.writeBudget(config.monoid, config.budgetMode);
+        this.dom.resultsSelect.value = ConfigController.writeResults(config.optMode, config.optimization);
         this.dom.budgetInput.value = String(config.beta ?? 0);
-        this.dom.showSelect.value = config.filterType || 'projection';
+        if (this.dom.lukKInput) {
+            // Only a Lukasiewicz preset carries k; leave the field alone otherwise so a
+            // user-chosen k is not clobbered by an unrelated example.
+            if (Number.isFinite(config.lukK)) this.dom.lukKInput.value = String(config.lukK);
+        }
         // Graph mode: an example may prefer a view (e.g. debates open in the
         // assumption-level view rather than the exponential Standard set-graph).
         const graphMode = config.graphMode || 'standard';
@@ -44,8 +73,7 @@ export class ConfigController {
             });
         }
         // A freshly applied config supersedes any held ABA-recovery snapshot.
-        this._savedDefaultPolicy = undefined;
-        this._savedBudgetMode = undefined;
+        this._saved = undefined;
     }
 
     populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
@@ -77,103 +105,74 @@ export class ConfigController {
     }
 
     syncUi() {
-        const semiringFamily = this.dom.semiringSelect.value;
-        let budgetMode = this.dom.constraintSelect.value;
+        const algebra = this.dom.semiringSelect.value;
         const semantics = this.dom.semanticsSelect.value;
         const abaRecovery = this.dom.abaRecoveryToggle.checked;
-        const isLukasiewicz = semiringFamily === 'lukasiewicz';
-        // Defence semantics are defined on the classical no-discard surface; their
-        // interaction with discarding (undefeated/affordability vs the budget) is
-        // undefined, so we run them with no budget.
-        const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(semantics);
-        // Budgeted-defence (Dunne Def 6 lift) uses beta but its OWN sum budget — no monoid/budget-mode.
-        const isBudgetedDefence = ['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred'].includes(semantics);
 
-        // Polarity: godel/tropical have higher/lower variants; Łukasiewicz is a
-        // standalone family with no polarity, so its selector is disabled.
-        const lowerOption = this.dom.polaritySelect.querySelector('option[value="lower"]');
-        if (lowerOption) {
-            lowerOption.disabled = false;
+        // Defence semantics carry their own SUM inconsistency budget and take beta directly,
+        // exactly as bin/waba does; they reject a monoid/bound pairing.
+        const isDefence = ['admissible', 'complete', 'preferred'].includes(semantics);
+        const isLukasiewicz = algebra === 'lukasiewicz';
+
+        // k only exists for Lukasiewicz.
+        if (this.dom.lukKContainer) {
+            this.dom.lukKContainer.style.display = isLukasiewicz ? 'block' : 'none';
         }
-        this.dom.polaritySelect.disabled = isLukasiewicz;
-        const ALIAS_MAP = {
-            godel: { higher: 'godel', lower: 'bottleneck_cost (godel_low)' },
-            tropical: { higher: 'arctic (tropical_high)', lower: 'tropical' }
-        };
-        const polarity = this.dom.polaritySelect.value;
-        this.dom.semiringAliasNote.textContent = isLukasiewicz
-            ? 'Łukasiewicz (bounded-sum ⊗, ⊕=max): a standalone algebra with no polarity variants.'
-            : `${polarity} polarity maps to ${(ALIAS_MAP[semiringFamily] || ALIAS_MAP.godel)[polarity]}.`;
 
+        // ABA recovery pins transparent defaults and forbids discarding.
         if (abaRecovery) {
-            // Snapshot the user's selections once, then force the ABA-recovery profile.
-            if (this._savedDefaultPolicy === undefined) {
-                this._savedDefaultPolicy = this.dom.defaultPolicySelect.value;
-                this._savedBudgetMode = this.dom.constraintSelect.value;
+            if (this._saved === undefined) {
+                this._saved = {
+                    policy: this.dom.defaultPolicySelect.value,
+                    budget: this.dom.budgetSelect.value
+                };
             }
             this.dom.defaultPolicySelect.value = 'neutral';
-            this.dom.constraintSelect.value = 'none';
-        } else if (this._savedDefaultPolicy !== undefined) {
-            // Restore what the user had before ABA recovery was switched on.
-            this.dom.defaultPolicySelect.value = this._savedDefaultPolicy;
-            this.dom.constraintSelect.value = this._savedBudgetMode;
-            this._savedDefaultPolicy = undefined;
-            this._savedBudgetMode = undefined;
-        }
-        // Classical defence runs with no budget; budgeted-defence carries its own budget
-        // (no monoid/budget-mode). Both pin the base discard set off (constraint = none).
-        if ((isDefence || isBudgetedDefence) && !abaRecovery) {
-            this.dom.constraintSelect.value = 'none';
-        }
-        // Re-read after the block so the monoid/budget enable logic below runs
-        // against the current budget mode (restored or forced), not the stale read.
-        budgetMode = this.dom.constraintSelect.value;
-        this.dom.defaultPolicySelect.disabled = abaRecovery;
-
-        if (budgetMode === 'ub') {
-            ['sum', 'max'].forEach((value) => {
-                this.dom.monoidSelect.querySelector(`option[value="${value}"]`).disabled = false;
-            });
-            this.dom.monoidSelect.querySelector('option[value="min"]').disabled = true;
-            if (this.dom.monoidSelect.value === 'min') {
-                this.dom.monoidSelect.value = 'sum';
-            }
-        } else if (budgetMode === 'lb') {
-            ['sum', 'max'].forEach((value) => {
-                this.dom.monoidSelect.querySelector(`option[value="${value}"]`).disabled = true;
-            });
-            this.dom.monoidSelect.querySelector('option[value="min"]').disabled = false;
-            this.dom.monoidSelect.value = 'min';
-        } else {
-            Array.from(this.dom.monoidSelect.options).forEach((option) => {
-                option.disabled = false;
-            });
+            this.dom.budgetSelect.value = 'none';
+        } else if (this._saved !== undefined) {
+            this.dom.defaultPolicySelect.value = this._saved.policy;
+            this.dom.budgetSelect.value = this._saved.budget;
+            this._saved = undefined;
         }
 
-        // With no discarding there is nothing to aggregate or optimise, so the
-        // Monoid / Optimization / Opt-Mode controls have no effect — grey them out.
-        const noDiscard = abaRecovery || budgetMode === 'none';
-        // grounded/preferred enumerate ALL complete candidates then subset-filter,
-        // so they require Opt-Mode = ignore (enumerate); force and lock it.
-        const forceEnumerate = semantics === 'grounded' || semantics === 'preferred' || semantics === 'budgeted-preferred';
+        // A defence semantics owns its budget, so the reading selector is not applicable.
+        if (isDefence && !abaRecovery) {
+            this.dom.budgetSelect.value = 'none';
+        }
+
+        const budgetActive = !abaRecovery && (isDefence || this.dom.budgetSelect.value !== 'none');
+
+        // `preferred` is computed by subset-maximal filtering over enumerated candidates,
+        // so it needs every candidate rather than the optimal ones.
+        const forceEnumerate = semantics === 'preferred';
         if (forceEnumerate) {
-            this.dom.optModeSelect.value = 'ignore';
+            this.dom.resultsSelect.value = 'all';
         }
 
-        // Budgeted-defence USES beta (its own sum budget) even though the budget mode is none.
-        const betaDisabled = abaRecovery || (budgetMode === 'none' && !isBudgetedDefence);
-        this.dom.monoidSelect.disabled = noDiscard;
-        this.dom.optimizeSelect.disabled = noDiscard;
-        this.dom.optModeSelect.disabled = noDiscard || forceEnumerate;
-        this.dom.constraintSelect.disabled = abaRecovery || isDefence || isBudgetedDefence;
-        this.dom.budgetInput.disabled = betaDisabled;
-        this.dom.budgetInput.style.opacity = betaDisabled ? '0.5' : '1';
+        this.dom.defaultPolicySelect.disabled = abaRecovery;
+        this.dom.budgetSelect.disabled = abaRecovery || isDefence;
+        this.dom.resultsSelect.disabled = !budgetActive || forceEnumerate;
+        this.dom.budgetInput.disabled = !budgetActive;
+        this.dom.budgetInput.style.opacity = budgetActive ? '1' : '0.5';
 
         if (this.dom.budgetInputLabel) {
-            this.dom.budgetInputLabel.textContent = abaRecovery
-                ? 'Budget Threshold (β disabled by ABA recovery)'
-                : (isBudgetedDefence ? 'Budget Threshold (β — inconsistency budget)' : 'Budget Threshold (β)');
-            this.dom.budgetInputLabel.style.opacity = betaDisabled ? '0.5' : '1';
+            this.dom.budgetInputLabel.textContent = 'Inconsistency budget (β)';
+            this.dom.budgetInputLabel.style.opacity = budgetActive ? '1' : '0.5';
+        }
+        if (this.dom.semanticsNote) {
+            this.dom.semanticsNote.textContent = isDefence
+                ? 'Defence semantics: β pays for the objections this set declines to answer.'
+                : 'Conflict-based: β pays for the attacks this set supports.';
+        }
+        if (this.dom.semiringAliasNote) {
+            const POLARITY = {
+                godel: 'strength — an objection is only as strong as its weakest premise',
+                arctic: 'strength — independent premises accumulate',
+                lukasiewicz: 'strength — a chain of premises erodes toward 0',
+                tropical: 'cost — a cheaply derived objection is a well-supported one',
+                bottleneck_cost: 'cost — an objection costs as much as its dearest premise'
+            };
+            this.dom.semiringAliasNote.textContent = POLARITY[algebra] || '';
         }
 
         this.updateNumModelsVisibility();
@@ -182,41 +181,38 @@ export class ConfigController {
 
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
-        const isDefence = ['admissible', 'complete', 'grounded', 'preferred'].includes(config.semantics);
-        const isBudgetedDefence = ['budgeted-admissible', 'budgeted-complete', 'budgeted-preferred'].includes(config.semantics);
-        const profile = config.abaRecovery
-            ? 'ABA recovery / neutral defaults / no-discard'
-            : (isBudgetedDefence
-                ? 'budgeted-defence (β sum inconsistency budget)'
-                : (config.budgetMode === 'none'
-                    ? 'plain / no-discard'
-                    : `${config.monoid} + ${config.budgetMode}`));
-        const postFilterCopy = (config.semantics === 'preferred' || config.semantics === 'grounded')
-            ? ` Exact ${config.semantics} uses browser-side ${config.semantics === 'grounded' ? 'subset-minimal' : 'subset-maximal'} filtering over complete candidates.`
-            : (config.semantics === 'budgeted-preferred'
-                ? ' Budgeted-preferred is subset-maximal filtering over budgeted-admissible candidates.'
-                : '');
-        const defenceCopy = isDefence
-            ? ' Defence semantics (admissible/complete/grounded/preferred) run on the no-discard surface.'
-            : (isBudgetedDefence
-                ? ' Budgeted-defence (Dunne Def 6 lift) spends a β-bounded sum inconsistency budget to discard attacks, then applies classical defence; strength semirings only.'
-                : '');
+        const isDefence = ['admissible', 'complete', 'preferred'].includes(config.semantics);
+        const READING = {
+            'sum-ub': 'total conceded ≤ β',
+            'max-ub': 'worst single concession ≤ β',
+            'min-lb': 'every concession ≥ β'
+        };
+        const budgetLabel = config.abaRecovery
+            ? 'no discarding (ABA recovery)'
+            : (isDefence
+                ? 'defence budget: total conceded ≤ β'
+                : (READING[this.dom.budgetSelect.value] || 'no discarding'));
 
-        this.dom.supportedSurfaceNote.innerHTML = `
-            Supported semiring surface: <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code>, <code>lukasiewicz</code> (families G&ouml;del / Tropical, plus standalone &#321;ukasiewicz).
-            Canonical bounded presets are <code>sum/max + ub</code> and <code>min + lb</code>.
-            Current profile: <code>${profile}</code>.${postFilterCopy}${defenceCopy}
-        `;
-
-        this.dom.budgetIntentNote.textContent = config.abaRecovery
-            ? 'ABA recovery matches the wrapper: neutral defaults, no-discard, and no bounded objective/beta controls.'
-            : (config.budgetMode === 'none'
-                ? 'Budget mode is disabled, so the playground matches the wrapper no-discard surface.'
-                : 'Budget mode is active, so the aggregate must satisfy the selected upper/lower bound against β.');
-
+        if (this.dom.supportedSurfaceNote) {
+            this.dom.supportedSurfaceNote.innerHTML = `
+                Five algebras &mdash; <code>godel</code>, <code>arctic</code>, <code>lukasiewicz</code> (strength);
+                <code>tropical</code>, <code>bottleneck_cost</code> (cost).
+                Five semantics, all budgeted. Reading: <code>${budgetLabel}</code>.
+                ${isDefence
+                    ? 'Under a cost algebra a defence budget reverses direction, so recovery arrives at a β above every attack weight rather than at 0.'
+                    : ''}
+            `;
+        }
+        if (this.dom.budgetIntentNote) {
+            this.dom.budgetIntentNote.textContent = config.abaRecovery
+                ? 'Every discard is forbidden, so this is plain ABA.'
+                : (isDefence
+                    ? 'This semantics supplies its own budget; the reading selector does not apply.'
+                    : 'Only the three canonical pairings are offered, so an invalid one is unreachable.');
+        }
         if (this.dom.implementationNote) {
             this.dom.implementationNote.textContent =
-                'Runs the mature WABA modules (semiring × monoid × budget × semantics) directly via clingo-WASM.';
+                'Runs the canonical WABA modules directly via clingo-WASM.';
         }
     }
 
@@ -224,6 +220,7 @@ export class ConfigController {
         if (!this.dom.numModelsContainer) {
             return;
         }
-        this.dom.numModelsContainer.style.display = this.dom.optModeSelect.value === 'ignore' ? 'block' : 'none';
+        const enumerating = this.dom.resultsSelect.disabled || this.dom.resultsSelect.value === 'all';
+        this.dom.numModelsContainer.style.display = enumerating ? 'block' : 'none';
     }
 }

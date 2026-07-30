@@ -1,5 +1,5 @@
-import { wabaModules } from '../waba-modules.js?v=20260729-2';
-import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260729-2';
+import { wabaModules } from '../waba-modules.js?v=20260730-1';
+import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260730-1';
 
 export function getCoreModule() {
     return wabaModules.core.base;
@@ -30,17 +30,12 @@ export function getFilterModule(filterType = 'standard') {
 }
 
 export function getSemanticsModule(semantics) {
-    if (semantics === 'preferred' || semantics === 'grounded') {
-        return wabaModules.semantics.complete;
-    }
-    // wABA budgeted-defence (Dunne Def 6): map to the self-contained-budget modules.
-    if (semantics === 'budgeted-admissible' || semantics === 'budgeted-preferred') {
-        return wabaModules.semantics.admissible_dunne;
-    }
-    if (semantics === 'budgeted-complete') {
-        return wabaModules.semantics.complete_dunne;
-    }
-    return wabaModules.semantics[semantics] || wabaModules.semantics.stable;
+    // A derived semantics (preferred) has no module of its own: it is computed by
+    // post-filtering the candidates of another one. metadata.derivedSemantics carries that
+    // mapping straight from the sync policy, so it cannot drift from bin/waba.
+    const derived = wabaModules.metadata.derivedSemantics || {};
+    const moduleKey = derived[semantics] || semantics;
+    return wabaModules.semantics[moduleKey] || wabaModules.semantics.stable;
 }
 
 /**
@@ -52,20 +47,20 @@ export function buildProgram(framework, config, options = {}) {
     const semanticsKey = options.semantics || config.semantics;
     const includeObjective = options.includeObjective ?? shouldLoadObjective(config);
     const budgetProfile = resolveBudgetProfile(config);
-    // Ground the CONSTANT beta, exactly as bin/waba's `-c beta=N` does. core/base.lp
-    // states `budget(beta).` and the curated frameworks end with `budget(beta).`, so
-    // emitting a `budget(N).` FACT instead would leave `beta` symbolic — and a symbolic
-    // constant outranks every integer in clingo's term order, which makes constraint/lb.lp
-    // (`:- budget_value(C), C < B, budget(B), some_discard.`) reject EVERY discard and
-    // silently collapse lower-bound mode to no-discard. Skip our declaration when the
-    // framework already fixes beta: clingo rejects a redefined constant outright.
-    const frameworkFixesBeta = /^[^%\n]*#const\s+beta\s*=/m.test(framework);
+    // beta is supplied as a SOLVER CONSTANT (-c beta=N) in buildSolverArgs, exactly as
+    // bin/waba does -- NOT as a `#const beta = N.` in the program text.
+    //
+    // Emitting it into the text could not override a framework that declares its own
+    // `#const beta = 0.` (clingo rejects a redefined constant), so the playground silently
+    // yielded to the framework while the CLI's -c overrode it. Under a cost algebra that
+    // turned beta=101 into beta=0, the lower-bound defence guard went vacuous, and the
+    // playground returned every candidate set where the CLI returned the 7 correct ones.
+    // -c wins over #const, so this makes the caller's beta authoritative in both surfaces.
     const parts = [
         '%% Framework',
         framework.trim(),
         '',
-        '%% Budget',
-        frameworkFixesBeta ? '%% (beta fixed by the framework)' : `#const beta = ${config.beta}.`,
+        `%% Budget: beta = ${config.beta} (passed as -c beta, which overrides any framework #const)`,
         '',
         '%% Core',
         getCoreModule(),
@@ -96,12 +91,18 @@ export function buildProgram(framework, config, options = {}) {
 
 export function buildSolverArgs(config) {
     const effectiveOptMode = resolveSolverOptMode(config);
+    const constants = ['-c', `beta=${config.beta}`];
+    // semiring/lukasiewicz.lp declares `#const k = 1000.`; -c overrides it, exactly as
+    // bin/waba's --luk-k does. Left off for every other algebra, which has no k.
+    if (config.semiringKey === 'lukasiewicz' && Number.isFinite(config.lukK)) {
+        constants.push('-c', `k=${config.lukK}`);
+    }
     if (effectiveOptMode === 'ignore') {
         // Budgeted-defence realises one extension via many discard sets, so project
         // onto the shown atoms to enumerate each beta-admissible set once.
         return isBudgetedDefence(config.semantics)
-            ? ['--opt-mode=ignore', '--project']
-            : ['--opt-mode=ignore'];
+            ? [...constants, '--opt-mode=ignore', '--project']
+            : [...constants, '--opt-mode=ignore'];
     }
-    return [`--opt-mode=${effectiveOptMode}`, '--quiet=1', '--project'];
+    return [...constants, `--opt-mode=${effectiveOptMode}`, '--quiet=1', '--project'];
 }
