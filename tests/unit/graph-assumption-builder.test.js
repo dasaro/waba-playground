@@ -63,7 +63,7 @@ test('Branching: a 2-level debate-style chain renders every intermediate claim',
     assert.equal(g.visNodes.filter((n) => n.isJunction).length, 2, 'two multi-premise steps -> two junctions');
 });
 
-test('Direct mode distinguishes joint (AND) from disjunctive (OR) by marker + colour (issue #3)', () => {
+test('Direct mode distinguishes joint (AND) from disjunctive (OR) by terminator', () => {
     const assumptions = ['a', 'b1', 'b2'];
     const contraries = [
         { assumption: 'a', contrary: 'c' },
@@ -76,16 +76,21 @@ test('Direct mode distinguishes joint (AND) from disjunctive (OR) by marker + co
     const joint = buildDirectAssumptionGraph(assumptions, contraries, [{ id: 'r1', head: 'c', body: ['b1', 'b2'] }], weights);
     const jointEdges = joint.visEdges.filter((e) => e.to === 'a');
     assert.equal(jointEdges.length, 2);
-    assert.ok(jointEdges.every((e) => e.label === '∧' && e.color.color === '#10b981'),
-        'joint contributions must be green and ∧-marked');
+    // Kind is carried by the TERMINATOR, not by hue -- hue belongs to the three attack
+    // states. The '∧' label is gone: `align:'middle'` rotated it into a false mid-edge
+    // arrowhead that could point the opposite way to the edge carrying it.
+    assert.ok(jointEdges.every((e) => e.arrows?.to?.type === 'bar'),
+        'joint contributions must end in a bar (needs its partners), not an arrowhead');
+    assert.ok(jointEdges.every((e) => e.label === ''), 'the rotating ∧ label must be gone');
 
     // disjunction: c <- b1.  c <- b2.
     const disj = buildDirectAssumptionGraph(assumptions, contraries,
         [{ id: 'r1', head: 'c', body: ['b1'] }, { id: 'r2', head: 'c', body: ['b2'] }], weights);
     const disjEdges = disj.visEdges.filter((e) => e.to === 'a');
-    assert.ok(disjEdges.every((e) => e.color.color === '#f59e0b'), 'disjunctive attacks must be amber');
+    assert.ok(disjEdges.every((e) => e.arrows?.to?.type === 'arrow'),
+        'an independent attack lands on its own, so it ends in a filled arrowhead');
     assert.deepEqual(disjEdges.map((e) => e.label).sort(), ['3', '4'],
-        'disjunctive edges carry their leaf weights, not the ∧ marker');
+        'disjunctive edges carry their leaf weights');
 });
 
 test('Branching single-premise derived attack carries the leaf weight (issue #4)', () => {

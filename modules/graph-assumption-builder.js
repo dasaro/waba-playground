@@ -1,4 +1,4 @@
-import { GraphUtils } from './graph-utils.js?v=20260730-18';
+import { GraphUtils } from './graph-utils.js?v=20260730-26';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
@@ -7,7 +7,7 @@ import {
     buildJunctionTooltip,
     buildSupportEdgeTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260730-18';
+} from './graph-tooltip-builder.js?v=20260730-26';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
@@ -20,6 +20,50 @@ function assumptionNodeColor() {
 function assumptionFont() {
     return { color: GraphUtils.getFontColor() };
 }
+/**
+ * Edge KIND is carried by the terminator, never by hue -- hue is reserved for the three attack
+ * states, which is the only thing a reader is actually tracking. A filled triangle lands, an
+ * open vee only carries evidence, and a perpendicular bar means "this force stops short: it
+ * needs its partners".
+ *
+ * The bar terminator retires the '\u2227' EDGE LABEL, which `align:'middle'` rotated into a
+ * convincing mid-edge arrowhead that could point the opposite way to the edge it sat on.
+ */
+function edgeKind(kind) {
+    const p = GraphUtils.palette();
+    if (kind === 'support') {
+        return {
+            attackType: 'support',
+            width: 1.5,
+            color: { color: p.support, highlight: p.lineStrong, hover: p.lineStrong },
+            arrows: { to: { enabled: true, type: 'vee', scaleFactor: 0.4 } },
+            dashes: false
+        };
+    }
+    if (kind === 'joint') {
+        return {
+            attackType: 'joint',
+            width: 2,
+            color: { color: p.line, highlight: p.lineStrong, hover: p.lineStrong },
+            arrows: {
+                to: { enabled: true, type: 'bar', scaleFactor: 0.5 },
+                from: { enabled: true, type: 'circle', scaleFactor: 0.22 }
+            },
+            dashes: false
+        };
+    }
+    return {
+        attackType: kind || 'attack',
+        width: 2,
+        color: { color: p.line, highlight: p.lineStrong, hover: p.lineStrong },
+        arrows: {
+            to: { enabled: true, type: 'arrow', scaleFactor: 0.5 },
+            from: { enabled: true, type: 'circle', scaleFactor: 0.22 }
+        },
+        dashes: false
+    };
+}
+
 
 function explicitWeight(weights, atom) {
     return Object.prototype.hasOwnProperty.call(weights, atom) ? weights[atom] : null;
@@ -30,7 +74,8 @@ function createAssumptionNode(assumption, weights, summary) {
     return {
         id: assumption,
         label: assumption,
-        size: 25,
+        shape: 'box',
+        shapeProperties: { borderRadius: 16 },
         color: assumptionNodeColor(),
         title: buildAssumptionNodeTooltip({
             assumption,
@@ -51,8 +96,11 @@ function createTopNode(factBasedAttacks) {
     return {
         id: '⊤',
         label: '⊤',
-        size: 25,
-        shape: 'triangle', // match the legend's ⊤ (Facts) triangle symbol
+        // `triangle` is a label-OUTSIDE shape, so the 26px glyph floated below a small
+        // triangle and collided with unrelated edges. A dashed pill says "nothing was
+        // assumed" and keeps the glyph inside the form it belongs to.
+        shape: 'box',
+        shapeProperties: { borderRadius: 16, borderDashes: [4, 3] },
         color: assumptionNodeColor(),
         title: buildTopNodeTooltip(factBasedAttacks),
         font: {
@@ -66,6 +114,9 @@ function createTopNode(factBasedAttacks) {
 function createAttackEdge(data) {
     return {
         ...data,
+        // The weight class the edge was built at. State styling SCALES this rather than
+        // replacing it, so a #sup attack stays heavier than an ordinary one in every state.
+        baseWidth: data.width ?? 2,
         originalWidth: data.width ?? 2,
         originalColor: data.color,
         originalDashes: data.dashes ?? false
@@ -108,16 +159,13 @@ function addFactBasedAttacks(visNodes, visEdges, factBasedAttacks) {
     }
     factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
         const displayWeight = (weight === '?' || weight === null || weight === undefined) ? '' : weight;
-        const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
-        visEdges.push(createAttackEdge({
+                visEdges.push(createAttackEdge({
             id: `top-attacks-${assumption}-via-${contrary}`,
             from: '⊤',
             to: assumption,
             label: displayWeight,
             weight,
-            width: 2,
-            color: edgeColor,
-            arrows: 'to',
+            ...edgeKind('attack'),
             title: buildAttackEdgeTooltip({
                 typeLabel: 'Fact-based attack',
                 attacker: contrary,
@@ -260,17 +308,13 @@ function pushSingleAttackEdge(visEdges, { leaf, assumption, contrary, weights, i
     // semiring (⊗ of one element is that element). So this weight is safe to show.
     const weight = explicitWeight(weights, leaf);
     const label = (weight === null || weight === undefined) ? '' : String(weight);
-    const edgeColor = { color: '#f59e0b', highlight: '#d97706' };
-    visEdges.push(createAttackEdge({
+        visEdges.push(createAttackEdge({
         id: `${leaf}-attacks-${assumption}-via-${contrary}-${idx}`,
         from: leaf,
         to: assumption,
         label,
         weight: weight === null ? '?' : weight,
-        width: 2,
-        color: edgeColor,
-        arrows: 'to',
-        dashes: false,
+        ...edgeKind('attack'),
         title: buildAttackEdgeTooltip({
             typeLabel: isDirect ? 'Direct attack' : 'Derived attack',
             attacker: leaf,
@@ -295,17 +339,15 @@ function pushDirectJoint(visEdges, { set, assumption, contrary, idx }) {
     // gets a green edge MARKED with ∧ to signal "jointly required" — distinguishing
     // it from independent (disjunctive) amber attacks, which differ only in colour.
     set.forEach((attacker) => {
-        const edgeColor = { color: '#10b981', highlight: '#059669' };
         visEdges.push(createAttackEdge({
             id: `${attacker}-joint-attacks-${assumption}-via-${contrary}-${idx}`,
             from: attacker,
             to: assumption,
-            label: '∧',
+            // No '∧' label: the bar terminator carries "needs its partners", and the label
+            // was being rotated into a false mid-edge arrowhead.
+            label: '',
             weight: '?', // the joint (⊗-aggregated) weight is semiring-dependent
-            width: 2,
-            color: edgeColor,
-            arrows: 'to',
-            dashes: false,
+            ...edgeKind('joint'),
             title: buildAttackEdgeTooltip({
                 typeLabel: 'Joint attack contribution',
                 attacker,
@@ -330,14 +372,17 @@ function pushBranchingJoint(visNodes, visEdges, { set, assumption, contrary, idx
     const junctionId = `junction_${contrary}_${idx}`;
     visNodes.push({
         id: junctionId,
-        label: '∧',
-        size: 22,
+        label: '',
+        size: 14,
         shape: 'diamond',
+        // Hollow, not filled: a junction is a connective, not a claim. Filling it green
+        // also made it the third unrelated thing that green meant on this canvas.
         color: {
-            border: '#10b981',
-            background: '#10b981',
-            highlight: { border: '#059669', background: '#059669' }
+            background: GraphUtils.palette().canvas,
+            border: GraphUtils.palette().line,
+            highlight: { background: GraphUtils.palette().canvas, border: GraphUtils.palette().lineStrong }
         },
+        borderWidth: 2,
         title: buildJunctionTooltip({
             target: assumption,
             contrary,
@@ -355,15 +400,11 @@ function pushBranchingJoint(visNodes, visEdges, { set, assumption, contrary, idx
     });
 
     set.forEach((attacker) => {
-        const edgeColor = { color: '#10b981', highlight: '#059669' };
-        visEdges.push(createAttackEdge({
+                visEdges.push(createAttackEdge({
             id: `${attacker}-to-${junctionId}`,
             from: attacker,
             to: junctionId,
-            width: 2,
-            color: edgeColor,
-            arrows: 'to',
-            dashes: false,
+            ...edgeKind('attack'),
             title: buildAttackEdgeTooltip({
                 typeLabel: 'Joint attack contribution',
                 attacker,
@@ -384,17 +425,13 @@ function pushBranchingJoint(visNodes, visEdges, { set, assumption, contrary, idx
         }));
     });
 
-    const edgeColor = { color: '#10b981', highlight: '#059669' };
-    visEdges.push(createAttackEdge({
+        visEdges.push(createAttackEdge({
         id: `${junctionId}-attacks-${assumption}`,
         from: junctionId,
         to: assumption,
         label: '', // the aggregate weight is semiring-dependent; do not fabricate one
         weight: '?',
-        width: 2,
-        color: edgeColor,
-        arrows: 'to',
-        dashes: false,
+        ...edgeKind('attack'),
         title: buildAttackEdgeTooltip({
             typeLabel: 'Joint attack',
             attacker: 'junction',
@@ -466,7 +503,12 @@ export function buildDirectAssumptionGraph(assumptions, contraries, rules, weigh
 // ---------------------------------------------------------------------------
 
 function derivedNodeColor() {
-    return { border: '#6366f1', background: '#818cf8', highlight: { border: '#4f46e5', background: '#6366f1' } };
+    const p = GraphUtils.palette();
+    return {
+        background: p.surface,
+        border: p.line,
+        highlight: { background: p.surface, border: p.lineStrong }
+    };
 }
 
 export function buildBranchingAssumptionGraph(assumptions, contraries, rules, weights) {
@@ -491,9 +533,9 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                 // (its weight is semiring-dependent — the Results panel has it).
                 label: (w === null || w === undefined) ? atom : `${atom}\n(w: ${w})`,
                 shape: 'box',
-                size: 18,
+                shapeProperties: { borderRadius: 3 },
                 color: derivedNodeColor(),
-                font: { color: '#ffffff', size: 13 },
+                font: { color: GraphUtils.palette().ink, size: 13 },
                 title: buildDerivedNodeTooltip({ atom, explicitWeight: w, derivingRules }),
                 isDerived: true,
                 atom
@@ -506,9 +548,16 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         if (!created.has(id)) {
             created.add(id);
             visNodes.push({
-                id, label: '∧', size: 16, shape: 'diamond',
-                color: { border: '#10b981', background: '#10b981', highlight: { border: '#059669', background: '#059669' } },
-                font: { color: GraphUtils.getFontColor(), size: 15 },
+                // No label: `diamond` is label-OUTSIDE, so the '∧' rendered as a detached
+                // glyph below the shape, overlapping whatever edge passed beneath. The
+                // hollow diamond IS the conjunction marker.
+                id, label: '', size: 14, shape: 'diamond',
+                color: {
+                    background: GraphUtils.palette().canvas,
+                    border: GraphUtils.palette().line,
+                    highlight: { background: GraphUtils.palette().canvas, border: GraphUtils.palette().lineStrong }
+                },
+                borderWidth: 2,
                 // This node used to be pushed with no `title`, so hovering an ∧ junction --
                 // the one element whose whole purpose needs explaining -- showed nothing.
                 title: buildDerivationJunctionTooltip({ head, ruleId, body }),
@@ -531,9 +580,8 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
     const pushSupportEdge = (from, to, meta = {}) => {
         visEdges.push(createAttackEdge({
             id: `support-${from}-to-${to}`,
-            from, to, width: 2,
-            color: { color: '#94a3b8', highlight: '#64748b' },
-            arrows: 'to', dashes: false,
+            from, to,
+            ...edgeKind('support'),
             title: buildSupportEdgeTooltip(meta),
             attackType: 'support'
         }));
@@ -607,9 +655,7 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
             from: src, to: assumption,
             label: leafW === null ? '' : String(leafW),
             weight: shownWeight,
-            width: 2,
-            color: { color: '#f59e0b', highlight: '#d97706' },
-            arrows: 'to', dashes: false,
+            ...edgeKind('attack'),
             title: buildAttackEdgeTooltip({
                 typeLabel: isDirect ? 'Direct attack' : 'Derived attack',
                 attacker: contrary, target: assumption, contrary,

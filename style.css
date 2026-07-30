@@ -39,6 +39,23 @@
     --button-ghost-hover: rgba(102, 126, 234, 0.14);
     --button-ghost-border: rgba(148, 163, 184, 0.24);
 
+    /* ===== Graph roles =====
+       The graph used to carry a private palette of hex literals inside modules/graph-*.js,
+       which no theme switch could reach. These are the single source; GraphUtils.palette()
+       resolves them. Most derive from the tokens above; only `conceded`, `dim` and `support`
+       are genuinely new roles the rest of the app has no use for. */
+    --graph-canvas:       #0f172a;   /* = --bg-primary: the measured background of #cy */
+    --graph-surface:      #1b2740;
+    --graph-surface-in:   #33456b;
+    --graph-ink:          #e2e8f0;
+    --graph-ink-dim:      #8494ad;
+    --graph-line:         #7c8ba6;   /* node border + at-rest attack; also carries 12px labels */
+    --graph-line-strong:  #dbe4f0;   /* the IN border: the loudest achromatic mark */
+    --graph-dim:          #475569;   /* never-launched: deliberately background, and OPAQUE */
+    --graph-support:      #6b7d99;   /* derivation: present, clearly subordinate */
+    --graph-active:       #f87171;   /* lands */
+    --graph-conceded:     #c084fc;   /* paid for -- NOT grey: it costs budget */
+
     /* ===== Typography Scale (6 sizes instead of 37!) ===== */
     --text-xs: 0.75rem;    /* 12px */
     --text-sm: 0.875rem;   /* 14px */
@@ -92,6 +109,17 @@
     --editor-field-bg: #ffffff;
     --button-ghost-hover: rgba(79, 111, 216, 0.1);
     --button-ghost-border: rgba(115, 131, 154, 0.2);
+    --graph-canvas:       #ffffff;
+    --graph-surface:      #f8fafc;
+    --graph-surface-in:   #ccd8ee;
+    --graph-ink:          #16233a;
+    --graph-ink-dim:      #64748b;
+    --graph-line:         #64748b;
+    --graph-line-strong:  #16233a;
+    --graph-dim:          #a3aec0;
+    --graph-support:      #8494ab;
+    --graph-active:       #d31f1f;
+    --graph-conceded:     #7c3aed;
 }
 
 /* ===================================
@@ -1752,54 +1780,53 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     flex-shrink: 0;
 }
 
-/* Node symbols */
-.node-assumption {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #667eea;
-    /* matches GraphUtils.createNodeColor('assumption'): border #5568d3, background #667eea */
-    border: 2px solid #5568d3;
+/* Node and edge symbols.
+   Every swatch reads the same --graph-* tokens the canvas does, so the legend cannot drift
+   from the diagram and it restyles with the theme. It used to be a third hard-coded copy of a
+   palette that itself no longer matched what rendered, with no light-theme rules at all. */
+.node-assumption,
+.node-claim,
+.node-in,
+.node-out {
+    width: 26px;
+    height: 16px;
+    background: var(--graph-surface);
+    border: 2px solid var(--graph-line);
 }
 
-.node-derived {
-    width: 20px;
-    height: 20px;
-    background: #10b981;
-    border: 2px solid #10b981;
-    transform: rotate(45deg);
-}
+/* Silhouette carries node KIND: a pill is an assumption, a soft rectangle is a derived claim. */
+.node-assumption { border-radius: 8px; }
+.node-claim { border-radius: 3px; }
 
-.node-claim {
-    width: 22px;
-    height: 14px;
-    border-radius: 3px;
-    background: #818cf8;
-    border: 2px solid #6366f1;
-}
-
-.node-top {
-    width: 0;
-    height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
-    border-bottom: 17px solid #667eea;
-}
-
+/* State carries fill: IN is filled with the loudest achromatic border, OUT is hollow. */
 .node-in {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #34d399;
-    border: 2px solid #10b981;
+    border-radius: 8px;
+    background: var(--graph-surface-in);
+    border-color: var(--graph-line-strong);
 }
 
 .node-out {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #94a3b8;
-    border: 2px solid #64748b;
+    border-radius: 8px;
+    background: var(--graph-canvas);
+    border-color: var(--graph-dim);
+}
+
+/* The ∧ junction is a connective, not a claim, so it is hollow and unlabelled. */
+.node-derived {
+    width: 14px;
+    height: 14px;
+    background: var(--graph-canvas);
+    border: 2px solid var(--graph-line);
+    transform: rotate(45deg);
+}
+
+/* ⊤ is a dashed pill: "nothing was assumed". */
+.node-top {
+    width: 26px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--graph-surface);
+    border: 2px dashed var(--graph-line);
 }
 
 /* Edge symbols */
@@ -1812,67 +1839,56 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .edge-active,
 .edge-discarded {
     width: 40px;
-    height: 3px;
+    height: 2px;
     position: relative;
+    background: var(--graph-line);
 }
 
-/* Self-loops are drawn on any set or claim that supports the contrary of something it accepts.
-   Six of them appear on the default example in Standard mode, and joint-attack self-loops occur
-   in the assumption modes; the legend documented neither. Same orange as any attack, since that
-   is how they render. */
 .edge-selfloop {
     width: 16px;
     height: 16px;
-    border: 2px solid #f59e0b;
+    border: 2px solid var(--graph-line);
     border-radius: 50%;
     background: transparent;
 }
 
+/* Weight class is carried by WIDTH alone; the parallel colour encoding it used to have was
+   redundant, and it spent hue the three attack states need. */
+.edge-sup { height: 3px; }
+.edge-inf { height: 1px; }
+
+/* Derivation is present but clearly subordinate. */
 .edge-support {
-    background: #94a3b8;
-}
-
-/* Standard-mode weight-based edge colours (match graph-manager) */
-.edge-sup {
-    background: #ff6b6b;
-}
-
-.edge-inf {
-    background: #888;
+    background: var(--graph-support);
+    height: 1.5px;
 }
 
 .legend-variant[hidden] {
     display: none;
 }
 
-.edge-derived {
-    background: #f59e0b;
-}
-
-.edge-joint {
-    background: #10b981;
-}
-
-.edge-fact {
-    background: #f59e0b;
-}
-
+/* The three attack states, each separable from the others without relying on hue. */
 .edge-active {
-    background: #ef4444;
-    height: 5px;
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+    background: var(--graph-active);
+    height: 3px;
 }
 
+/* Violet and dashed, NOT grey: a conceded attack was paid for out of the budget. It is the
+   point of the framework, not debris, and it must never outweigh one that lands. */
 .edge-discarded {
     background: repeating-linear-gradient(
         to right,
-        #9ca3af 0px,
-        #9ca3af 5px,
-        transparent 5px,
-        transparent 10px
+        var(--graph-conceded) 0px,
+        var(--graph-conceded) 9px,
+        transparent 9px,
+        transparent 14px
     );
-    height: 3px;
-    opacity: 0.7;
+    height: 2px;
+}
+
+.edge-dormant {
+    background: var(--graph-dim);
+    height: 1.5px;
 }
 
 /* ===================================

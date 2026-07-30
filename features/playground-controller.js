@@ -1,17 +1,17 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260730-18';
-import { FontManager } from '../modules/font-manager.js?v=20260730-18';
-import { UIManager } from '../modules/ui-manager.js?v=20260730-18';
-import { PanelManager } from '../modules/panel-manager.js?v=20260730-18';
-import { FileManager } from '../modules/file-manager.js?v=20260730-18';
-import { GraphManager } from '../modules/graph-manager.js?v=20260730-18';
-import { PopupManager } from '../modules/popup-manager.js?v=20260730-18';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-18';
-import { OutputManager } from '../modules/output-manager.js?v=20260730-18';
-import { ExportManager } from '../modules/export-manager.js?v=20260730-18';
-import { ConfigController } from './config-controller.js?v=20260730-18';
-import { DocsController } from './docs-controller.js?v=20260730-18';
-import { EditorController } from './editor-controller.js?v=20260730-18';
-import { ExamplesController } from './examples-controller.js?v=20260730-18';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-26';
+import { FontManager } from '../modules/font-manager.js?v=20260730-26';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-26';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-26';
+import { FileManager } from '../modules/file-manager.js?v=20260730-26';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-26';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-26';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-26';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-26';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-26';
+import { ConfigController } from './config-controller.js?v=20260730-26';
+import { DocsController } from './docs-controller.js?v=20260730-26';
+import { EditorController } from './editor-controller.js?v=20260730-26';
+import { ExamplesController } from './examples-controller.js?v=20260730-26';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -43,7 +43,8 @@ export class PlaygroundController {
             this.dom.themeToggleBtn,
             this.dom.themeIcon,
             () => this.network,
-            () => this.networkData
+            () => this.networkData,
+            () => this.outputManager?.restoreActiveExtension?.()
         );
 
         this.fontManager = new FontManager(this.dom.fontIncreaseBtn, this.dom.fontDecreaseBtn);

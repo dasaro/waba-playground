@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-18';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-18';
-import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-18';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-18';
+import { PopupManager } from './popup-manager.js?v=20260730-26';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-26';
+import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-26';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-26';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its

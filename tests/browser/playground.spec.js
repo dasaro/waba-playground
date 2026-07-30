@@ -736,6 +736,66 @@ test('a defence detour returns the budget and the Results choice intact', async 
     await expect(page.locator('#results-select'), 'Results choice lost').toHaveValue('min');
 });
 
+test('selecting an extension restyles edges without moving anything', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+    await page.click('#run-btn');
+    await runFinished(page);
+    await settled(page);
+
+    const snapshot = () => page.evaluate(() => {
+        const gm = window.playground.graphManager;
+        const positions = gm.network.getPositions();
+        return {
+            geometry: gm.networkData.edges.get().map((e) => ({
+                id: e.id, type: e.smooth?.type, roundness: e.smooth?.roundness
+            })).sort((a, b) => a.id.localeCompare(b.id)),
+            positions,
+            colours: gm.networkData.edges.get().map((e) => e.color?.color).sort()
+        };
+    });
+
+    const before = await snapshot();
+    await page.locator('.answer-header').first().click();
+    await page.waitForTimeout(400);
+    const after = await snapshot();
+
+    // The reported bug: conceding an attack straightened its curve while every neighbour
+    // stayed bowed, because the discarded branch wrote `smooth: {enabled: false}`. State is
+    // colour/width/dash only -- geometry is assigned once and is immutable.
+    expect(after.geometry, 'selecting an extension must not change edge geometry')
+        .toEqual(before.geometry);
+    expect(after.positions, 'nor move any node').toEqual(before.positions);
+    // ...but it must actually restyle something, or the test proves nothing.
+    expect(after.colours).not.toEqual(before.colours);
+});
+
+test('the three attack states stay distinguishable without colour', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+    await page.click('#run-btn');
+    await runFinished(page);
+    await page.locator('.answer-header').first().click();
+    await page.waitForTimeout(400);
+
+    const states = await page.evaluate(() => window.playground.graphManager.networkData.edges
+        .get().map((e) => ({ w: e.width, dashed: Array.isArray(e.dashes), c: e.color?.color })));
+    const conceded = states.filter((e) => e.dashed);
+    const solid = states.filter((e) => !e.dashed);
+    expect(conceded.length, 'this example concedes an attack at the preset budget')
+        .toBeGreaterThan(0);
+    // A conceded attack was PAID FOR. It must not be drawn heavier than one that lands.
+    const heaviestSolid = Math.max(...solid.map((e) => e.w));
+    expect(Math.max(...conceded.map((e) => e.w))).toBeLessThanOrEqual(heaviestSolid);
+    // No state may be carried by hue alone.
+    expect(new Set(states.map((e) => e.c)).size).toBeGreaterThan(1);
+    expect(new Set(states.map((e) => e.w)).size).toBeGreaterThan(1);
+});
+
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));

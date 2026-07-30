@@ -1,25 +1,39 @@
-import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-18';
-function colorToRGBA(color, opacity = 0.3) {
-    if (typeof color === 'object' && color.color) {
-        color = color.color;
-    }
+import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-26';
+import { GraphUtils } from './graph-utils.js?v=20260730-26';
 
-    const rgbaMatch = typeof color === 'string' && color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (rgbaMatch) {
-        return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${opacity})`;
+/**
+ * The three attack states, each separable from the others on TWO non-hue channels, so the
+ * encoding survives deuteranopia and greyscale.
+ *
+ *   lands      colour --graph-active     width x1.4   solid
+ *   conceded   colour --graph-conceded   width x1.0   dashed
+ *   dormant    colour --graph-dim        width x0.75  solid
+ *
+ * `conceded` is deliberately NOT grey. It is the attack this extension PAID FOR out of the
+ * budget -- the whole point of the framework -- and it used to be drawn in the same grey as
+ * inert scaffolding while being WIDER than an attack that actually lands, so the visual
+ * hierarchy ranked the three states backwards.
+ *
+ * None of these writes `smooth`. Geometry belongs to assignEdgeGeometry and is fixed for the
+ * lifetime of the graph: the discarded branch used to set `smooth: {enabled: false}`, so
+ * conceding an attack straightened its curve while every neighbour stayed bowed -- an
+ * unexplainable shape change on state, and a whole-graph geometry rebuild on every click.
+ */
+function stateStyle(state, baseWidth, p) {
+    const w = baseWidth || 2;
+    if (state === 'active') {
+        return { color: { color: p.active, highlight: p.active, hover: p.active },
+            width: w * 1.4, dashes: false };
     }
-
-    if (typeof color === 'string' && color.startsWith('#')) {
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    if (state === 'conceded') {
+        return { color: { color: p.conceded, highlight: p.conceded, hover: p.conceded },
+            width: w, dashes: [9, 5] };
     }
-
-    return `rgba(156, 163, 175, ${opacity})`;
+    // dormant: opaque, never alpha. At 20% alpha two crossing dormant edges composited
+    // BRIGHTER than a single one, so the least important thing on the canvas got emphasis
+    // exactly where the picture was busiest.
+    return { color: { color: p.dim, highlight: p.dim, hover: p.dim }, width: w * 0.75, dashes: false };
 }
-
 function parseSuccessfulAttacks(successfulAttacks) {
     return successfulAttacks.map((attack) => {
         const match = attack.match(/attacks_successfully_with_weight\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
@@ -46,6 +60,14 @@ function edgeMatches(edge, source, target) {
 function attackSupportedByIn(edge, inSet) {
     if (edge.attackType === 'fact') {
         return true; // the contrary is supported by a fact, so the attack always launches
+    }
+    // Standard mode: the edge belongs to a SET, and it launches exactly when the selected
+    // extension is that set. Its attackingElement is a derived atom rather than an assumption,
+    // so the contributor test below could never be satisfied and no attack in the set graph
+    // was ever drawn as active -- selecting an extension only ever dimmed things.
+    if (Array.isArray(edge.sourceSetMembers)) {
+        return edge.sourceSetMembers.length === inSet.size
+            && edge.sourceSetMembers.every((assumption) => inSet.has(assumption));
     }
     const contributors = (Array.isArray(edge.jointWith) && edge.jointWith.length > 0)
         ? edge.jointWith
@@ -75,12 +97,13 @@ export function buildResetUpdates(networkData) {
             borderWidth: node.originalBorderWidth || 2,
             title: node.titleHtml !== undefined ? node.titleHtml : node.title
         })),
+        // No `smooth` here: restoring it re-wrote the curvature ladder assignEdgeGeometry
+        // computed, which is what let one discarded edge flatten and stay flat.
         edgeUpdates: edges.map((edge) => ({
             id: edge.id,
             color: edge.originalColor || edge.color,
             width: edge.originalWidth || edge.width || 2,
             dashes: edge.originalDashes || false,
-            smooth: edge.originalSmooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 },
             title: edge.titleHtml !== undefined ? edge.titleHtml : edge.title
         }))
     };
@@ -96,6 +119,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
     const parsedSuccessful = parseSuccessfulAttacks(successfulAttacks);
     const inSet = new Set(inAssumptions);
 
+    const p = GraphUtils.palette();
     const nodeUpdates = nodes.flatMap((node) => {
         const preserved = {
             // Preserve the pre-highlight color once so resetGraphColors can restore it
@@ -104,11 +128,17 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             originalBorderWidth: node.originalBorderWidth || node.borderWidth || 2
         };
         const baseTitle = node.titleHtml !== undefined ? node.titleHtml : node.title;
+        // IN is carried by a filled surface + the loudest achromatic border, not by a green
+        // that already meant three other things (junction node, joint-attack edge, success).
         const accepted = {
             id: node.id,
             ...preserved,
-            color: { border: '#10b981', background: '#34d399', highlight: { border: '#059669', background: '#10b981' } },
-            borderWidth: 4
+            color: {
+                background: p.surfaceIn,
+                border: p.lineStrong,
+                highlight: { background: p.surfaceIn, border: p.lineStrong }
+            },
+            borderWidth: 3
         };
 
         // Assumption-level nodes ARE a single assumption (node.id): colour by IN/OUT
@@ -120,7 +150,11 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return [{
                 id: node.id,
                 ...preserved,
-                color: { border: '#64748b', background: '#94a3b8', highlight: { border: '#475569', background: '#64748b' } },
+                color: {
+                    background: p.canvas,
+                    border: p.dim,
+                    highlight: { background: p.canvas, border: p.dim }
+                },
                 borderWidth: 2,
                 title: withNodeState(baseTitle, 'OUT', 'out')
             }];
@@ -143,9 +177,11 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         const preserved = {
             originalColor: edge.originalColor || edge.color,
             originalWidth: edge.originalWidth || edge.width || 2,
-            originalDashes: edge.originalDashes !== undefined ? edge.originalDashes : (edge.dashes || false),
-            originalSmooth: edge.originalSmooth || edge.smooth || { enabled: true, type: 'cubicBezier', roundness: 0.5 }
+            originalDashes: edge.originalDashes !== undefined ? edge.originalDashes : (edge.dashes || false)
         };
+        // The weight class the edge was built with -- state SCALES this rather than replacing
+        // it, so a #sup attack stays visibly heavier than an ordinary one in every state.
+        const baseWidth = edge.baseWidth || preserved.originalWidth;
         // Immutable base tooltip HTML string kept on the edge by graph-manager's
         // withElementTitle; restyle THIS (a string) so vis re-renders the tooltip as HTML.
         const baseTitle = edge.titleHtml !== undefined ? edge.titleHtml : edge.title;
@@ -154,32 +190,45 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         // they are NOT attacks, so keep them at their original neutral styling instead
         // of fading them as "inactive". The active/inactive story is told by the attack
         // edges (red) and the IN/OUT colouring of the assumption nodes.
+        // Derivation edges are not attacks, but they are not inert either: a support edge
+        // whose leaves are all IN is CARRYING the derivation that launches an attack, and one
+        // whose leaves are not is a branch that never fired. Branching mode exists to show
+        // exactly that, and used to leave the entire derivation half unchanged on selection.
         if (edge.attackType === 'support') {
+            const leaves = Array.isArray(edge.leafSet) ? edge.leafSet : null;
+            const carrying = leaves === null || leaves.length === 0
+                || leaves.every((leaf) => inSet.has(leaf));
             return {
                 id: edge.id,
                 ...preserved,
-                color: preserved.originalColor,
-                width: preserved.originalWidth,
-                dashes: preserved.originalDashes,
-                smooth: preserved.originalSmooth,
-                title: baseTitle
+                color: carrying
+                    ? { color: p.support, highlight: p.support, hover: p.support }
+                    : { color: p.dim, highlight: p.dim, hover: p.dim },
+                width: carrying ? 1.5 : 1,
+                dashes: false,
+                title: withAttackState(baseTitle, carrying ? 'carrying' : 'not carrying',
+                    carrying ? 'active' : 'out')
             };
         }
 
-        const discarded = discardedAttacks.find((attack) => edgeMatches(edge, attack.source, attack.via));
+        // A concession belongs to the set that made it. In the set graph the same attack is
+        // drawn once per attacking set, and matching on (attacker, target) alone dashed every
+        // one of them -- so conceding a single attack made half the canvas look paid-for.
+        const ownsTheConcession = !Array.isArray(edge.sourceSetMembers)
+            || (edge.sourceSetMembers.length === inSet.size
+                && edge.sourceSetMembers.every((assumption) => inSet.has(assumption)));
+        const discarded = ownsTheConcession
+            && discardedAttacks.find((attack) => edgeMatches(edge, attack.source, attack.via));
         if (discarded) {
             return {
                 id: edge.id,
                 ...preserved,
                 title: withAttackState(baseTitle,
                     discarded.weight !== undefined && discarded.weight !== null
-                        ? `discarded, ${discarded.weight} charged`
-                        : 'discarded',
+                        ? `conceded, weight ${discarded.weight}`
+                        : 'conceded',
                     'discarded'),
-                color: { color: '#9ca3af', highlight: '#6b7280' },
-                width: 3,
-                dashes: [8, 4],
-                smooth: { enabled: false }
+                ...stateStyle('conceded', baseWidth, p)
             };
         }
 
@@ -191,22 +240,16 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return {
                 id: edge.id,
                 ...preserved,
-                title: withAttackState(baseTitle, 'active', 'active'),
-                color: { color: '#ef4444', highlight: '#dc2626' },
-                width: 2,
-                dashes: false
+                title: withAttackState(baseTitle, 'lands', 'active'),
+                ...stateStyle('active', baseWidth, p)
             };
         }
 
-        const originalColor = preserved.originalColor || '#9ca3af';
         return {
             id: edge.id,
             ...preserved,
-            title: withAttackState(baseTitle, 'inactive', 'out'),
-            color: {
-                color: colorToRGBA(originalColor, 0.2),
-                highlight: colorToRGBA(originalColor, 0.4)
-            }
+            title: withAttackState(baseTitle, 'never launched', 'out'),
+            ...stateStyle('dormant', baseWidth, p)
         };
     });
 

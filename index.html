@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260730-18">
+    <link rel="stylesheet" href="style.css?v=20260730-26">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-18"></script>
+    <script src="modules/prism-waba.js?v=20260730-26"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-18"></script>
-    <script src="clingo.web.js?v=20260730-18"></script>
+    <script src="modules/wasm-config.js?v=20260730-26"></script>
+    <script src="clingo.web.js?v=20260730-26"></script>
 </head>
 <body>
     <div class="container">
@@ -387,7 +387,7 @@ c_a: 70"></textarea>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-discarded" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Discarded attack</b><em>The extension declined to answer this attack and paid its weight against the budget β. Drawn dashed and grey.</em></span>
+                                        <span class="legend-text"><b>Conceded attack</b><em>The extension declined to answer this attack and paid its weight against the budget β. Dashed and violet — it is a deliberate purchase, not noise.</em></span>
                                     </div>
                                 </div>
                             </div>
@@ -434,7 +434,7 @@ c_a: 70"></textarea>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-discarded" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Discarded attack</b><em>Conceded and charged against β. Drawn dashed and grey.</em></span>
+                                        <span class="legend-text"><b>Conceded attack</b><em>Declined and charged against β. Dashed and violet.</em></span>
                                     </div>
                                 </div>
                             </div>
@@ -899,6 +899,6 @@ contrary(b, attack_element).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-18"></script>
+    <script type="module" src="app.js?v=20260730-26"></script>
 </body>
 </html>

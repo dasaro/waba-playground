@@ -1,14 +1,18 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-18';
+import { GraphUtils } from './graph-utils.js?v=20260730-26';
 
 export class ThemeManager {
-    constructor(themeToggleBtn, themeIcon, network, networkData) {
+    constructor(themeToggleBtn, themeIcon, network, networkData, onGraphRestyled = null) {
         this.themeToggleBtn = themeToggleBtn;
         this.themeIcon = themeIcon;
         this.network = network; // vis.js network instance
         this.networkData = networkData; // vis.js DataSets
+        // Called after the base restyle so a live extension highlight can be re-derived from
+        // the new palette. Without it, highlighted elements keep the OUTGOING theme's colours:
+        // in light theme the selected extension's own nodes stayed near-black.
+        this.onGraphRestyled = onGraphRestyled;
     }
 
     initTheme() {
@@ -61,38 +65,52 @@ export class ThemeManager {
         // Clingo-WASM is still loading.
         const network = typeof this.network === 'function' ? this.network() : this.network;
         const networkData = typeof this.networkData === 'function' ? this.networkData() : this.networkData;
+        // The palette is cached per theme, so drop it before anything reads a colour --
+        // otherwise the whole graph restyles itself with the OUTGOING theme's values.
+        GraphUtils.invalidatePalette();
         if (!network || !networkData || !networkData.edges || !networkData.nodes) return;
 
-        // Get current theme-appropriate font settings from GraphUtils
-        const edgeFontSettings = GraphUtils.getEdgeFontColor();
-        const nodeFontColor = GraphUtils.getFontColor();
+        const p = GraphUtils.palette();
 
-        // Update edge font colors (for weight labels)
+        // Restyle the whole graph, not just the fonts. This used to update font colours only,
+        // so flipping to the light theme left every line, border and fill at its dark-tuned
+        // value -- it did not restyle the graph, it just removed the contrast that had been
+        // making it readable. Now that every colour comes from a token, re-reading the palette
+        // is the entire fix.
+        network.setOptions({
+            nodes: { font: { color: p.ink } },
+            edges: { font: { color: p.line, background: p.canvas } }
+        });
+
         const edges = networkData.edges.get();
-        const edgeUpdates = edges.map(edge => ({
+        networkData.edges.update(edges.map((edge) => ({
             id: edge.id,
-            font: {
-                ...edge.font,
-                ...edgeFontSettings  // Use GraphUtils settings with strokeWidth and strokeColor
-            }
-        }));
+            font: { ...edge.font, color: p.line, background: p.canvas, strokeWidth: 0 },
+            // Reset to base unconditionally; the highlight is re-applied below, against the
+            // NEW palette. Skipping highlighted elements froze them at the old theme's values.
+            color: { color: p.line, highlight: p.lineStrong, hover: p.lineStrong },
+            width: edge.baseWidth || edge.originalWidth || 2,
+            dashes: false
+        })));
 
-        networkData.edges.update(edgeUpdates);
-
-        // Update node font colors
         const nodes = networkData.nodes.get();
-        const nodeUpdates = nodes.map(node => ({
+        networkData.nodes.update(nodes.map((node) => ({
             id: node.id,
-            font: {
-                ...node.font,
-                color: nodeFontColor  // Use GraphUtils font color
-            }
-        }));
+            font: { ...node.font, color: p.ink },
+            color: {
+                background: node.shape === 'diamond' ? p.canvas : p.surface,
+                border: p.line,
+                highlight: { background: node.shape === 'diamond' ? p.canvas : p.surface, border: p.lineStrong }
+            },
+            borderWidth: 2
+        })));
 
-        networkData.nodes.update(nodeUpdates);
-
-        // Redraw without physics
         network.setOptions({ physics: { enabled: false } });
         network.redraw();
+
+        // Re-derive any live highlight against the palette that is now current.
+        if (typeof this.onGraphRestyled === 'function') {
+            this.onGraphRestyled();
+        }
     }
 }

@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-18';
-import { ParserUtils } from './parser-utils.js?v=20260730-18';
-import { UIManager } from './ui-manager.js?v=20260730-18';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-18';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-18';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-18';
+import { GraphUtils } from './graph-utils.js?v=20260730-26';
+import { ParserUtils } from './parser-utils.js?v=20260730-26';
+import { UIManager } from './ui-manager.js?v=20260730-26';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-26';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-26';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-26';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
@@ -104,12 +104,15 @@ export class GraphManager {
         });
 
         // Prevent physics from re-enabling during drag
+        // Both handlers used to DISABLE physics, removing it from the one moment it is
+        // unambiguously wanted. vis pins the dragged node for the duration, so neighbours relax
+        // around it and nothing else drifts; physics goes back off immediately after, so a
+        // highlight update cannot restart the simulation.
         this.network.on('dragStart', () => {
-            this.network.setOptions({ physics: { enabled: false } });
+            this.network.setOptions({ physics: { enabled: true, stabilization: { enabled: false } } });
         });
 
         this.network.on('dragEnd', () => {
-            // Ensure physics stays disabled after drag
             this.network.setOptions({ physics: { enabled: false } });
         });
 
@@ -253,7 +256,10 @@ export class GraphManager {
         // vis.js renders a STRING `title` as escaped text (so the raw "<div …>" markup
         // showed through). Pass a DOM element instead so the tooltip HTML is rendered.
         this.networkData.nodes.add((visNodes || []).map((node) => withElementTitle(node)));
-        this.networkData.edges.add((visEdges || []).map((edge) => withElementTitle(edge)));
+        // Curvature ladder + self-loop angles, assigned once here so every builder gets it and
+        // no build site has to remember. See GraphUtils.assignEdgeGeometry.
+        const laidOut = GraphUtils.assignEdgeGeometry(visEdges || []);
+        this.networkData.edges.add(laidOut.map((edge) => withElementTitle(edge)));
         this.isolatedNodes = isolatedNodes;
 
         if (!visNodes || visNodes.length === 0) {
@@ -267,24 +273,34 @@ export class GraphManager {
         UIManager.hideGraphEmptyState();
         this.updateIsolatedAssumptionsOverlay();
 
-        this.runGraphLayout(true);
-        // The camera keeps moving for ~1.1 s after this method returns: a deferred fit at
-        // +600 ms whose animation runs another 500. Anything that reads a node's SCREEN
-        // position before that (a hover probe, a click) computes it from a transform that no
-        // longer holds. Expose the settle as a promise so callers can wait on the real event
-        // instead of a sleep sized by guesswork.
-        const FIT_DELAY = 600;
+        // Settle = physics finished AND the camera finished moving.
+        //
+        // This used to be three uncoordinated timers: stabilisation ran for as long as it
+        // needed, a fit was queued at a blind +600 ms, and its animation ran another 500. So
+        // the fit could fire mid-stabilisation, and anything waiting on the settle could
+        // resume while the layout was still visibly rearranging itself -- measured: node
+        // positions moved by up to 200 units after the "settled" signal. Chain them instead:
+        // fit when the layout is actually done, resolve when the fit animation is done.
         const FIT_DURATION = 500;
+        const SETTLE_CEILING = 4000;
         this.cameraSettled = new Promise((resolve) => {
-            setTimeout(() => {
+            let finished = false;
+            const finish = () => {
+                if (finished) return;
+                finished = true;
                 this.network.fit({
-                    animation: {
-                        duration: FIT_DURATION,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: FIT_DURATION, easingFunction: 'easeInOutQuad' }
                 });
                 setTimeout(resolve, FIT_DURATION + 50);
-            }, FIT_DELAY);
+            };
+            this.network.once('stabilizationIterationsDone', finish);
+            // Safety net: a graph small enough to be stable already may never emit the event.
+            setTimeout(finish, SETTLE_CEILING);
+            // Started AFTER the listener is attached. Attaching afterwards raced a
+            // stabilisation that vis can complete synchronously inside setOptions, in which
+            // case the event was already gone and every settle waited out the full ceiling --
+            // it took the browser suite from 1.4 to 5.1 minutes.
+            this.runGraphLayout(true);
         });
     }
 
@@ -468,46 +484,63 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 });
             });
 
-            // Add attack edges from sets to assumptions
+            // Attack edges: ONE per (source set, attacked assumption).
+            //
+            // This used to nest a second loop over every set CONTAINING the attacked
+            // assumption, emitting 2^(n-1) copies of each attack. The Three-Way Standoff --
+            // three assumptions, three real attacks -- became 48 edges over 7 nodes, and at
+            // the n=5 cap it reached four figures. Worse, the fan mechanically manufactured
+            // true parallel edges: a source set attacking two assumptions that both live in
+            // one target set produced two edges with identical endpoints carrying different
+            // weights, one drawn exactly on top of the other.
+            //
+            // Every one of those edges was deducible from "S attacks A" plus "A is a member of
+            // T", and membership is already written on the node label. So draw the attack at
+            // the singleton {A}, which is the minimal set carrying it, and let the lattice say
+            // the rest. No information is lost and no edge is drawn twice.
             setsMap.forEach(set => {
                 set.attacks.forEach(attack => {
                     const { assumption, attackingElement, weight, derivedBy } = attack;
-                    const displayWeight = weight === Infinity ? '#sup' : (weight === -Infinity ? '#inf' : weight);
-                    const normalizedWidth = weight === Infinity ? 5 : (weight === -Infinity ? 1 : 2);
-                    const color = weight === Infinity ? '#ff6b6b' :
-                                 (weight === -Infinity ? '#888' : '#f59e0b');
-
-                    // Attack edge from set to assumption (shown as attacking any set containing that assumption)
-                    // For visualization, we'll create edges to all sets that contain the attacked assumption
-                    setsMap.forEach(targetSet => {
-                        if (targetSet.assumptions.includes(assumption)) {
-                            // Include attacking element in edge ID to ensure uniqueness
-                    const edgeId = `${set.id}-attacks-${targetSet.id}-via-${assumption}-from-${attackingElement}`;
+                    const displayWeight = weight === Infinity ? '#sup'
+                        : (weight === -Infinity ? '#inf' : weight);
+                    // Prefer the singleton; fall back to the smallest set carrying the
+                    // assumption if the cap dropped it.
+                    let targetId = assumption;
+                    if (!setsMap.has(targetId)) {
+                        let best = null;
+                        setsMap.forEach((candidate) => {
+                            if (!candidate.assumptions.includes(assumption)) return;
+                            if (best === null || candidate.assumptions.length < best.assumptions.length) {
+                                best = candidate;
+                            }
+                        });
+                        if (!best) return;
+                        targetId = best.id;
+                    }
                     elements.push({
                         data: {
-                            id: edgeId,
+                            id: `${set.id}-attacks-${assumption}-from-${attackingElement}`,
                             source: set.id,
-                            target: targetSet.id,
+                            target: targetId,
                             label: `${displayWeight}`,
-                            width: normalizedWidth,
-                            color: color,
+                            width: GraphUtils.baseWidthForWeight(weight),
+                            baseWidth: GraphUtils.baseWidthForWeight(weight),
                             weight: attack.weight,
+                            attackType: 'attack',
                             attackedAssumption: assumption,
                             attackingElement: attackingElement,
                             derivedBy: derivedBy,
                             sourceSet: set.id,
-                            targetSet: targetSet.id,
+                            targetSet: targetId,
                             title: buildSetAttackTooltip({
                                 sourceSet: set.id,
-                                targetSet: targetSet.id,
+                                targetSet: targetId,
                                 targetAssumption: assumption,
                                 attackingElement,
                                 weight: attack.weight,
                                 derivedBy
                             })
                         }
-                    });
-                }
                     });
                 });
             });
@@ -521,18 +554,28 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             elements.forEach(el => {
                 if (el.data.source) {
                     // It's an edge - store original width, color, and dashes for reset
-                    const edgeColor = { color: el.data.color, highlight: el.data.color };
+                    const p = GraphUtils.palette();
+                    const edgeColor = { color: p.line, highlight: p.lineStrong, hover: p.lineStrong };
                     visEdges.push({
                         id: el.data.id,
                         from: el.data.source,
                         to: el.data.target,
                         label: el.data.label,
                         width: el.data.width,
+                        baseWidth: el.data.baseWidth ?? el.data.width,
                         originalWidth: el.data.width,  // Store original for reset
                         color: edgeColor,
                         originalColor: edgeColor,  // Store original for reset
                         dashes: false,
                         originalDashes: false,  // Store original for reset
+                        attackType: 'attack',
+                        // Which set SUPPORTS this attack. In the set graph an attack is live
+                        // exactly when the selected extension is the set that mounts it -- the
+                        // generic "are all its contributors IN" test cannot decide that,
+                        // because attackingElement here is a DERIVED atom, not an assumption,
+                        // so it never matched and no standard-mode attack could ever be active.
+                        sourceSetMembers: el.data.sourceSet === '∅'
+                            ? [] : String(el.data.sourceSet).split(','),
                         attackedAssumption: el.data.attackedAssumption,
                         attackingElement: el.data.attackingElement,
                         derivedBy: el.data.derivedBy,
@@ -555,22 +598,18 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
             elements.forEach(el => {
                 if (!el.data.source) {
                     // It's a node
-                    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-
-                    // Consistent assumption color for all nodes
+                    const p = GraphUtils.palette();
                     const nodeColor = {
-                        border: '#5568d3',
-                        background: '#667eea',
-                        highlight: {
-                            border: '#4557c2',
-                            background: '#5568d3'
-                        }
+                        background: p.surface,
+                        border: p.line,
+                        highlight: { background: p.surface, border: p.lineStrong }
                     };
 
                     const nodeData = {
                         id: el.data.id,
                         label: el.data.label,
-                        size: Math.max(25, 15 + (el.data.size * 3)),  // Min size 25 for labels to fit inside
+                        shape: 'box',
+                        shapeProperties: { borderRadius: 8 },
                         color: nodeColor,
                         title: buildSetNodeTooltip({
                             setId: el.data.id,
@@ -578,9 +617,7 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                             supported: el.data.supported ? el.data.supported.split(', ').filter(Boolean) : [],
                             attacks: Array.from(setsMap.get(el.data.id)?.attacks || [])
                         }),
-                        font: {
-                            color: isDark ? '#f1f5f9' : '#1e293b'
-                        },
+                        font: { color: p.ink },
                         assumptions: el.data.id.split(',').filter(a => a !== '∅'),
                         supportedAtoms: el.data.supported ? el.data.supported.split(', ').filter(Boolean) : [],
                         attackCount: el.data.attackCount
