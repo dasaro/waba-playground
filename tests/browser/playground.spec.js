@@ -496,7 +496,21 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
                 })(),
                 // a tooltip that renders its own markup as text is a bug
                 escaped: [...nodes, ...edges].filter((x) => /&lt;div|&lt;strong/.test(text(x.title))).map((x) => x.id),
-                sawDirectSupportFallback: edges.some((e) => /Rule \/ derivation:\s*direct support/.test(text(e.title)))
+                // Panels are chip-based now; a bare label row means the old markup came back.
+                sawLabelRows: [...nodes, ...edges].some((x) => /Rule \/ derivation:|Target assumption:|Supported attacking atom:/.test(text(x.title))),
+                // Nothing may exceed the bound, which is what made them fill the screen.
+                overWide: [...nodes, ...edges].filter((x) => {
+                    const el = typeof x.title === 'object' ? x.title : null;
+                    if (!el) return false;
+                    document.body.appendChild(el);
+                    const w = el.getBoundingClientRect().width;
+                    el.remove();
+                    return w > 360;
+                }).map((x) => x.id),
+                chipCounts: [...nodes, ...edges].map((x) => {
+                    const el = typeof x.title === 'object' ? x.title : null;
+                    return el ? el.querySelectorAll('.gt-chip').length : 0;
+                })
             };
         });
         expect(audit.nodes, `${mode} drew no nodes`).toBeGreaterThan(0);
@@ -504,6 +518,10 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
         expect(audit.untitledEdges, `${mode}: edges with no tooltip`).toEqual([]);
         expect(audit.leaks, `${mode}: internal ids visible in tooltips`).toEqual([]);
         expect(audit.escaped, `${mode}: tooltip markup rendered as text`).toEqual([]);
+        expect(audit.sawLabelRows, `${mode}: a pre-chip label row is back`).toBe(false);
+        expect(audit.overWide, `${mode}: panels wider than the bound`).toEqual([]);
+        // every panel must actually carry chips, or it is an empty shell
+        expect(Math.min(...audit.chipCounts), `${mode}: a panel has no chips`).toBeGreaterThan(0);
     }
 
     // Selecting an extension must annotate NODES, not only edges.
@@ -513,10 +531,13 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
     await page.waitForTimeout(1200);
     const state = await page.evaluate(() => {
         const gm = window.playground.graphManager;
-        const text = (t) => (!t ? '' : (typeof t === 'string' ? t : (t.innerText || t.textContent || '')));
+        // State is a CHIP now, not a "State:" / "In this extension:" prose row.
+        const hasChip = (t, selector) => (t && typeof t === 'object' ? !!t.querySelector(selector) : false);
         return {
-            nodeMembership: gm.networkData.nodes.get().some((n) => /In this extension/i.test(text(n.title))),
-            edgeState: gm.networkData.edges.get().some((e) => /State:/i.test(text(e.title)))
+            nodeMembership: gm.networkData.nodes.get()
+                .some((n) => hasChip(n.title, '.gt-chip-in, .gt-chip-out')),
+            edgeState: gm.networkData.edges.get()
+                .some((e) => hasChip(e.title, '.gt-chip-active, .gt-chip-discarded, .gt-chip-out'))
         };
     });
     expect(state.nodeMembership, 'no node reported its IN/OUT membership').toBe(true);

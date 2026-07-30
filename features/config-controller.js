@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-8';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-11';
 
 export class ConfigController {
     constructor(dom) {

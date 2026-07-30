@@ -2269,10 +2269,11 @@ button:focus-visible,
    Graph Popups and Tooltips
    ================================================================ */
 
+/* Click-popups (popup-manager.js). These shared a rule with .vis-tooltip before the hover
+   panels were reworked; they keep that appearance and are styled on their own now. */
 .graph-tooltip,
 .node-popup,
-.derivation-tooltip,
-.vis-tooltip {
+.derivation-tooltip {
     position: fixed;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -2289,37 +2290,125 @@ button:focus-visible,
 
 .graph-tooltip strong,
 .node-popup strong,
-.derivation-tooltip strong,
-.vis-tooltip strong {
+.derivation-tooltip strong {
     color: var(--primary-color);
     display: block;
     margin-bottom: 4px;
 }
 
+/* ===================================
+   Graph hover panels
+   ===================================
+   vis-network ships `div.vis-network div.vis-tooltip { white-space: nowrap;
+   background-color: #f5f4ed; font-family: verdana; color: #000; }`. A bare `.vis-tooltip`
+   loses to it on specificity, so the panels used to render cream-on-dark in Verdana and,
+   unable to wrap, grew to their longest line and were clipped by the viewport. Matching its
+   specificity is enough now that style.css loads after the vis sheet. */
+div.vis-network div.vis-tooltip {
+    position: fixed;
+    z-index: 10000;
+    max-width: 22rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-family: inherit;
+    /* the two properties vis sets that actually broke the layout */
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .graph-hover-panel {
-    display: grid;
-    gap: 4px;
-    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    /* Bounded on the panel itself, not only on vis's wrapper: a long rule chip such as
+       `r6: c_impact ← impact_theory, arg_selectivity` otherwise stretches it to ~665px. */
+    max-width: 22rem;
+    overflow-wrap: anywhere;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    line-height: 1.45;
 }
 
-.graph-hover-panel div {
-    margin: 0;
+.gt-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.35rem;
 }
 
-/* Light theme adjustments */
-[data-theme="light"] .graph-tooltip,
-[data-theme="light"] .node-popup,
-[data-theme="light"] .derivation-tooltip,
-[data-theme="light"] .vis-tooltip {
-    background: #ffffff;
-    border-color: #e2e8f0;
-    color: #1e293b;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+.gt-kind {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
 }
 
-[data-theme="light"] .graph-tooltip strong,
-[data-theme="light"] .node-popup strong,
-[data-theme="light"] .derivation-tooltip strong,
-[data-theme="light"] .vis-tooltip strong {
-    color: #5568d3;
+.gt-subject {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--text-primary);
 }
+
+.gt-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.gt-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    max-width: 100%;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--text-primary);
+}
+
+/* the micro-label inside a chip */
+.gt-chip i {
+    font-style: normal;
+    font-family: inherit;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+/* Tones reuse the palette the rest of the interface already uses for these meanings. */
+.gt-chip-weight {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.gt-chip-rule {
+    background: transparent;
+}
+
+.gt-chip-in {
+    border-color: var(--success-color, #10b981);
+    color: var(--success-color, #10b981);
+}
+
+.gt-chip-active {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.gt-chip-discarded,
+.gt-chip-out {
+    color: var(--text-muted);
+}
+

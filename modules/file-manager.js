@@ -220,69 +220,6 @@ export class FileManager {
         return content.trim();
     }
 
-    // ===================================
-    // File Upload
-    // ===================================
-    async handleFileUpload(event, onGraphUpdate, parseSimpleABA, onLog) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const fileName = file.name;
-        const fileExtension = fileName.split('.').pop().toLowerCase();
-
-        try {
-            const content = await file.text();
-
-            if (fileExtension === 'lp') {
-                // .lp file: switch to Advanced Mode and load directly
-                this.inputMode.value = 'advanced';
-                this.simpleMode.style.display = 'none';
-                this.editor.style.display = 'block';
-                this.editor.value = content;
-
-                // Update graph visualization
-                await onGraphUpdate(content);
-
-                onLog(`📁 Loaded .lp file: ${fileName}`, 'info');
-
-            } else if (fileExtension === 'waba') {
-                // .waba file: parse and load into Simple Mode
-                const parsed = this.parseWabaFile(content);
-
-                // Switch to Simple Mode
-                this.inputMode.value = 'simple';
-                this.simpleMode.style.display = 'block';
-                this.editor.style.display = 'none';
-
-                // Populate fields
-                this.assumptionsInput.value = parsed.assumptions.join('\n');
-                this.rulesInput.value = parsed.rules.join('\n');
-                this.contrariesInput.value = parsed.contraries.join('\n');
-                this.weightsInput.value = parsed.weights.join('\n');
-                if (this.descriptionInput) {
-                    this.descriptionInput.value = parsed.description || '';
-                }
-
-                // Generate ASP code and update graph
-                const aspCode = parseSimpleABA();
-                await onGraphUpdate(aspCode);
-
-                onLog(`📁 Loaded .waba file: ${fileName}`, 'info');
-
-            } else {
-                onLog(`❌ Unsupported file type: ${fileExtension}. Please use .lp or .waba files.`, 'error');
-            }
-
-            // Reset file input for subsequent uploads
-            this.fileUploadInput.value = '';
-
-        } catch (error) {
-            onLog(`❌ Error loading file: ${error.message}`, 'error');
-            console.error('File upload error:', error);
-            this.fileUploadInput.value = '';
-        }
-    }
-
     parseWabaFile(content) {
         const lines = content.split('\n').map(l => l.trim());
 

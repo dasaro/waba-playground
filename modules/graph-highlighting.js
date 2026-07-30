@@ -1,3 +1,4 @@
+import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-11';
 function colorToRGBA(color, opacity = 0.3) {
     if (typeof color === 'object' && color.color) {
         color = color.color;
@@ -55,23 +56,12 @@ function attackSupportedByIn(edge, inSet) {
 // Inject a "State" row (Active / Discarded / Inactive) into an existing edge
 // hover panel, right after its title. Returns the title unchanged if it is not a
 // recognizable hover-panel string.
-function withAttackState(baseTitle, label, color) {
-    if (typeof baseTitle !== 'string' || !baseTitle.includes('</strong></div>')) {
-        return baseTitle;
-    }
-    const row = `<div><strong>State:</strong> <span style="color: ${color}; font-weight: 600;">${label}</span></div>`;
-    return baseTitle.replace('</strong></div>', `</strong></div>${row}`);
+function withAttackState(baseTitle, label, tone) {
+    return appendStateChip(baseTitle, label, tone);
 }
 
-// The node equivalent of withAttackState. Nothing solver-derived reached NODE tooltips at all:
-// an assumption was recoloured green or grey to show its membership while its hover panel said
-// nothing about it, so the one fact the colour encodes was the one fact the tooltip omitted.
-function withNodeState(baseTitle, label, color) {
-    if (typeof baseTitle !== 'string' || !baseTitle.includes('</strong></div>')) {
-        return baseTitle;
-    }
-    const row = `<div><strong>In this extension:</strong> <span style="color: ${color}; font-weight: 600;">${label}</span></div>`;
-    return baseTitle.replace('</strong></div>', `</strong></div>${row}`);
+function withNodeState(baseTitle, label, tone) {
+    return appendStateChip(baseTitle, label, tone);
 }
 
 export function buildResetUpdates(networkData) {
@@ -125,14 +115,14 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         // membership. ⊤ and junction nodes have no in/out status, so leave them.
         if (node.isAssumption === true) {
             if (inSet.has(node.id)) {
-                return [{ ...accepted, title: withNodeState(baseTitle, 'IN — accepted', '#10b981') }];
+                return [{ ...accepted, title: withNodeState(baseTitle, 'IN', 'in') }];
             }
             return [{
                 id: node.id,
                 ...preserved,
                 color: { border: '#64748b', background: '#94a3b8', highlight: { border: '#475569', background: '#64748b' } },
                 borderWidth: 2,
-                title: withNodeState(baseTitle, 'OUT — not accepted', '#94a3b8')
+                title: withNodeState(baseTitle, 'OUT', 'out')
             }];
         }
 
@@ -143,7 +133,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         const isExactExtension = members.length === inAssumptions.length
             && members.every((assumption) => inSet.has(assumption));
         if (isExactExtension) {
-            return [{ ...accepted, title: withNodeState(baseTitle, 'this is the selected extension', '#10b981') }];
+            return [{ ...accepted, title: withNodeState(baseTitle, 'selected', 'in') }];
         }
         return [];
     });
@@ -181,13 +171,11 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return {
                 id: edge.id,
                 ...preserved,
-                title: withAttackState(
-                    baseTitle,
+                title: withAttackState(baseTitle,
                     discarded.weight !== undefined && discarded.weight !== null
-                        ? `Discarded — ${discarded.weight} charged against β`
-                        : 'Discarded — overridden against the budget',
-                    '#9ca3af'
-                ),
+                        ? `discarded, ${discarded.weight} charged`
+                        : 'discarded',
+                    'discarded'),
                 color: { color: '#9ca3af', highlight: '#6b7280' },
                 width: 3,
                 dashes: [8, 4],
@@ -203,7 +191,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return {
                 id: edge.id,
                 ...preserved,
-                title: withAttackState(baseTitle, 'Active — defeats its target in this extension', '#ef4444'),
+                title: withAttackState(baseTitle, 'active', 'active'),
                 color: { color: '#ef4444', highlight: '#dc2626' },
                 width: 2,
                 dashes: false
@@ -214,7 +202,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         return {
             id: edge.id,
             ...preserved,
-            title: withAttackState(baseTitle, 'Inactive — attacker not supported in this extension', '#94a3b8'),
+            title: withAttackState(baseTitle, 'inactive', 'out'),
             color: {
                 color: colorToRGBA(originalColor, 0.2),
                 highlight: colorToRGBA(originalColor, 0.4)

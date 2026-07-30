@@ -1,3 +1,23 @@
+/**
+ * Hover panels for the argumentation graph.
+ *
+ * Design: a one-line header naming what the element is, then a row of CHIPS carrying only the
+ * facts you cannot read off the graph itself.
+ *
+ * Two problems shaped this:
+ *
+ *  - vis-network's stylesheet sets `div.vis-network div.vis-tooltip { white-space: nowrap;
+ *    background-color: #f5f4ed; ... }`. That selector outranks a bare `.vis-tooltip`, so panels
+ *    rendered cream-on-dark in Verdana and, being unable to wrap, grew to the width of their
+ *    longest line and were clipped by the viewport. style.css now loads AFTER the vis sheet and
+ *    matches its specificity.
+ *  - the panels were one label per line with a block `<strong>`, so every fact cost two lines,
+ *    and each ended in a sentence of explanatory prose. Chips carry the same facts in a fraction
+ *    of the space.
+ *
+ * Values are escaped here; callers pass raw atoms.
+ */
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -9,7 +29,7 @@ function escapeHtml(value) {
 
 function formatWeight(weight) {
     if (weight === undefined || weight === null || weight === '?') {
-        return 'not available';
+        return null;
     }
     if (weight === Infinity || weight === '#sup') {
         return '#sup';
@@ -20,33 +40,61 @@ function formatWeight(weight) {
     return escapeHtml(weight);
 }
 
-function formatItemList(items, { empty = 'none', limit = 6 } = {}) {
+/** A chip: a micro-label plus a value. Both escaped. Empty values drop out entirely. */
+function chip(label, value, { tone = '' } = {}) {
+    if (value === undefined || value === null || value === '') {
+        return '';
+    }
+    const toneClass = tone ? ` gt-chip-${tone}` : '';
+    const caption = label ? `<i>${escapeHtml(label)}</i>` : '';
+    return `<span class="gt-chip${toneClass}">${caption}${value}</span>`;
+}
+
+/** Chip listing atoms, capped so a wide framework cannot produce an essay. */
+function chipList(label, items, { limit = 4 } = {}) {
     if (!items || items.length === 0) {
-        return empty;
+        return '';
     }
-
-    const deduped = [...new Set(items.map((item) => String(item)))].sort();
-    const visible = deduped.slice(0, limit).map(escapeHtml);
-    if (deduped.length > limit) {
-        visible.push(`... (+${deduped.length - limit} more)`);
-    }
-    return visible.join(', ');
+    const deduped = [...new Set(items.map(String))].sort();
+    const shown = deduped.slice(0, limit).map(escapeHtml).join(', ');
+    const more = deduped.length > limit ? ` +${deduped.length - limit}` : '';
+    return chip(label, `${shown}${more}`);
 }
 
-function formatRule(ruleId, body, head) {
-    const renderedBody = body && body.length > 0 ? body.map(escapeHtml).join(', ') : 'top';
+/** `r1: head ← b1, b2` — the single most useful fact about a derived element. */
+function ruleChip(ruleId, body = [], head = null) {
+    if (!ruleId) {
+        return '';
+    }
+    const renderedBody = body && body.length > 0 ? body.map(escapeHtml).join(', ') : '⊤';
     const renderedHead = head ? escapeHtml(head) : '?';
-    return `${escapeHtml(ruleId)}: ${renderedHead} &larr; ${renderedBody}`;
+    return chip(ruleId, `${renderedHead} &larr; ${renderedBody}`, { tone: 'rule' });
 }
 
-function buildTooltip(title, rows, note = '') {
-    const renderedRows = rows
-        .filter(([, value]) => value !== undefined && value !== null && value !== '')
-        .map(([label, value]) => `<div><strong>${escapeHtml(label)}:</strong> ${value}</div>`)
-        .join('');
+/**
+ * Every panel ends with exactly `</div></div>` -- the close of the chip row, then of the panel.
+ * The chip row is emitted even when empty so graph-highlighting can append a state chip by
+ * slicing that suffix. The previous injector matched the first `</strong></div>`, which tied it
+ * to a markup shape it did not own.
+ */
+export const PANEL_CHIP_SUFFIX = '</div></div>';
 
-    const renderedNote = note ? `<div><em>${note}</em></div>` : '';
-    return `<div class="graph-hover-panel"><div><strong>${escapeHtml(title)}</strong></div>${renderedRows}${renderedNote}</div>`;
+function panel(kind, subject, chips) {
+    const body = chips.filter(Boolean).join('');
+    const heading = subject
+        ? `<span class="gt-kind">${escapeHtml(kind)}</span><span class="gt-subject">${escapeHtml(subject)}</span>`
+        : `<span class="gt-kind">${escapeHtml(kind)}</span>`;
+    return `<div class="graph-hover-panel"><div class="gt-head">${heading}</div>`
+        + `<div class="gt-chips">${body}${PANEL_CHIP_SUFFIX}`;
+}
+
+/** Appends a chip to an already-built panel. Returns the input unchanged if it is not one. */
+export function appendStateChip(baseTitle, label, tone) {
+    if (typeof baseTitle !== 'string' || !baseTitle.endsWith(PANEL_CHIP_SUFFIX)) {
+        return baseTitle;
+    }
+    const stateChip = chip('', escapeHtml(label), { tone });
+    return baseTitle.slice(0, -PANEL_CHIP_SUFFIX.length) + stateChip + PANEL_CHIP_SUFFIX;
 }
 
 export function buildAssumptionNodeTooltip({
@@ -54,27 +102,22 @@ export function buildAssumptionNodeTooltip({
     explicitWeight,
     contrary,
     incomingSources = [],
-    outgoingTargets = [],
-    outgoingContraries = []
+    outgoingTargets = []
 }) {
-    const weightLabel = explicitWeight === null ? 'undeclared (default policy applies)' : formatWeight(explicitWeight);
-    return buildTooltip(`Assumption ${assumption}`, [
-        ['Explicit weight', weightLabel],
-        ['Contrary', contrary ? escapeHtml(contrary) : 'not declared'],
-        ['Attacked by', formatItemList(incomingSources)],
-        ['Can attack', formatItemList(outgoingTargets)],
-        ['Via derived contraries', formatItemList(outgoingContraries)]
-    ], 'Assumptions are the selectable commitments in the current framework.');
+    return panel('Assumption', assumption, [
+        chip('w', explicitWeight === null ? 'default' : formatWeight(explicitWeight)),
+        chip('contrary', contrary ? escapeHtml(contrary) : 'none'),
+        incomingSources.length > 0 ? chip('attacked by', String(incomingSources.length)) : '',
+        outgoingTargets.length > 0 ? chip('attacks', String(outgoingTargets.length)) : ''
+    ]);
 }
 
 export function buildTopNodeTooltip(factBasedAttacks = []) {
-    const rows = factBasedAttacks.length > 0
-        ? factBasedAttacks.slice(0, 8).map((attack) => `${escapeHtml(attack.contrary)} &rhd; ${escapeHtml(attack.assumption)} (w: ${formatWeight(attack.weight)})`).join('<br>')
-        : null;
-    return buildTooltip('⊤ (unconditional support)', [
-        ['Meaning', 'Stands for what holds with no assumption in the body — facts and empty-body rules'],
-        [rows ? 'Attacks it launches' : 'Attacks it launches', rows || 'none — it only feeds a derivation here']
-    ], 'Synthetic node: it groups everything derivable without committing to any assumption.');
+    return panel('⊤', 'holds with no assumption', [
+        factBasedAttacks.length > 0
+            ? chipList('attacks', factBasedAttacks.map((a) => a.assumption))
+            : chip('attacks', 'none')
+    ]);
 }
 
 export function buildAttackEdgeTooltip({
@@ -86,107 +129,66 @@ export function buildAttackEdgeTooltip({
     ruleId,
     derivationBody = [],
     derivedBy = [],
-    jointWith = [],
-    note
+    jointWith = []
 }) {
-    const ruleSummary = ruleId ? formatRule(ruleId, derivationBody, contrary) : (derivedBy.length > 0 ? derivedBy.map((id) => escapeHtml(id)).join(', ') : 'direct support');
     const partners = jointWith.filter((item) => item !== attacker);
-    return buildTooltip(`${typeLabel}: ${attacker} -> ${target}`, [
-        ['Weight', formatWeight(weight)],
-        ['Target assumption', escapeHtml(target)],
-        ['Attacking element', escapeHtml(attacker)],
-        ['Contrary produced', contrary ? escapeHtml(contrary) : 'not specified'],
-        ['Rule / derivation', ruleSummary],
-        ['Other required contributors', formatItemList(partners)]
-    ], note);
+    return panel(typeLabel, `${attacker} ⊳ ${target}`, [
+        chip('w', formatWeight(weight), { tone: 'weight' }),
+        contrary && contrary !== attacker ? chip('via', escapeHtml(contrary)) : '',
+        ruleId ? ruleChip(ruleId, derivationBody, contrary) : chipList('rules', derivedBy),
+        chipList('needs', partners)
+    ]);
+}
+
+export function buildJunctionTooltip({ target, contrary, ruleId, derivationBody = [], weight }) {
+    return panel('∧ joint attack', target, [
+        chip('w', formatWeight(weight), { tone: 'weight' }),
+        chip('derives', contrary ? escapeHtml(contrary) : null),
+        ruleChip(ruleId, derivationBody, contrary),
+        chipList('all of', derivationBody)
+    ]);
 }
 
 /**
- * A derived (intermediate) claim node in the assumption views.
- *
- * Previously these borrowed buildAttackEdgeTooltip with `target: ''`, which rendered a panel
- * titled "Derived claim: x -> " with an empty "Target assumption" row and always claimed
- * "Rule / derivation: direct support" because no caller passed a rule. The deriving rules are
- * available at the call site, so show them.
+ * A derived (intermediate) claim. Its weight is usually propagated rather than declared, and the
+ * rules that derive it are the fact worth showing.
  */
 export function buildDerivedNodeTooltip({ atom, explicitWeight = null, derivingRules = [] }) {
-    const weightLabel = explicitWeight === null || explicitWeight === undefined
-        ? 'none declared — propagated from its premises by the semiring'
-        : formatWeight(explicitWeight);
-    const ruleRows = derivingRules.length > 0
-        ? derivingRules.map((rule) => formatRule(rule.id, rule.body || [], rule.head || atom)).join('<br>')
-        : 'no rule derives this atom';
-    return buildTooltip(`Derived claim ${atom}`, [
-        ['Declared weight', weightLabel],
-        [derivingRules.length > 1 ? 'Derived by (any of)' : 'Derived by', ruleRows]
-    ], 'An intermediate claim built by rules from the assumptions — a step in the reasoning, not itself an assumption.');
+    const rules = derivingRules.slice(0, 2)
+        .map((rule) => ruleChip(rule.id, rule.body || [], rule.head || atom));
+    const extra = derivingRules.length > 2 ? chip('', `+${derivingRules.length - 2} more`) : '';
+    return panel('Derived claim', atom, [
+        chip('w', explicitWeight === null || explicitWeight === undefined
+            ? 'propagated'
+            : formatWeight(explicitWeight)),
+        ...rules,
+        extra
+    ]);
 }
 
-/**
- * A derivation (support) step in the assumption views.
- *
- * Previously this borrowed buildAttackEdgeTooltip and was handed vis NODE IDS, so it displayed
- * internal identifiers such as `arg_chimerism` and `junction_chimerism_r3` to the reader.
- * Takes atoms instead; a junction end is described rather than named.
- */
-export function buildSupportEdgeTooltip({ fromAtom = null, toAtom, ruleId = null, body = [], viaJunction = false }) {
-    const source = fromAtom === null
-        ? 'all premises of the rule (via the ∧ junction)'
-        : escapeHtml(fromAtom);
-    return buildTooltip('Derivation step', [
-        ['Supports', escapeHtml(toAtom)],
-        ['From', source],
-        ['Rule', ruleId ? formatRule(ruleId, body, toAtom) : 'not recorded'],
-        [viaJunction ? 'Feeds the junction for' : null, viaJunction ? escapeHtml(toAtom) : null]
-    ].filter(([label]) => label !== null), 'A support step, not an attack: the source helps establish the target.');
+/** A support step. Takes ATOMS, never internal vis node ids. */
+export function buildSupportEdgeTooltip({ fromAtom = null, toAtom, ruleId = null, body = [] }) {
+    return panel('Derivation step', toAtom, [
+        chip('from', fromAtom === null ? 'all premises' : escapeHtml(fromAtom)),
+        ruleChip(ruleId, body, toAtom)
+    ]);
 }
 
-export function buildJunctionTooltip({
-    target,
-    contrary,
-    ruleId,
-    derivationBody = [],
-    weight
-}) {
-    return buildTooltip(`Joint attack node for ${target}`, [
-        ['Derived contrary', escapeHtml(contrary)],
-        ['Target assumption', escapeHtml(target)],
-        ['Rule', formatRule(ruleId, derivationBody, contrary)],
-        ['Required contributors', formatItemList(derivationBody)],
-        ['Attack weight', formatWeight(weight)]
-    ], 'The final attack only fires when all contributors to this junction are supported.');
-}
-
-/**
- * The ∧ node in Assumption-Branching, which marks a rule with several premises. Distinct from
- * buildJunctionTooltip, which describes a joint ATTACK: this one is a derivation step, so
- * calling its head a "target assumption" (as the attack wording does) is simply wrong.
- */
 export function buildDerivationJunctionTooltip({ head, ruleId = null, body = [] }) {
-    return buildTooltip('∧ all premises required', [
-        ['Derives', escapeHtml(head)],
-        ['Rule', ruleId ? formatRule(ruleId, body, head) : 'not recorded'],
-        [body.length === 1 ? 'Premise' : `Premises (all ${body.length} needed)`, formatItemList(body, { limit: 8 })]
-    ], 'A rule with more than one premise. The step fires only when every premise above is supported.');
+    return panel('∧ all premises', head, [
+        ruleChip(ruleId, body, head),
+        chipList('needs', body)
+    ]);
 }
 
-export function buildSetNodeTooltip({
-    setId,
-    assumptions = [],
-    supported = [],
-    attacks = []
-}) {
-    // One row per attack. The previous 'Attack weight labels' row deduped and sorted the
-    // weights, so it could not be matched back to the attack it belonged to.
-    const attackRows = attacks.length > 0
-        ? attacks.slice(0, 8).map((attack) => `${escapeHtml(attack.attackingElement)} &rhd; ${escapeHtml(attack.assumption)} (w: ${formatWeight(attack.weight)})`).join('<br>')
-            + (attacks.length > 8 ? `<br>... (+${attacks.length - 8} more)` : '')
-        : 'none';
-    return buildTooltip(`Extension candidate ${setId}`, [
-        ['Accepted assumptions', assumptions.length > 0 ? formatItemList(assumptions, { limit: 10 }) : 'empty set'],
-        ['Supported atoms', formatItemList(supported, { limit: 10 })],
-        [attacks.length === 1 ? 'Attack it launches' : `Attacks it launches (${attacks.length})`, attackRows]
-    ], 'One candidate set of assumptions. The Standard view draws every such set, so it is bounded to small frameworks.');
+export function buildSetNodeTooltip({ assumptions = [], supported = [], attacks = [] }) {
+    return panel('Candidate set', assumptions.length > 0 ? assumptions.join(',') : '∅', [
+        chip('accepted', String(assumptions.length)),
+        chip('supports', String(supported.length)),
+        attacks.length > 0
+            ? chipList('attacks', attacks.map((a) => a.assumption))
+            : chip('attacks', 'none')
+    ]);
 }
 
 export function buildSetAttackTooltip({
@@ -197,12 +199,10 @@ export function buildSetAttackTooltip({
     weight,
     derivedBy = []
 }) {
-    return buildTooltip(`Set attack ${sourceSet} -> ${targetSet}`, [
-        ['Weight', formatWeight(weight)],
-        ['Attacked assumption', escapeHtml(targetAssumption)],
-        ['Supported attacking atom', escapeHtml(attackingElement)],
-        ['Source extension', escapeHtml(sourceSet)],
-        ['Target extension', escapeHtml(targetSet)],
-        ['Derivation rules', formatItemList(derivedBy)]
-    ], 'This edge exists because the source extension supports an atom that is the contrary of an assumption accepted by the target extension.');
+    return panel('Set attack', `${sourceSet || '∅'} ⊳ ${targetSet || '∅'}`, [
+        chip('w', formatWeight(weight), { tone: 'weight' }),
+        chip('hits', escapeHtml(targetAssumption)),
+        chip('via', escapeHtml(attackingElement)),
+        chipList('rules', derivedBy)
+    ]);
 }
