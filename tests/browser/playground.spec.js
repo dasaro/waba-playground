@@ -796,6 +796,51 @@ test('the three attack states stay distinguishable without colour', async ({ pag
     expect(new Set(states.map((e) => e.w)).size).toBeGreaterThan(1);
 });
 
+test('fullscreen gives the graph the height it gains', async ({ page }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+
+    const measure = () => page.evaluate(() => {
+        const h = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().height);
+        return {
+            content: h('#panel-graph-content'),
+            cy: h('#cy'),
+            // The canvas BACKING STORE, not its CSS box: the element is styled 100%/100% so its
+            // box stretches even when vis has not re-measured, and the stale drawing surface
+            // underneath is what breaks hit-testing.
+            canvas: Math.round(document.querySelector('#cy canvas').height / devicePixelRatio),
+            display: getComputedStyle(document.querySelector('#panel-graph-content')).display
+        };
+    });
+
+    const windowed = await measure();
+    await page.click('#fullscreen-btn');
+    await page.waitForFunction(() => Boolean(document.fullscreenElement), null, { timeout: 10000 });
+    await page.waitForTimeout(800);
+    const full = await measure();
+
+    // The fullscreen rules used to be grouped selector lists containing `:-moz-full-screen`
+    // and `:-ms-fullscreen`. CSS drops the WHOLE rule when any selector in the list is
+    // unrecognised, so Chromium applied none of them: the panel grew to 100vh while
+    // .panel-content stayed `display: block`, #cy's `flex: 1` did nothing, and its fixed 500px
+    // stood -- a short band of graph with dead space beneath it.
+    expect(full.display, 'the fullscreen layout rules must actually apply').toBe('flex');
+    expect(full.cy, 'the graph must grow with the panel').toBeGreaterThan(windowed.cy);
+    expect(full.cy / full.content,
+        'the graph should take most of the panel, not sit in a band').toBeGreaterThan(0.7);
+    expect(Math.abs(full.canvas - full.cy),
+        'the drawing surface must follow, not keep its windowed size').toBeLessThanOrEqual(4);
+
+    await page.click('#fullscreen-btn');
+    await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 10000 });
+    await page.waitForTimeout(600);
+    const back = await measure();
+    expect(back.cy, 'and it must go back').toBe(windowed.cy);
+});
+
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -1075,16 +1120,24 @@ test('the legend matches what the diagrams actually draw', async ({ page }) => {
 
     // Every legend swatch must be styled. A class with no rule renders as an empty gap, which
     // reads as a missing symbol rather than a missing stylesheet.
-    const unstyled = await page.evaluate(() => [...document.querySelectorAll('.legend-symbol')]
-        .filter((el) => {
+    const unstyled = await page.evaluate(() => {
+        const paints = (el) => {
             const cs = getComputedStyle(el);
-            const painted = cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
+            if (cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
                 || cs.backgroundImage !== 'none'
                 || parseFloat(cs.borderTopWidth) > 0
-                || parseFloat(cs.borderBottomWidth) > 0;
-            return !painted;
-        })
-        .map((el) => el.className));
+                || parseFloat(cs.borderBottomWidth) > 0) {
+                return true;
+            }
+            // A ::after terminator counts, and so does a swatch that is a container for
+            // painted children (the #sup/#inf pair shows both thicknesses at once).
+            const after = getComputedStyle(el, '::after');
+            if (after.content !== 'none') return true;
+            return [...el.children].some(paints);
+        };
+        return [...document.querySelectorAll('.legend-symbol')]
+            .filter((el) => !paints(el)).map((el) => el.className);
+    });
     expect(unstyled, 'legend swatches with no visible styling').toEqual([]);
 
     // Every legend item must carry an explanation, which is the point of the legend.

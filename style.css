@@ -1305,6 +1305,12 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     gap: var(--space-xs);
 }
 
+/* Fullscreen: each vendor prefix gets its OWN rule.
+   CSS drops an ENTIRE rule when any selector in its list is unrecognised, so `:-moz-full-screen`
+   and `:-ms-fullscreen` invalidated every rule they appeared in and Chromium applied NONE of
+   them. Measured: in fullscreen the panel grew to 100vh while .panel-content stayed
+   `display: block`, so #cy's `flex: 1` did nothing, its 500px height stood, and the graph sat
+   in a short band with dead space beneath it. */
 .graph-panel:fullscreen {
     padding: var(--space-lg);
     background: var(--bg-primary);
@@ -1596,10 +1602,15 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 /* The element placed into fullscreen is the .graph-panel section (see
    GraphManager.initFullscreen). The old rules targeted a non-existent
    #graph-container, so fullscreen left the canvas tiny in a blank panel. */
-.graph-panel:fullscreen,
-.graph-panel:-webkit-full-screen,
-.graph-panel:-moz-full-screen,
-.graph-panel:-ms-fullscreen {
+.graph-panel:fullscreen {
+    display: flex;
+    flex-direction: column;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: var(--space-md);
+    background: var(--bg-primary);
+}
+.graph-panel:-webkit-full-screen {
     display: flex;
     flex-direction: column;
     width: 100vw !important;
@@ -1609,20 +1620,27 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 }
 
 /* Let the collapsible panel body grow so the canvas can fill the screen. */
-.graph-panel:fullscreen .panel-content,
-.graph-panel:-webkit-full-screen .panel-content,
-.graph-panel:-moz-full-screen .panel-content,
-.graph-panel:-ms-fullscreen .panel-content {
+.graph-panel:fullscreen .panel-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.graph-panel:-webkit-full-screen .panel-content {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
 }
 
-.graph-panel:fullscreen #cy,
-.graph-panel:-webkit-full-screen #cy,
-.graph-panel:-moz-full-screen #cy,
-.graph-panel:-ms-fullscreen #cy {
+.graph-panel:fullscreen #cy {
+    flex: 1;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    /* vis.js is explicitly resized via setSize() on fullscreenchange. */
+}
+.graph-panel:-webkit-full-screen #cy {
     flex: 1;
     width: 100% !important;
     height: auto !important;
@@ -1630,21 +1648,23 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     /* vis.js is explicitly resized via setSize() on fullscreenchange. */
 }
 
-.graph-panel:fullscreen .panel-header,
-.graph-panel:fullscreen .graph-header,
-.graph-panel:-webkit-full-screen .panel-header,
-.graph-panel:-webkit-full-screen .graph-header,
-.graph-panel:-moz-full-screen .panel-header,
-.graph-panel:-moz-full-screen .graph-header,
-.graph-panel:-ms-fullscreen .panel-header,
-.graph-panel:-ms-fullscreen .graph-header {
+.graph-panel:fullscreen .panel-header {
+    flex-shrink: 0; /* Prevent header/toolbar from shrinking */
+}
+.graph-panel:fullscreen .graph-header {
+    flex-shrink: 0; /* Prevent header/toolbar from shrinking */
+}
+.graph-panel:-webkit-full-screen .panel-header {
+    flex-shrink: 0; /* Prevent header/toolbar from shrinking */
+}
+.graph-panel:-webkit-full-screen .graph-header {
     flex-shrink: 0; /* Prevent header/toolbar from shrinking */
 }
 
-.graph-panel:fullscreen .isolated-assumptions-banner,
-.graph-panel:-webkit-full-screen .isolated-assumptions-banner,
-.graph-panel:-moz-full-screen .isolated-assumptions-banner,
-.graph-panel:-ms-fullscreen .isolated-assumptions-banner {
+.graph-panel:fullscreen .isolated-assumptions-banner {
+    flex-shrink: 0; /* Prevent banner from shrinking */
+}
+.graph-panel:-webkit-full-screen .isolated-assumptions-banner {
     flex-shrink: 0; /* Prevent banner from shrinking */
 }
 
@@ -1717,10 +1737,30 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     border-radius: var(--radius-md);
     padding: var(--space-md);
     margin-bottom: var(--space-md);
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-lg);
     transition: all 0.3s ease;
+}
+
+/* The grid belongs on the VARIANT, not the container. With it on the container each variant
+   was a single grid item and its three sections stacked into one tall column -- the auto-fit
+   columns had nothing to lay out. Sized so all three fit inside the graph panel's ~582px of
+   usable width: 3 x 165 + 2 x 16 = 527. */
+.legend-variant {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+    gap: var(--space-md);
+    align-items: start;
+}
+
+/* A qualifier on a section heading (e.g. "line thickness = weight class") that would
+   otherwise need an entry of its own. */
+.legend-note {
+    display: block;
+    font-weight: 400;
+    font-size: var(--text-xs);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    margin-top: 2px;
 }
 
 .graph-legend[hidden] {
@@ -1837,11 +1877,82 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 .edge-sup,
 .edge-inf,
 .edge-active,
-.edge-discarded {
-    width: 40px;
+.edge-discarded,
+.edge-dormant {
+    width: 34px;
     height: 2px;
     position: relative;
     background: var(--graph-line);
+    /* Room for the terminator drawn by ::after, so a swatch shows what the canvas shows. Kind
+       is carried by the terminator now, not by colour, and three entries whose swatches were
+       identical grey lines told the reader the opposite. `.edge-dormant` was missing from this
+       group entirely, so the third attack state had no swatch at all. */
+    margin-right: 8px;
+}
+
+/* Terminators, matching what the renderer draws. currentColor drives all of them, so each
+   swatch's own colour rule is enough. */
+.edge-derived::after,
+.edge-sup::after,
+.edge-inf::after,
+.edge-active::after,
+.edge-discarded::after,
+.edge-dormant::after {
+    content: '';
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 7px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+}
+
+/* A perpendicular bar: "this force stops short, it needs its partners". */
+.edge-joint::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 12px;
+    background: currentColor;
+}
+
+/* An open chevron: lighter than a filled head, because support is not defeat. */
+.edge-support::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 7px;
+    height: 7px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+}
+
+.edge-derived,
+.edge-joint { color: var(--graph-line); }
+
+/* The two extremes are shown together, because the CONTRAST is the point and one line each
+   could not convey it. */
+.edge-extremes {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 34px;
+    margin-right: 8px;
+}
+
+.edge-extremes .edge-sup,
+.edge-extremes .edge-inf {
+    display: block;
+    width: 100%;
+    margin: 0;
+    background: var(--graph-line);
+    color: var(--graph-line);
 }
 
 .edge-selfloop {
@@ -1854,12 +1965,13 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 /* Weight class is carried by WIDTH alone; the parallel colour encoding it used to have was
    redundant, and it spent hue the three attack states need. */
-.edge-sup { height: 3px; }
+.edge-sup { height: 4px; }
 .edge-inf { height: 1px; }
 
 /* Derivation is present but clearly subordinate. */
 .edge-support {
     background: var(--graph-support);
+    color: var(--graph-support);
     height: 1.5px;
 }
 
@@ -1870,12 +1982,14 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 /* The three attack states, each separable from the others without relying on hue. */
 .edge-active {
     background: var(--graph-active);
+    color: var(--graph-active);
     height: 3px;
 }
 
 /* Violet and dashed, NOT grey: a conceded attack was paid for out of the budget. It is the
    point of the framework, not debris, and it must never outweigh one that lands. */
 .edge-discarded {
+    color: var(--graph-conceded);
     background: repeating-linear-gradient(
         to right,
         var(--graph-conceded) 0px,
@@ -1888,6 +2002,7 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .edge-dormant {
     background: var(--graph-dim);
+    color: var(--graph-dim);
     height: 1.5px;
 }
 
@@ -2067,7 +2182,7 @@ button:focus-visible,
 .text-secondary,
 .config-item label,
 .legend-section h4 {
-    color: #cbd5e1; /* Improved contrast in dark mode */
+    color: var(--text-secondary);
 }
 
 [data-theme="light"] .text-secondary,

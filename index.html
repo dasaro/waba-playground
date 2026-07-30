@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260730-26">
+    <link rel="stylesheet" href="style.css?v=20260730-34">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-26"></script>
+    <script src="modules/prism-waba.js?v=20260730-34"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-26"></script>
-    <script src="clingo.web.js?v=20260730-26"></script>
+    <script src="modules/wasm-config.js?v=20260730-34"></script>
+    <script src="clingo.web.js?v=20260730-34"></script>
 </head>
 <body>
     <div class="container">
@@ -320,74 +320,76 @@ c_a: 70"></textarea>
 
                     <!-- Graph Legend (Collapsible) -->
                     <div id="graph-legend" class="graph-legend" role="region" aria-label="Graph visualization legend" hidden>
-                        <!-- Assumption-level modes (Assumption-Direct / Assumption-Branching).
-                             Every colour and shape below was checked against what the builders
-                             actually render; see tests/browser/playground.spec.js. -->
+                        <!-- One line per entry. It used to run to 13 entries of paragraph-long
+                             prose, three of which described edges that are now drawn
+                             identically (kind moved from hue to the terminator), while the
+                             third attack STATE and the standard mode's own node states were
+                             missing entirely. -->
                         <div class="legend-variant" data-legend-mode="assumption">
                             <div class="legend-section">
-                                <h4>Node Types</h4>
+                                <h4>Nodes</h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol node-assumption" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Assumption</b><em>A defeasible commitment. Each one is either accepted or rejected in an extension.</em></span>
+                                        <span class="legend-text"><b>Assumption</b><em>Defeasible; in or out of an extension.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol node-claim" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Derived claim</b><em>An intermediate conclusion built by rules, not itself an assumption. Its weight is propagated from its premises by the semiring rather than declared. Branching mode only.</em></span>
+                                        <span class="legend-text"><b>Derived claim</b><em>Built by rules; its weight is propagated, not declared.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol node-derived" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>∧ junction</b><em>A rule with more than one premise. The step fires only when every premise feeding it is supported.</em></span>
+                                        <span class="legend-text"><b>∧ junction</b><em>A rule needing every premise that feeds it.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol node-top" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>⊤</b><em>Stands for what holds with no assumption at all: facts and empty-body rules.</em></span>
+                                        <span class="legend-text"><b>⊤</b><em>Holds with no assumption: facts. Attacks from here always fire.</em></span>
                                     </div>
                                 </div>
                             </div>
                             <div class="legend-section">
-                                <h4>Edge Types</h4>
+                                <h4>Edges <span class="legend-note">line thickness = weight class</span></h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-derived" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Attack</b><em>The source is the contrary of the target, so it defeats it once its derivation is supported. A number is shown only when the support has a single leaf, whose weight is the attack weight under every algebra.</em></span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol edge-support" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Derivation step</b><em>Support, not attack: the source helps establish the target. Branching mode only.</em></span>
+                                        <span class="legend-text"><b>Attack →</b><em>The source is the target's contrary. The number is its weight.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-joint" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Joint attack</b><em>One contribution to an attack that needs several atoms together. It fires only when all of them are supported.</em></span>
+                                        <span class="legend-text"><b>Joint contribution ⊣</b><em>Bar, not arrow: fires only with its partners.</em></span>
                                     </div>
                                     <div class="legend-item">
-                                        <span class="legend-symbol edge-fact" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Fact-based attack</b><em>An attack needing no assumption. Drawn in the same colour as any other attack; what marks it out is that it starts at ⊤.</em></span>
+                                        <span class="legend-symbol edge-support" aria-hidden="true"></span>
+                                        <span class="legend-text"><b>Derivation ›</b><em>Support, not attack. Branching mode only.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-selfloop" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Self-loop</b><em>A set or claim that attacks itself, because it supports the contrary of something it accepts. Common, and not an error.</em></span>
+                                        <span class="legend-text"><b>Self-loop</b><em>Attacks itself. Common, not an error.</em></span>
                                     </div>
                                 </div>
                             </div>
                             <div class="legend-section">
-                                <h4>States (selected extension)</h4>
+                                <h4>With an extension selected</h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol node-in" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>In</b><em>The assumption is accepted in the extension you clicked.</em></span>
+                                        <span class="legend-text"><b>In</b><em>Accepted. Filled, bright border.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol node-out" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Out</b><em>Not accepted in that extension.</em></span>
+                                        <span class="legend-text"><b>Out</b><em>Not accepted. Hollow.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-active" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Active attack</b><em>Every atom supporting this attack is accepted, so it defeats its target.</em></span>
+                                        <span class="legend-text"><b>Lands</b><em>Every atom behind it is accepted, so it defeats its target.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-discarded" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Conceded attack</b><em>The extension declined to answer this attack and paid its weight against the budget β. Dashed and violet — it is a deliberate purchase, not noise.</em></span>
+                                        <span class="legend-text"><b>Conceded</b><em>Declined and charged against β — a purchase, not noise.</em></span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol edge-dormant" aria-hidden="true"></span>
+                                        <span class="legend-text"><b>Never launched</b><em>Its support is not accepted, so it never fired.</em></span>
                                     </div>
                                 </div>
                             </div>
@@ -396,45 +398,49 @@ c_a: 70"></textarea>
                         <!-- Standard mode: the set-level graph -->
                         <div class="legend-variant" data-legend-mode="standard" hidden>
                             <div class="legend-section">
-                                <h4>Node Types</h4>
+                                <h4>Nodes</h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol node-assumption" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Candidate set</b><em>One set of assumptions. This view draws every subset, so it is limited to small frameworks; above the limit use an assumption-level view.</em></span>
+                                        <span class="legend-text"><b>Candidate set</b><em>One subset of the assumptions. Every subset is drawn, so this view is capped at small frameworks.</em></span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol node-in" aria-hidden="true"></span>
+                                        <span class="legend-text"><b>Selected extension</b><em>The set whose card you clicked.</em></span>
                                     </div>
                                 </div>
                             </div>
                             <div class="legend-section">
-                                <h4>Edge Types (coloured by the propagated weight)</h4>
+                                <h4>Edges <span class="legend-note">line thickness = weight class</span></h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-derived" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Attack, finite weight</b><em>The source set supports an atom that is the contrary of an assumption the target set accepts.</em></span>
+                                        <span class="legend-text"><b>Attack →</b><em>Drawn at the attacked assumption; it also hits every set containing it. The number is its weight.</em></span>
                                     </div>
                                     <div class="legend-item">
-                                        <span class="legend-symbol edge-sup" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Attack, #sup</b><em>Maximal weight. Under a strength algebra this attack can never be discarded.</em></span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol edge-inf" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Attack, #inf</b><em>Minimal weight. Under a cost algebra this attack can never be discarded; under a strength algebra it is the ⊕-identity and costs nothing to drop.</em></span>
+                                        <span class="legend-symbol edge-extremes" aria-hidden="true"><i class="edge-sup"></i><i class="edge-inf"></i></span>
+                                        <span class="legend-text"><b>#sup / #inf</b><em>The extreme weights. Each is un-droppable under one polarity and free under the other.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-selfloop" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Self-loop</b><em>A set that attacks itself: it supports the contrary of one of its own members. Expected for any set that is not conflict-free.</em></span>
+                                        <span class="legend-text"><b>Self-loop</b><em>The set attacks one of its own members: it is not conflict-free.</em></span>
                                     </div>
                                 </div>
                             </div>
                             <div class="legend-section">
-                                <h4>Attack States (selected extension)</h4>
+                                <h4>With an extension selected</h4>
                                 <div class="legend-items">
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-active" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Active attack</b><em>The source set is the extension you clicked, and the attack stands.</em></span>
+                                        <span class="legend-text"><b>Lands</b><em>Mounted by the selected set and unanswered.</em></span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-symbol edge-discarded" aria-hidden="true"></span>
-                                        <span class="legend-text"><b>Conceded attack</b><em>Declined and charged against β. Dashed and violet.</em></span>
+                                        <span class="legend-text"><b>Conceded</b><em>Declined by the selected set and charged against β.</em></span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol edge-dormant" aria-hidden="true"></span>
+                                        <span class="legend-text"><b>Never launched</b><em>Belongs to some other set, so it does not fire here.</em></span>
                                     </div>
                                 </div>
                             </div>
@@ -899,6 +905,6 @@ contrary(b, attack_element).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-26"></script>
+    <script type="module" src="app.js?v=20260730-34"></script>
 </body>
 </html>

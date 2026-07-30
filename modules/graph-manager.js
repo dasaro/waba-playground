@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-26';
-import { ParserUtils } from './parser-utils.js?v=20260730-26';
-import { UIManager } from './ui-manager.js?v=20260730-26';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-26';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-26';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-26';
+import { GraphUtils } from './graph-utils.js?v=20260730-34';
+import { ParserUtils } from './parser-utils.js?v=20260730-34';
+import { UIManager } from './ui-manager.js?v=20260730-34';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-34';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-34';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-34';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
@@ -65,6 +65,22 @@ export class GraphManager {
         // Create the network
         const options = GraphUtils.getNetworkOptions();
         this.network = new vis.Network(this.graphCanvas, this.networkData, options);
+
+        // Track the container's box rather than listening for specific events. A panel
+        // collapse, a fullscreen transition and a window resize all change it, and only the
+        // fullscreen case was handled.
+        if (typeof ResizeObserver !== 'undefined' && this.graphCanvas) {
+            let pending = null;
+            this._resizeObserver = new ResizeObserver(() => {
+                // Coalesce: the observer fires per frame during a drag-resize.
+                if (pending) clearTimeout(pending);
+                pending = setTimeout(() => {
+                    pending = null;
+                    this.resizeToContainer();
+                }, 120);
+            });
+            this._resizeObserver.observe(this.graphCanvas);
+        }
 
         // Add reset layout button handler
         if (this.resetLayoutBtn) {
@@ -206,19 +222,38 @@ export class GraphManager {
             return;
         }
 
-        setTimeout(() => {
-            try {
-                this.network.redraw();
-                this.network.fit({
-                    animation: {
-                        duration: 300,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-            } catch (error) {
-                console.warn('Graph resize after fullscreen change failed:', error);
+        // vis caches its canvas dimensions; redraw() re-paints but never re-measures the
+        // container. So entering fullscreen grew the panel to 100vh while the canvas kept its
+        // windowed height, leaving the graph in a short band with dead space beneath it -- the
+        // CSS even claimed "vis.js is explicitly resized via setSize()", which nothing did.
+        // One frame later, so the browser has applied the fullscreen box.
+        requestAnimationFrame(() => this.resizeToContainer({ animate: true }));
+    }
+
+    /**
+     * Re-measure the container and hand vis the new size.
+     *
+     * Used for fullscreen transitions AND ordinary window resizes: before this, nothing
+     * re-fitted on resize either, so dragging the window narrower cropped the graph instead of
+     * rescaling it.
+     */
+    resizeToContainer({ animate = false } = {}) {
+        if (!this.network || !this.graphCanvas) {
+            return;
+        }
+        try {
+            const { width, height } = this.graphCanvas.getBoundingClientRect();
+            if (width < 1 || height < 1) {
+                return;
             }
-        }, 150);
+            this.network.setSize(`${Math.round(width)}px`, `${Math.round(height)}px`);
+            this.network.redraw();
+            this.network.fit(animate
+                ? { animation: { duration: 300, easingFunction: 'easeInOutQuad' } }
+                : {});
+        } catch (error) {
+            console.warn('Graph resize failed:', error);
+        }
     }
 
     resetGraphColors() {
