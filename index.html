@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260730-2">
+    <link rel="stylesheet" href="style.css?v=20260730-3">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,11 +18,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-2"></script>
+    <script src="modules/prism-waba.js?v=20260730-3"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-2"></script>
-    <script src="clingo.web.js?v=20260730-2"></script>
+    <script src="modules/wasm-config.js?v=20260730-3"></script>
+    <script src="clingo.web.js?v=20260730-3"></script>
 </head>
 <body>
     <div class="container">
@@ -80,7 +80,7 @@
                     <div class="panel-content" id="panel-config-content">
                     <div class="config-grid">
                         <div class="config-item">
-                            <label for="semiring-select"><span class="label-with-help">Algebra <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label for="semiring-select">Algebra</label>
                             <select id="semiring-select" class="select">
                                 <optgroup label="Strength (⊕ = max: a bigger weight is a harder objection)">
                                     <option value="godel" selected>Gödel (⊗ = min)</option>
@@ -108,7 +108,7 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="budget-select"><span class="label-with-help">Budget reading <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label for="budget-select">Budget reading</label>
                             <select id="budget-select" class="select">
                                 <option value="none" selected>No discarding</option>
                                 <option value="sum-ub">Sum ≤ β (total)</option>
@@ -119,9 +119,9 @@
                         </div>
 
                         <div class="config-item" id="luk-k-container" style="display:none">
-                            <label for="luk-k-input"><span class="label-with-help">Łukasiewicz bound k <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label for="luk-k-input">Łukasiewicz bound k</label>
                             <input type="number" id="luk-k-input" class="select" value="10" min="1" max="1000000">
-                            <div class="config-note">⊗ is max(0, a+b−k). With k far above your weights every derivation erodes to 0, so keep k near their scale.</div>
+                            <div class="config-note">⊗ = max(0, a+b−k). Keep k near your weight scale; far above it, derivations erode to 0.</div>
                         </div>
 
                         <div class="config-item">
@@ -134,17 +134,16 @@
                         </div>
 
                         <div class="config-item">
-                            <label for="default-policy-select"><span class="label-with-help">Unweighted assumptions (δ) <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label for="default-policy-select">Unweighted assumptions (δ)</label>
                             <select id="default-policy-select" class="select">
-                                <option value="legacy" selected>Legacy</option>
+                                <option value="neutral" selected>Transparent (⊗ id)</option>
                                 <option value="aba">Unoverrulable (⊤)</option>
-                                <option value="neutral">Transparent (⊗ id)</option>
                             </select>
-                            <div class="config-note">What an assumption weighs when the modeller gave it no weight. This changes which budgets recover classical ABA.</div>
+                            <div class="config-note">The weight an unweighted assumption carries. Changes which budgets recover plain ABA.</div>
                         </div>
 
                         <div class="config-item">
-                            <label for="aba-recovery-toggle"><span class="label-with-help">ABA recovery <span class="help-dot" aria-hidden="true">?</span></span></label>
+                            <label for="aba-recovery-toggle">ABA recovery</label>
                             <label class="switch-toggle" for="aba-recovery-toggle">
                                 <input type="checkbox" id="aba-recovery-toggle" aria-label="Toggle ABA recovery">
                                 <span class="switch-slider" aria-hidden="true"></span>
@@ -262,7 +261,7 @@ contrary(b, c_b)."></textarea>
 
                         <div class="simple-grid">
                             <div class="simple-field">
-                                <label for="assumptions-input"><span class="label-with-help">Assumptions <span class="help-dot" aria-hidden="true">?</span></span></label>
+                                <label for="assumptions-input">Assumptions</label>
                                 <span class="comment-hint">Use one atom per line. Prefix a line with <code>%</code> to keep it as a comment.</span>
                                 <textarea id="assumptions-input" class="simple-textarea" placeholder="a
 b
@@ -270,20 +269,20 @@ c"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label for="rules-input"><span class="label-with-help">Rules <span class="help-dot" aria-hidden="true">?</span></span></label>
+                                <label for="rules-input">Rules</label>
                                 <span class="comment-hint">Use <code>head &lt;- body1, body2</code>. Prefix a line with <code>%</code> for comments.</span>
                                 <textarea id="rules-input" class="simple-textarea" placeholder="c_a <- b"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label for="contraries-input"><span class="label-with-help">Contraries <span class="help-dot" aria-hidden="true">?</span></span></label>
+                                <label for="contraries-input">Contraries</label>
                                 <span class="comment-hint">Use <code>(assumption, contrary)</code>. Prefix a line with <code>%</code> for comments.</span>
                                 <textarea id="contraries-input" class="simple-textarea" placeholder="(a, c_a)
 (b, c_b)"></textarea>
                             </div>
 
                             <div class="simple-field">
-                                <label for="weights-input"><span class="label-with-help">Weights <span class="help-dot" aria-hidden="true">?</span></span></label>
+                                <label for="weights-input">Weights</label>
                                 <span class="comment-hint">Use <code>atom: weight</code> with finite nonnegative integers. Prefix a line with <code>%</code> for comments.</span>
                                 <textarea id="weights-input" class="simple-textarea" placeholder="a: 80
 b: 60
@@ -550,12 +549,12 @@ c_a: 70"></textarea>
                 <!-- Getting Started Tab -->
                 <div id="tab-getting-started" class="doc-tab-content active" role="tabpanel">
                     <h3>Welcome to WABA Playground! 👋</h3>
-                    <p><strong>WABA</strong> (Weighted Assumption-Based Argumentation) combines algebraic semirings and monoids to enable flexible reasoning with weighted arguments and budget-constrained attack resolution.</p>
+                    <p><strong>WABA</strong> (Weighted Assumption-Based Argumentation) extends flat ABA with weights on the leaves of a derivation. An ordered semiring propagates them, and a set of assumptions is accepted only if the objections it concedes fit an inconsistency budget β.</p>
 
                     <div class="doc-card">
                         <h4>🎯 Quick Start Workflow</h4>
                         <ol class="workflow-steps">
-                            <li><strong>Configure:</strong> Choose your semiring (weight propagation) and monoid (cost aggregation)</li>
+                            <li><strong>Configure:</strong> Pick an algebra (how weights propagate) and a semantics; the budget reading is preselected to match the algebra</li>
                             <li><strong>Define Framework:</strong> Load an example or write your own in Simple/Advanced mode</li>
                             <li><strong>Run:</strong> Click "▶️ Run WABA" to compute extensions</li>
                             <li><strong>Explore:</strong> View results and interact with the argumentation graph</li>
@@ -755,115 +754,106 @@ budget(100).</code></pre>
                                 </tr>
                             </tbody>
                         </table>
-                        <p class="config-note">Four clean algebras across two families: Gödel (<code>godel</code> / <code>bottleneck_cost</code>) and Tropical (<code>arctic</code> / <code>tropical</code>); <code>godel_low</code> and <code>tropical_high</code> are polarity-dual aliases.</p>
+                        <p class="config-note">Five algebras. Four form a 2&times;2 over &otimes; (idempotent / additive) and polarity (&oplus; = max is <em>strength</em>, &oplus; = min is <em>cost</em>): <code>godel</code>, <code>bottleneck_cost</code>, <code>arctic</code>, <code>tropical</code>. <code>lukasiewicz</code> sits outside it (bounded sum). <code>godel_low</code> and <code>tropical_high</code> are polarity-dual aliases of <code>bottleneck_cost</code> and <code>arctic</code>.</p>
                     </div>
 
                     <div class="config-section">
-                        <h4>📊 Monoid (Cost Aggregation)</h4>
-                        <p>Determines how costs of discarded attacks are combined.</p>
+                        <h4>📊 Budget reading (β)</h4>
+                        <p>How the objections an extension concedes are priced against the budget. Monoid and bound are no longer separate controls: only the three <em>canonical</em> pairings are offered, so an incoherent one is unreachable rather than merely discouraged.</p>
 
                         <table class="config-table">
                             <thead>
                                 <tr>
-                                    <th>Monoid</th>
-                                    <th>Operation</th>
-                                    <th>Meaning</th>
+                                    <th>Reading</th>
+                                    <th>Aggregate</th>
+                                    <th>Weights mean</th>
+                                    <th>Accepts when</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><strong>MAX</strong></td>
-                                    <td>max(weights)</td>
-                                    <td>Worst single attack cost</td>
+                                    <td><strong>Sum &le; β</strong></td>
+                                    <td>&Sigma; of conceded weights</td>
+                                    <td>strength — bigger is harder to overrule</td>
+                                    <td>the total conceded is at most β</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>SUM</strong></td>
-                                    <td>Σ weights</td>
-                                    <td>Total cost of all discarded attacks</td>
+                                    <td><strong>Max &le; β</strong></td>
+                                    <td>max of conceded weights</td>
+                                    <td>strength</td>
+                                    <td>no single concession exceeds β</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>MIN</strong></td>
-                                    <td>min(weights)</td>
-                                    <td>Best single attack cost</td>
+                                    <td><strong>Min &ge; β</strong></td>
+                                    <td>min of conceded weights</td>
+                                    <td>weakness — bigger is easier to concede</td>
+                                    <td>every concession is worth at least β</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>No discarding</strong></td>
+                                    <td>&mdash;</td>
+                                    <td>&mdash;</td>
+                                    <td>nothing may be conceded, i.e. plain ABA</td>
                                 </tr>
                             </tbody>
                         </table>
+                        <p class="config-note">Choosing an algebra preselects the reading that matches its polarity: strength algebras get <strong>Sum &le; β</strong>, cost algebras get <strong>Min &ge; β</strong>. The boundary is non-strict, so an extension costing exactly β survives. Note that <strong>Sum &le; β</strong> with β = 0 is <em>not</em> the same as no discarding: an attack whose propagated weight is 0 is still discardable. Use <em>ABA recovery</em> for exact recovery.</p>
                     </div>
 
                     <div class="config-section">
                         <h4>🎯 Semantics</h4>
-                        <p>Defines admissibility criteria for extensions.</p>
+                        <p>Which sets of assumptions count as acceptable. All five consume the weights; none is weight-blind.</p>
 
                         <table class="config-table">
                             <thead>
                                 <tr>
                                     <th>Semantics</th>
                                     <th>Description</th>
-                                    <th>Extensions</th>
+                                    <th>How β applies</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
+                                    <td><strong>Conflict-free</strong></td>
+                                    <td>No supported attack between selected assumptions</td>
+                                    <td>via the budget reading</td>
+                                </tr>
+                                <tr>
                                     <td><strong>Stable</strong></td>
-                                    <td>Conflict-free + all external arguments attacked</td>
-                                    <td>0 or more</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Preferred</strong></td>
-                                    <td>Maximal complete extensions</td>
-                                    <td>1 or more</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Complete</strong></td>
-                                    <td>Admissible + contains all defended arguments</td>
-                                    <td>1 or more</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Grounded</strong></td>
-                                    <td>Minimal complete extension</td>
-                                    <td>Exactly 1</td>
+                                    <td>Conflict-free, and every assumption left out is attacked</td>
+                                    <td>via the budget reading</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Admissible</strong></td>
-                                    <td>Conflict-free + defends all members</td>
-                                    <td>1 or more</td>
+                                    <td>Conflict-free and defends every member</td>
+                                    <td>internal: one shared <code>pay</code> set covers internal conflict and undefended attack</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Conflict-free</strong></td>
-                                    <td>No supported attack between selected assumptions</td>
-                                    <td>1 or more</td>
+                                    <td><strong>Complete</strong></td>
+                                    <td>Admissible, and contains everything it defends</td>
+                                    <td>internal, as admissible</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Preferred</strong></td>
+                                    <td>The subset-maximal admissible sets</td>
+                                    <td>internal, as admissible</td>
                                 </tr>
                             </tbody>
                         </table>
+                        <p class="config-note">The last three are a structured lift of the Dunne et&nbsp;al. (AIJ 2011) inconsistency budget, so they take β directly and the budget-reading control does not apply to them. Their bound direction follows the algebra's polarity: under a strength algebra the conceded weights must sum to at most β, so plain ABA is recovered at β = 0; under a cost algebra the smallest concession must be at least β, so recovery arrives at a β above every attack weight.</p>
                     </div>
 
                     <div class="config-section">
-                        <h4>🎚️ Optimization</h4>
+                        <h4>🎚️ Results</h4>
                         <dl class="config-dl">
-                            <dt><strong>Minimize (Cost Semantics)</strong></dt>
-                            <dd>Find extensions with lowest cost. Weights represent costs to avoid.</dd>
+                            <dt><strong>All extensions</strong></dt>
+                            <dd>Enumerate every extension the budget admits. This is the only option for <em>Preferred</em>, which is computed by subset-maximal filtering over enumerated candidates and therefore needs them all.</dd>
 
-                            <dt><strong>Maximize (Reward Semantics)</strong></dt>
-                            <dd>Find extensions with highest reward. Weights represent benefits to pursue.</dd>
-
-                            <dt><strong>Opt Mode</strong> (separate control)</dt>
-                            <dd>Controls whether the objective above is enforced: <em>Enumerate all surviving extensions</em> lists every feasible extension (ranked by the objective), while <em>Keep only optimal extensions</em> returns just the optimum. The Monoid / Optimization / Opt-Mode controls only apply when a Budget Mode (discarding) is active.</dd>
+                            <dt><strong>Cheapest only</strong> / <strong>Dearest only</strong></dt>
+                            <dd>Keep just the optimum of the aggregate named by the budget reading. Available only when a budget reading is active — with nothing conceded there is nothing to optimise.</dd>
                         </dl>
                     </div>
 
-                    <div class="config-section">
-                        <h4>💰 Budget Constraint</h4>
-                        <dl class="config-dl">
-                            <dt><strong>Upper Bound (cost ≤ β)</strong></dt>
-                            <dd>Only allow extensions where total cost doesn't exceed budget β.</dd>
-
-                            <dt><strong>Lower Bound (quality ≥ β)</strong></dt>
-                            <dd>Only allow extensions meeting minimum quality threshold β.</dd>
-
-                            <dt><strong>None</strong></dt>
-                            <dd>No budget constraints (enumerate all valid extensions).</dd>
-                        </dl>
-                    </div>
                 </div>
 
                 <!-- Understanding Results Tab -->
@@ -974,6 +964,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-2"></script>
+    <script type="module" src="app.js?v=20260730-3"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { escapeHtml } from './parser-utils.js?v=20260730-2';
+import { escapeHtml } from './parser-utils.js?v=20260730-3';
 /**
  * MetricsManager - Decision-oriented analysis for ranked WABA extensions.
  *
@@ -14,19 +14,16 @@ export class MetricsManager {
     static getAnalysisContext(config = {}) {
         const optimization = config.optimization || 'minimize';
         const supportHigherBetter = config.polarity === 'higher' || config.polarity === 'strength';
-        const budgetThresholdMode = config.budgetMode === 'none' && config.budgetIntent === 'explore';
-
+        // budgetIntent is only ever 'no_discard' or 'bounded' (config-service.js), so the
+        // former 'explore' threshold mode and its alternate label set were unreachable.
         return {
             optimization,
             objectiveHigherBetter: optimization === 'maximize',
             supportHigherBetter,
-            budgetThresholdMode,
-            scoreLabel: budgetThresholdMode ? 'Minimum β' : 'Objective score',
-            bestLabel: budgetThresholdMode ? 'Best threshold' : 'Best objective',
-            gapLabel: budgetThresholdMode ? 'Threshold gap' : 'Objective gap',
-            summaryText: budgetThresholdMode
-                ? 'Extensions are first grouped by accepted assumptions, then ranked by their minimum observed β*.'
-                : 'Extensions are first grouped by accepted assumptions, then ranked by the active objective.'
+            scoreLabel: 'Objective score',
+            bestLabel: 'Best objective',
+            gapLabel: 'Objective gap',
+            summaryText: 'Extensions are first grouped by accepted assumptions, then ranked by the active objective.'
         };
     }
 

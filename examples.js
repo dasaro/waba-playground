@@ -369,7 +369,7 @@ export const examples = {
         code: CONFLICT_CYCLE,
         preset: {
             semiring: 'godel',
-            defaultPolicy: 'legacy',
+            defaultPolicy: 'neutral',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'ub',
@@ -387,14 +387,15 @@ export const examples = {
         code: ARCTIC_GROUNDS,
         preset: {
             semiring: 'arctic',
-            defaultPolicy: 'legacy',
+            defaultPolicy: 'neutral',
             monoid: 'sum',
             optimization: 'minimize',
             budgetMode: 'ub',
             budgetIntent: 'bounded',
             semantics: 'stable',
             optMode: 'ignore',
-            beta: 9
+            beta: 9,
+            graphMode: 'assumption-branching'
         }
     },
     bottleneck_worstcase: {
@@ -405,14 +406,15 @@ export const examples = {
         code: BOTTLENECK_WORSTCASE,
         preset: {
             semiring: 'bottleneck_cost',
-            defaultPolicy: 'legacy',
+            defaultPolicy: 'neutral',
             monoid: 'max',
             optimization: 'minimize',
             budgetMode: 'ub',
             budgetIntent: 'bounded',
             semantics: 'stable',
             optMode: 'ignore',
-            beta: 8
+            beta: 8,
+            graphMode: 'assumption-branching'
         }
     },
     kpg_impact_vs_deccan: {
@@ -423,7 +425,7 @@ export const examples = {
         code: KPG_IMPACT,
         preset: {
             semiring: 'arctic',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'neutral', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 22, graphMode: "assumption-branching"
         }
@@ -436,7 +438,7 @@ export const examples = {
         code: HIGGS_DISCOVERY,
         preset: {
             semiring: 'tropical',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'aba', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 109, graphMode: "assumption-branching"
         }
@@ -449,7 +451,7 @@ export const examples = {
         code: OUT_OF_AFRICA,
         preset: {
             semiring: 'arctic',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'neutral', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 37, graphMode: "assumption-branching"
         }
@@ -462,7 +464,7 @@ export const examples = {
         code: LIPID_HYPOTHESIS,
         preset: {
             semiring: 'arctic',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'neutral', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 25, graphMode: "assumption-branching"
         }
@@ -475,7 +477,7 @@ export const examples = {
         code: DETECTIVE_LOCKED_HOUSE,
         preset: {
             semiring: 'tropical',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'aba', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 27, graphMode: "assumption-branching"
         }
@@ -488,7 +490,7 @@ export const examples = {
         code: WEAKEST_LINK_SECURITY,
         preset: {
             semiring: 'bottleneck_cost',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'neutral', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 9, graphMode: "assumption-branching"
         }
@@ -501,7 +503,7 @@ export const examples = {
         code: DEORBIT_PLAN_RISK,
         preset: {
             semiring: 'tropical',
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'aba', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 28, graphMode: "assumption-branching"
         }
@@ -514,7 +516,7 @@ export const examples = {
         code: EROSION_TRANSMISSION,
         preset: {
             semiring: 'lukasiewicz', lukK: 1000,
-            defaultPolicy: 'legacy', monoid: 'sum', optimization: 'minimize',
+            defaultPolicy: 'neutral', monoid: 'sum', optimization: 'minimize',
             budgetMode: 'ub', budgetIntent: 'bounded', semantics: 'stable',
             optMode: 'ignore', beta: 800, graphMode: "assumption-branching"
         }

@@ -68,13 +68,13 @@ export function buildAssumptionNodeTooltip({
 }
 
 export function buildTopNodeTooltip(factBasedAttacks = []) {
-    const targets = factBasedAttacks.map((attack) => attack.assumption);
-    const contraries = factBasedAttacks.map((attack) => attack.contrary);
-    return buildTooltip('Fact-based attacker top', [
-        ['Meaning', 'Encodes attacks derived from facts or empty-body rules'],
-        ['Targets', formatItemList(targets)],
-        ['Contraries derived as facts', formatItemList(contraries)]
-    ], 'This node is synthetic: it summarizes attacks that do not require any assumption in the body.');
+    const rows = factBasedAttacks.length > 0
+        ? factBasedAttacks.slice(0, 8).map((attack) => `${escapeHtml(attack.contrary)} &rhd; ${escapeHtml(attack.assumption)} (w: ${formatWeight(attack.weight)})`).join('<br>')
+        : null;
+    return buildTooltip('⊤ (unconditional support)', [
+        ['Meaning', 'Stands for what holds with no assumption in the body — facts and empty-body rules'],
+        [rows ? 'Attacks it launches' : 'Attacks it launches', rows || 'none — it only feeds a derivation here']
+    ], 'Synthetic node: it groups everything derivable without committing to any assumption.');
 }
 
 export function buildAttackEdgeTooltip({
@@ -101,6 +101,46 @@ export function buildAttackEdgeTooltip({
     ], note);
 }
 
+/**
+ * A derived (intermediate) claim node in the assumption views.
+ *
+ * Previously these borrowed buildAttackEdgeTooltip with `target: ''`, which rendered a panel
+ * titled "Derived claim: x -> " with an empty "Target assumption" row and always claimed
+ * "Rule / derivation: direct support" because no caller passed a rule. The deriving rules are
+ * available at the call site, so show them.
+ */
+export function buildDerivedNodeTooltip({ atom, explicitWeight = null, derivingRules = [] }) {
+    const weightLabel = explicitWeight === null || explicitWeight === undefined
+        ? 'none declared — propagated from its premises by the semiring'
+        : formatWeight(explicitWeight);
+    const ruleRows = derivingRules.length > 0
+        ? derivingRules.map((rule) => formatRule(rule.id, rule.body || [], rule.head || atom)).join('<br>')
+        : 'no rule derives this atom';
+    return buildTooltip(`Derived claim ${atom}`, [
+        ['Declared weight', weightLabel],
+        [derivingRules.length > 1 ? 'Derived by (any of)' : 'Derived by', ruleRows]
+    ], 'An intermediate claim built by rules from the assumptions — a step in the reasoning, not itself an assumption.');
+}
+
+/**
+ * A derivation (support) step in the assumption views.
+ *
+ * Previously this borrowed buildAttackEdgeTooltip and was handed vis NODE IDS, so it displayed
+ * internal identifiers such as `arg_chimerism` and `junction_chimerism_r3` to the reader.
+ * Takes atoms instead; a junction end is described rather than named.
+ */
+export function buildSupportEdgeTooltip({ fromAtom = null, toAtom, ruleId = null, body = [], viaJunction = false }) {
+    const source = fromAtom === null
+        ? 'all premises of the rule (via the ∧ junction)'
+        : escapeHtml(fromAtom);
+    return buildTooltip('Derivation step', [
+        ['Supports', escapeHtml(toAtom)],
+        ['From', source],
+        ['Rule', ruleId ? formatRule(ruleId, body, toAtom) : 'not recorded'],
+        [viaJunction ? 'Feeds the junction for' : null, viaJunction ? escapeHtml(toAtom) : null]
+    ].filter(([label]) => label !== null), 'A support step, not an attack: the source helps establish the target.');
+}
+
 export function buildJunctionTooltip({
     target,
     contrary,
@@ -117,23 +157,36 @@ export function buildJunctionTooltip({
     ], 'The final attack only fires when all contributors to this junction are supported.');
 }
 
+/**
+ * The ∧ node in Assumption-Branching, which marks a rule with several premises. Distinct from
+ * buildJunctionTooltip, which describes a joint ATTACK: this one is a derivation step, so
+ * calling its head a "target assumption" (as the attack wording does) is simply wrong.
+ */
+export function buildDerivationJunctionTooltip({ head, ruleId = null, body = [] }) {
+    return buildTooltip('∧ all premises required', [
+        ['Derives', escapeHtml(head)],
+        ['Rule', ruleId ? formatRule(ruleId, body, head) : 'not recorded'],
+        [body.length === 1 ? 'Premise' : `Premises (all ${body.length} needed)`, formatItemList(body, { limit: 8 })]
+    ], 'A rule with more than one premise. The step fires only when every premise above is supported.');
+}
+
 export function buildSetNodeTooltip({
     setId,
     assumptions = [],
     supported = [],
     attacks = []
 }) {
-    const attackedAssumptions = attacks.map((attack) => attack.assumption);
-    const attackingElements = attacks.map((attack) => attack.attackingElement);
-    const weightLabels = attacks.map((attack) => formatWeight(attack.weight));
+    // One row per attack. The previous 'Attack weight labels' row deduped and sorted the
+    // weights, so it could not be matched back to the attack it belonged to.
+    const attackRows = attacks.length > 0
+        ? attacks.slice(0, 8).map((attack) => `${escapeHtml(attack.attackingElement)} &rhd; ${escapeHtml(attack.assumption)} (w: ${formatWeight(attack.weight)})`).join('<br>')
+            + (attacks.length > 8 ? `<br>... (+${attacks.length - 8} more)` : '')
+        : 'none';
     return buildTooltip(`Extension candidate ${setId}`, [
         ['Accepted assumptions', assumptions.length > 0 ? formatItemList(assumptions, { limit: 10 }) : 'empty set'],
         ['Supported atoms', formatItemList(supported, { limit: 10 })],
-        ['Launched attacks', String(attacks.length)],
-        ['Attacked assumptions', formatItemList(attackedAssumptions)],
-        ['Attacking atoms', formatItemList(attackingElements)],
-        ['Attack weight labels', formatItemList(weightLabels)]
-    ], 'This node represents one candidate extension in the powerset exploration used by the standard graph.');
+        [attacks.length === 1 ? 'Attack it launches' : `Attacks it launches (${attacks.length})`, attackRows]
+    ], 'One candidate set of assumptions. The Standard view draws every such set, so it is bounded to small frameworks.');
 }
 
 export function buildSetAttackTooltip({

@@ -63,6 +63,17 @@ function withAttackState(baseTitle, label, color) {
     return baseTitle.replace('</strong></div>', `</strong></div>${row}`);
 }
 
+// The node equivalent of withAttackState. Nothing solver-derived reached NODE tooltips at all:
+// an assumption was recoloured green or grey to show its membership while its hover panel said
+// nothing about it, so the one fact the colour encodes was the one fact the tooltip omitted.
+function withNodeState(baseTitle, label, color) {
+    if (typeof baseTitle !== 'string' || !baseTitle.includes('</strong></div>')) {
+        return baseTitle;
+    }
+    const row = `<div><strong>In this extension:</strong> <span style="color: ${color}; font-weight: 600;">${label}</span></div>`;
+    return baseTitle.replace('</strong></div>', `</strong></div>${row}`);
+}
+
 export function buildResetUpdates(networkData) {
     const nodes = networkData.nodes.get();
     const edges = networkData.edges.get();
@@ -71,7 +82,8 @@ export function buildResetUpdates(networkData) {
         nodeUpdates: nodes.map((node) => ({
             id: node.id,
             color: node.originalColor || node.color,
-            borderWidth: node.originalBorderWidth || 2
+            borderWidth: node.originalBorderWidth || 2,
+            title: node.titleHtml !== undefined ? node.titleHtml : node.title
         })),
         edgeUpdates: edges.map((edge) => ({
             id: edge.id,
@@ -101,6 +113,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             originalColor: node.originalColor || node.color,
             originalBorderWidth: node.originalBorderWidth || node.borderWidth || 2
         };
+        const baseTitle = node.titleHtml !== undefined ? node.titleHtml : node.title;
         const accepted = {
             id: node.id,
             ...preserved,
@@ -112,13 +125,14 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         // membership. ⊤ and junction nodes have no in/out status, so leave them.
         if (node.isAssumption === true) {
             if (inSet.has(node.id)) {
-                return [accepted];
+                return [{ ...accepted, title: withNodeState(baseTitle, 'IN — accepted', '#10b981') }];
             }
             return [{
                 id: node.id,
                 ...preserved,
                 color: { border: '#64748b', background: '#94a3b8', highlight: { border: '#475569', background: '#64748b' } },
-                borderWidth: 2
+                borderWidth: 2,
+                title: withNodeState(baseTitle, 'OUT — not accepted', '#94a3b8')
             }];
         }
 
@@ -129,7 +143,7 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
         const isExactExtension = members.length === inAssumptions.length
             && members.every((assumption) => inSet.has(assumption));
         if (isExactExtension) {
-            return [accepted];
+            return [{ ...accepted, title: withNodeState(baseTitle, 'this is the selected extension', '#10b981') }];
         }
         return [];
     });
@@ -167,7 +181,13 @@ export function buildHighlightUpdates(networkData, inAssumptions, discardedAttac
             return {
                 id: edge.id,
                 ...preserved,
-                title: withAttackState(baseTitle, 'Discarded — overridden against the budget', '#9ca3af'),
+                title: withAttackState(
+                    baseTitle,
+                    discarded.weight !== undefined && discarded.weight !== null
+                        ? `Discarded — ${discarded.weight} charged against β`
+                        : 'Discarded — overridden against the budget',
+                    '#9ca3af'
+                ),
                 color: { color: '#9ca3af', highlight: '#6b7280' },
                 width: 3,
                 dashes: [8, 4],

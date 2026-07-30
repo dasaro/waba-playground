@@ -1,10 +1,13 @@
-import { GraphUtils } from './graph-utils.js?v=20260730-2';
+import { GraphUtils } from './graph-utils.js?v=20260730-3';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
+    buildDerivationJunctionTooltip,
+    buildDerivedNodeTooltip,
     buildJunctionTooltip,
+    buildSupportEdgeTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260730-2';
+} from './graph-tooltip-builder.js?v=20260730-3';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
@@ -94,7 +97,15 @@ function addFactBasedAttacks(visNodes, visEdges, factBasedAttacks) {
         return;
     }
 
-    visNodes.push(createTopNode(factBasedAttacks));
+    // ensureTop() in the branching builder may already have created ⊤ for an empty-body
+    // derivation step, and it necessarily did so before factBasedAttacks was known -- which is
+    // why its tooltip read "Targets: none". Enrich that node rather than pushing a duplicate id.
+    const existingTop = visNodes.find((node) => node.id === '⊤');
+    if (existingTop) {
+        existingTop.title = buildTopNodeTooltip(factBasedAttacks);
+    } else {
+        visNodes.push(createTopNode(factBasedAttacks));
+    }
     factBasedAttacks.forEach(({ assumption, contrary, weight }) => {
         const displayWeight = (weight === '?' || weight === null || weight === undefined) ? '' : weight;
         const edgeColor = { color: '#f59e0b', highlight: '#ea580c' };
@@ -472,6 +483,7 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         if (!created.has(id)) {
             created.add(id);
             const w = explicitWeight(weights, atom);
+            const derivingRules = rules.filter((rule) => rule.head === atom);
             visNodes.push({
                 id,
                 // Show the explicit weight in the label when the intermediate carries one
@@ -482,11 +494,7 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                 size: 18,
                 color: derivedNodeColor(),
                 font: { color: '#ffffff', size: 13 },
-                title: buildAttackEdgeTooltip({
-                    typeLabel: 'Derived claim', attacker: atom, target: '', contrary: atom,
-                    weight: w === null ? '?' : w,
-                    note: 'An intermediate claim derived by rules from the assumptions — a step in the debate\'s reasoning.'
-                }),
+                title: buildDerivedNodeTooltip({ atom, explicitWeight: w, derivingRules }),
                 isDerived: true,
                 atom
             });
@@ -494,13 +502,16 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         return id;
     };
 
-    const ensureJunction = (id, body) => {
+    const ensureJunction = (id, body, { head, ruleId } = {}) => {
         if (!created.has(id)) {
             created.add(id);
             visNodes.push({
                 id, label: '∧', size: 16, shape: 'diamond',
                 color: { border: '#10b981', background: '#10b981', highlight: { border: '#059669', background: '#059669' } },
                 font: { color: GraphUtils.getFontColor(), size: 15 },
+                // This node used to be pushed with no `title`, so hovering an ∧ junction --
+                // the one element whose whole purpose needs explaining -- showed nothing.
+                title: buildDerivationJunctionTooltip({ head, ruleId, body }),
                 isJunction: true, attackers: body, derivationBody: body
             });
         }
@@ -515,16 +526,15 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         return '⊤';
     };
 
-    const pushSupportEdge = (from, to) => {
+    // `meta` carries the ATOMS and the rule. The tooltip must never show `from`/`to`, which
+    // are internal vis ids like `arg_chimerism` / `junction_chimerism_r3`.
+    const pushSupportEdge = (from, to, meta = {}) => {
         visEdges.push(createAttackEdge({
             id: `support-${from}-to-${to}`,
             from, to, width: 2,
             color: { color: '#94a3b8', highlight: '#64748b' },
             arrows: 'to', dashes: false,
-            title: buildAttackEdgeTooltip({
-                typeLabel: 'Derivation step', attacker: from, target: to, weight: '?',
-                note: 'A support step: the source helps derive the target claim (not itself an attack).'
-            }),
+            title: buildSupportEdgeTooltip(meta),
             attackType: 'support'
         }));
     };
@@ -546,7 +556,7 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         derivingRules.forEach((rule, ri) => {
             const body = rule.body || [];
             if (body.length === 0) {
-                pushSupportEdge(ensureTop(), derivedId); // empty-body fact -> ⊤
+                pushSupportEdge(ensureTop(), derivedId, { fromAtom: '⊤', toAtom: atom, ruleId: rule.id, body: [] }); // empty-body fact -> ⊤
                 fired = true;
                 return;
             }
@@ -554,11 +564,13 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
             if (bodyNodes.some((n) => n === null)) return; // a body atom is unsupportable -> dead rule
             fired = true;
             if (bodyNodes.length === 1) {
-                pushSupportEdge(bodyNodes[0], derivedId);
+                pushSupportEdge(bodyNodes[0], derivedId, { fromAtom: body[0], toAtom: atom, ruleId: rule.id, body });
             } else {
-                const jId = ensureJunction(`junction_${atom}_${rule.id || ri}`, body);
-                bodyNodes.forEach((bn) => pushSupportEdge(bn, jId));
-                pushSupportEdge(jId, derivedId);
+                const jId = ensureJunction(`junction_${atom}_${rule.id || ri}`, body, { head: atom, ruleId: rule.id });
+                bodyNodes.forEach((bn, bi) => pushSupportEdge(bn, jId, {
+                    fromAtom: body[bi], toAtom: atom, ruleId: rule.id, body, viaJunction: true
+                }));
+                pushSupportEdge(jId, derivedId, { fromAtom: null, toAtom: atom, ruleId: rule.id, body });
             }
         });
         if (!fired) {
@@ -603,6 +615,7 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
                 attacker: contrary, target: assumption, contrary,
                 weight: shownWeight,
                 derivationBody: jointWith,
+                derivedBy: rules.filter((rule) => rule.head === contrary).map((rule) => rule.id),
                 note: isDirect
                     ? 'The attacker is itself the contrary of the target assumption.'
                     : 'This derived claim is the contrary of the target — it defeats it once its derivation is supported. The aggregate weight is semiring-dependent (see the Results panel).'
@@ -618,6 +631,13 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
 
     visNodes.push(...createAssumptionNodes(assumptions, contraries, visEdges, weights));
     addFactBasedAttacks(visNodes, visEdges, factBasedAttacks);
+
+    // A ⊤ that exists only because some rule has an empty body launches no attack of its own;
+    // say so rather than leaving the builder's placeholder rows reading "none".
+    const topNode = visNodes.find((node) => node.id === '⊤');
+    if (topNode && factBasedAttacks.length === 0) {
+        topNode.title = buildTopNodeTooltip([]);
+    }
 
     return {
         visNodes,

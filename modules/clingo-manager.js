@@ -1,16 +1,18 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260730-2';
+import { wabaModules } from '../waba-modules.js?v=20260730-3';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
+    isBudgetedDefence,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260730-2';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-2';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-2';
+} from '../runtime/config-service.js?v=20260730-3';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-3';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-3';
+import { ParserUtils } from './parser-utils.js?v=20260730-3';
 
 // Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.
@@ -92,12 +94,85 @@ export class ClingoManager {
             const result = POST_FILTERED.has(normalized.semantics)
                 ? await this.runExactSubsetSemantics(framework, normalized, onLog)
                 : await this.runDirect(framework, normalized);
+            const defenceCosts = await this.computeDefenceCosts(framework, normalized, result, onLog);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-            return { result, elapsed, effectiveConfig: normalized };
+            return { result, elapsed, effectiveConfig: normalized, defenceCosts };
         } catch (error) {
             console.error('Error running WABA:', error);
             throw error;
         }
+    }
+
+    /**
+     * Per-extension cost for the DEFENCE semantics (admissible / complete / preferred).
+     *
+     * Those semantics price a shared `pay` set internally and emit no discarded_attack/3, so
+     * the answer set carries in/1 and out/1 and nothing else -- which is why no cost was ever
+     * shown for them. `#show pay/2` is NOT the fix: it multiplies the model count, because
+     * different payment choices realising the SAME extension become distinct projected models
+     * (measured 3 -> 5 -> 7 -> 11 as beta rises), breaking enumerate-each-extension-once.
+     *
+     * Instead: one extra solve per returned extension, with in/out PINNED and the paid
+     * aggregate minimised. The optimum is the least objection-weight this extension has to
+     * wave away -- 0 exactly when it is classically admissible. Under a strength algebra that
+     * is also the smallest beta admitting it.
+     *
+     * Returns a Map from a canonical extension key to the number, or null when not applicable.
+     */
+    async computeDefenceCosts(framework, config, result, onLog = () => {}) {
+        if (!isBudgetedDefence(config.semantics)) {
+            return null;
+        }
+        const witnesses = result?.Call?.[0]?.Witnesses || [];
+        if (witnesses.length === 0) {
+            return null;
+        }
+
+        const assumptions = ParserUtils.parseAssumptions(framework);
+        if (assumptions.length === 0) {
+            return null;
+        }
+
+        // The probe must not be blocked by the module's own bound while we search for the
+        // minimum. A strength bound is `sum <= beta` and additionally forbids ANY payment at
+        // beta = 0, so the probe needs a large beta; a cost bound is `min >= beta`, which is
+        // vacuous at 0. Either way the #minimize, not beta, decides the answer.
+        const probeBeta = config.polarity === 'lower' ? 0 : 1000000;
+        const costs = new Map();
+
+        for (const witness of witnesses) {
+            const inSet = new Set((witness.Value || [])
+                .map((predicate) => predicate.match(/^in\((.+)\)$/))
+                .filter(Boolean)
+                .map((match) => match[1]));
+            const key = [...inSet].sort().join(',');
+            if (costs.has(key)) {
+                continue;
+            }
+
+            const pins = assumptions
+                .map((a) => (inSet.has(a) ? `:- not in(${a}).` : `:- in(${a}).`))
+                .join('\n');
+            const program = `${buildProgram(framework, { ...config, beta: probeBeta })}
+%% Pin this extension and minimise what it must concede
+${pins}
+#minimize { W,X,Y : pay(X,Y), arg_weight(X,W) }.
+`;
+            try {
+                const probe = await this.runSolver(
+                    program, 1, ['-c', `beta=${probeBeta}`, '--opt-mode=opt', '--quiet=1'], config.timeout
+                );
+                const probeWitnesses = probe?.Call?.[0]?.Witnesses || [];
+                const last = probeWitnesses[probeWitnesses.length - 1];
+                const value = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : null;
+                // An extension needing no concession yields no `pay` atom, so clingo reports no
+                // objective at all rather than 0. That IS zero, not "unknown".
+                costs.set(key, typeof value === 'number' ? value : 0);
+            } catch (error) {
+                onLog(`Could not price extension {${key}}: ${error.message}`, 'warning');
+            }
+        }
+        return costs;
     }
 
     async runDirect(framework, config) {

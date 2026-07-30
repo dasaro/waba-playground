@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-2';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-3';
 
 export class ConfigController {
     constructor(dom) {
@@ -53,6 +53,9 @@ export class ConfigController {
 
     applyConfigToUI(config) {
         this.dom.semiringSelect.value = config.semiringKey || config.semiring || 'godel';
+        // Seed the algebra-change detector so applying a preset does not look like a user
+        // switching algebra, which would overwrite the preset's own budget reading.
+        this._lastAlgebra = this.dom.semiringSelect.value;
         this.dom.defaultPolicySelect.value = config.defaultPolicy;
         this.dom.abaRecoveryToggle.checked = Boolean(config.abaRecovery);
         this.dom.semanticsSelect.value = config.semantics;
@@ -113,6 +116,38 @@ export class ConfigController {
         // exactly as bin/waba does; they reject a monoid/bound pairing.
         const isDefence = ['admissible', 'complete', 'preferred'].includes(semantics);
         const isLukasiewicz = algebra === 'lukasiewicz';
+
+        // Choosing an algebra preselects the canonical (monoid, bound) pairing for its
+        // polarity. oplus = max reads a weight as STRENGTH (bigger = harder to overrule), so
+        // the natural bound is on the total conceded; oplus = min reads it as COST, where a
+        // bigger weight means WORSE support and therefore an easier concession, so the natural
+        // bound is a floor on each concession. These are exactly the pairings bin/waba's
+        // CANONICAL_PRESETS admits. It fires only on an actual algebra change, so a manual
+        // budget choice (or a preset's) is never overwritten by an unrelated syncUi.
+        const RECOMMENDED_BUDGET = {
+            godel: 'sum-ub',
+            arctic: 'sum-ub',
+            lukasiewicz: 'sum-ub',
+            tropical: 'min-lb',
+            bottleneck_cost: 'min-lb'
+        };
+        if (this._lastAlgebra !== undefined && this._lastAlgebra !== algebra) {
+            const previousReading = this.dom.budgetSelect.value;
+            const reading = RECOMMENDED_BUDGET[algebra] || 'sum-ub';
+            this.dom.budgetSelect.value = reading;
+            // The two bounds run in OPPOSITE directions: under `ub` a bigger beta is more
+            // permissive, under `lb` a bigger beta is more restrictive (every concession must
+            // be worth at least beta). So carrying a beta tuned for one across to the other
+            // silently yields nothing -- switching to a cost algebra with the presets' beta=8
+            // returned zero extensions. When the reading flips, move beta to that reading's
+            // permissive end so the run still shows something to tighten from.
+            const flipped = previousReading !== 'none'
+                && previousReading.split('-')[1] !== reading.split('-')[1];
+            if (flipped && reading.endsWith('-lb')) {
+                this.dom.budgetInput.value = '0';
+            }
+        }
+        this._lastAlgebra = algebra;
 
         // k only exists for Lukasiewicz.
         if (this.dom.lukKContainer) {

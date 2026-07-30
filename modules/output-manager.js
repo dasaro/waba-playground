@@ -1,11 +1,11 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-2';
-import { MetricsManager } from './metrics-manager.js?v=20260730-2';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-2';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-2';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-2';
+import { PopupManager } from './popup-manager.js?v=20260730-3';
+import { MetricsManager } from './metrics-manager.js?v=20260730-3';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-3';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-3';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-3';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -102,7 +102,7 @@ export class OutputManager {
     }
 
     // ===================================
-    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '') {
+    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '', defenceCosts = null) {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
@@ -169,9 +169,17 @@ export class OutputManager {
                 const aggregateValue = parsed.budgetValueRaw !== null
                     ? normalizeAggregateValue(parsed.budgetValueRaw)
                     : computeAggregateFromDiscarded(parsed.discarded, config.monoid);
-                const cost = (config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
-                    ? null
-                    : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization);
+                // The defence semantics carry no discarded_attack/3 at all, so the monoid
+                // aggregate is meaningless for them; their cost is the separately probed
+                // minimum concession (see ClingoManager.computeDefenceCosts).
+                const defenceCost = defenceCosts
+                    ? defenceCosts.get(parsed.in.slice().sort().join(','))
+                    : undefined;
+                const cost = defenceCost !== undefined
+                    ? displayValue(defenceCost)
+                    : ((config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
+                        ? null
+                        : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization));
 
                 return {
                     witness,
@@ -197,8 +205,7 @@ export class OutputManager {
                     index + 1,
                     onHighlightExtension,
                     onResetGraph,
-                    item.cost,
-                    item.parsed.budgetValue
+                    item.cost
                 );
             });
 
@@ -212,7 +219,6 @@ export class OutputManager {
             // Add download and metrics buttons if there are extensions
             this.addDownloadButton();
             this.addMetricsButton();
-            this.addRankingSummary(witnessesWithCosts, config);
         }
 
         // Display statistics
@@ -444,7 +450,7 @@ export class OutputManager {
     // null to mean "no cost applies" (no-discard mode, where nothing can be discarded). With
     // a null default the two were indistinguishable, so the suppression was silently undone
     // and the cost recomputed from an EMPTY discard set - rendering #inf (max) or #sup (min).
-    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = undefined, budgetValue = null) {
+    appendAnswerSet(witness, answerNumber, onHighlightExtension, onResetGraph, precomputedCost = undefined) {
         // witness is an object with Time and Value properties
         // Value is an array of predicate strings
         const predicates = witness.Value || [];
@@ -630,11 +636,18 @@ export class OutputManager {
 
         contentHTML += '</div>';
 
+        // A single badge. `Cost` and `β*` used to be rendered side by side from the SAME
+        // budget_value/1 atom -- one through displayValue, one raw -- which produced
+        // contradictory pairs like "Cost: -inf   β*: #inf". The label now names the aggregate
+        // so the number is self-describing instead of needing a legend.
+        const costBadge = parsed.cost !== null
+            ? `<span class="extension-cost-badge">${escapeHtml(this.costLabel())}: ${escapeHtml(String(parsed.cost))}</span>`
+            : '';
+
         answerDiv.innerHTML = `
             <div class="answer-header clickable-extension" data-extension-id="${answerNumber}">
                 <span class="answer-number">Extension ${answerNumber}</span>
-                ${parsed.cost !== null ? `<span class="extension-cost-badge">💰 Cost: ${parsed.cost}</span>` : ''}
-                ${budgetValue !== null && budgetValue !== undefined ? `<span class="extension-cost-badge">β*: ${budgetValue}</span>` : ''}
+                ${costBadge}
                 <span class="click-hint" style="font-size: 0.85em; color: var(--text-muted); margin-left: 10px;">👆 Click to highlight</span>
             </div>
             ${contentHTML}
@@ -761,9 +774,30 @@ export class OutputManager {
         return parseAnswerSet(predicates);
     }
 
+    /**
+     * What the per-extension number IS, so the badge does not need a legend. Reads the config
+     * captured for the current run; falls back to a neutral word if none is available.
+     */
+    costLabel() {
+        const config = this.lastRunConfig || this.readConfig();
+        if (['admissible', 'complete', 'preferred'].includes(config.semantics)) {
+            return 'β* needed';
+        }
+        return {
+            sum: 'Σ conceded',
+            max: 'worst conceded',
+            min: 'least conceded'
+        }[config.monoid] || 'conceded';
+    }
+
     extractDisplayCost(witness, aggregateValue, _monoid, optimization) {
-        if (witness.Optimization !== undefined) {
-            const opt = witness.Optimization;
+        // clingo-wasm reports the objective under `Costs` (see run.d.ts: `Costs?: number[]`),
+        // NOT `Optimization`. Reading only the latter meant the branch never fired and
+        // clingo's actual optimum was silently discarded in favour of the recomputed
+        // aggregate. Prefer Costs; keep Optimization as a fallback for other wrappers.
+        const objective = witness.Costs !== undefined ? witness.Costs : witness.Optimization;
+        if (objective !== undefined) {
+            const opt = objective;
             const raw = Array.isArray(opt) ? (opt.length > 0 ? opt[opt.length - 1] : null) : opt;
             // clingo compiles #maximize into #minimize{-W}, so it reports a negated
             // objective for maximize runs. Flip the sign back so the badge shows the
@@ -777,44 +811,6 @@ export class OutputManager {
         }
 
         return null;
-    }
-
-    addRankingSummary(witnessesWithCosts, config) {
-        if (!Array.isArray(witnessesWithCosts) || witnessesWithCosts.length === 0) {
-            return;
-        }
-
-        const shouldShow = config.budgetMode === 'none' && config.budgetIntent === 'explore';
-        if (!shouldShow) {
-            return;
-        }
-
-        const grouped = new Map();
-        witnessesWithCosts.forEach((item) => {
-            const key = item.parsed.in.slice().sort().join(',') || '∅';
-            if (!grouped.has(key)) {
-                grouped.set(key, { extension: item.parsed.in.slice(), thresholds: [] });
-            }
-            grouped.get(key).thresholds.push(item.parsed.budgetValue ?? item.aggregateValue);
-        });
-
-        const container = this.dom.document.createElement('div');
-        container.className = 'info-message';
-        const lines = ['Threshold view (grouped by extension):'];
-
-        grouped.forEach((value) => {
-            const sortedThresholds = value.thresholds.slice().sort((left, right) =>
-                String(left).localeCompare(String(right), undefined, { numeric: true })
-            );
-            const threshold = config.budgetMode === 'lb'
-                ? sortedThresholds[sortedThresholds.length - 1]
-                : sortedThresholds[0];
-            const extensionLabel = value.extension.length > 0 ? `{${value.extension.join(', ')}}` : '∅';
-            lines.push(`${extensionLabel} -> β*: ${threshold}`);
-        });
-
-        container.innerHTML = `<pre style="margin: 0; white-space: pre-wrap;">${lines.join('\n')}</pre>`;
-        this.output.insertBefore(container, this.output.firstChild);
     }
 
     // ===================================

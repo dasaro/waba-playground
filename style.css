@@ -438,6 +438,9 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     gap: var(--space-xs);
     position: relative;
     min-width: 0;
+    /* captions differ in length, so let each cell keep its own height rather than
+       stretching every sibling to the tallest one */
+    align-self: start;
 }
 
 .switch-toggle {
@@ -506,52 +509,24 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     gap: var(--space-xs);
 }
 
+/* Control descriptions are shown INLINE, not on hover: a control whose meaning is only
+   discoverable by hovering is a control the reader has to guess at. Kept deliberately small
+   and muted so the panel reads as label / control / caption. */
 .config-note {
     font-size: var(--text-xs);
     color: var(--text-muted);
-    line-height: 1.5;
-    position: absolute;
-    left: 0;
-    top: calc(100% + 8px);
-    width: min(22rem, calc(100vw - 5rem));
-    padding: var(--space-sm) var(--space-md);
-    background: var(--tooltip-bg);
-    border: 1px solid var(--tooltip-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px);
-    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
-    z-index: 20;
-    pointer-events: none;
-    backdrop-filter: blur(10px);
+    line-height: 1.45;
+    margin-top: 0.15rem;
+    max-width: 30rem;
 }
 
 .config-note code {
     font-size: 0.95em;
 }
 
-.config-note::before {
-    content: '';
-    position: absolute;
-    top: -7px;
-    left: 18px;
-    width: 12px;
-    height: 12px;
-    background: var(--tooltip-bg);
-    border-top: 1px solid var(--tooltip-border);
-    border-left: 1px solid var(--tooltip-border);
-    transform: rotate(45deg);
-}
 
 /* Config help shows on hovering the item, but NOT on :focus-within — otherwise it stayed
    open while typing in the field (e.g. the budget β input). */
-.config-item:hover .config-note {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
 
 .label-with-help {
     display: inline-flex;

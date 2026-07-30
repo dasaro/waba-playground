@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-2';
-import { ParserUtils } from './parser-utils.js?v=20260730-2';
-import { UIManager } from './ui-manager.js?v=20260730-2';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-2';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-2';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-2';
+import { GraphUtils } from './graph-utils.js?v=20260730-3';
+import { ParserUtils } from './parser-utils.js?v=20260730-3';
+import { UIManager } from './ui-manager.js?v=20260730-3';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-3';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-3';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-3';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
@@ -36,6 +36,12 @@ function toVisTitle(update) {
 }
 
 export class GraphManager {
+    /**
+     * Largest number of candidate sets the Standard set-graph will draw. 2^n nodes, so this
+     * caps n at 5. See the rationale in updateGraphStandard.
+     */
+    static MAX_STANDARD_SETS = 32;
+
     constructor(graphCanvas, resetLayoutBtn, fullscreenBtn = null, options = {}) {
         this.graphCanvas = graphCanvas;
         this.resetLayoutBtn = resetLayoutBtn;
@@ -215,7 +221,7 @@ export class GraphManager {
     resetGraphColors() {
         if (!this.network) return;
         const { nodeUpdates, edgeUpdates } = buildResetUpdates(this.networkData);
-        this.networkData.nodes.update(nodeUpdates);
+        this.networkData.nodes.update(nodeUpdates.map(toVisTitle));
         this.networkData.edges.update(edgeUpdates.map(toVisTitle));
     }
 
@@ -230,7 +236,7 @@ export class GraphManager {
             return;
         }
         if (updates.nodeUpdates.length > 0) {
-            this.networkData.nodes.update(updates.nodeUpdates);
+            this.networkData.nodes.update(updates.nodeUpdates.map(toVisTitle));
         }
         if (updates.edgeUpdates.length > 0) {
             this.networkData.edges.update(updates.edgeUpdates.map(toVisTitle));
@@ -305,12 +311,16 @@ export class GraphManager {
             return;
         }
 
-        // The standard graph is the POWER SET of the assumptions (2^n candidate sets),
-        // which clingo cannot enumerate for large frameworks and would otherwise stall
-        // the solver queue on load. Guard it; the assumption-level views (linear in the
-        // number of assumptions) remain available and are the right view here.
+        // The standard graph is the POWER SET of the assumptions, so it renders 2^n set nodes
+        // with up to n attack edges each. The bound therefore has to be stated in SETS, not in
+        // assumptions: the previous `assumptionCount > 8` allowed 2^8 = 256 nodes and never
+        // fired on any shipped example, the largest of which has n = 6 and so drew 64 nodes
+        // with hundreds of crossing edges -- unreadable, and the thing this guard exists to
+        // prevent. 32 sets (n <= 5) is the point at which the set graph is still legible; the
+        // assumption-level views are linear in n and are the right view above it.
         const assumptionCount = ParserUtils.parseAssumptions(frameworkCode).length;
-        if (assumptionCount > 8) {
+        const candidateSets = 2 ** assumptionCount;
+        if (candidateSets > GraphManager.MAX_STANDARD_SETS) {
             if (generation !== undefined && generation !== this._graphGeneration) {
                 return;
             }
@@ -318,7 +328,7 @@ export class GraphManager {
             this.networkData.edges.clear();
             this.isolatedNodes = [];
             this.updateIsolatedAssumptionsOverlay();
-            UIManager.showGraphEmptyState(`${assumptionCount} assumptions ⇒ 2^${assumptionCount} candidate sets — too many for the Standard set-graph. Switch to Assumption-Direct or Assumption-Branching to view this framework.`);
+            UIManager.showGraphEmptyState(`${assumptionCount} assumptions ⇒ 2^${assumptionCount} = ${candidateSets} candidate sets, over the Standard set-graph limit of ${GraphManager.MAX_STANDARD_SETS}. Switch to Assumption-Direct or Assumption-Branching, which scale linearly in the number of assumptions.`);
             return;
         }
 

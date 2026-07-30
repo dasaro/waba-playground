@@ -1,24 +1,28 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260730-2';
-import { FontManager } from '../modules/font-manager.js?v=20260730-2';
-import { UIManager } from '../modules/ui-manager.js?v=20260730-2';
-import { PanelManager } from '../modules/panel-manager.js?v=20260730-2';
-import { FileManager } from '../modules/file-manager.js?v=20260730-2';
-import { GraphManager } from '../modules/graph-manager.js?v=20260730-2';
-import { PopupManager } from '../modules/popup-manager.js?v=20260730-2';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-2';
-import { OutputManager } from '../modules/output-manager.js?v=20260730-2';
-import { ExportManager } from '../modules/export-manager.js?v=20260730-2';
-import { MetricsManager } from '../modules/metrics-manager.js?v=20260730-2';
-import { ConfigController } from './config-controller.js?v=20260730-2';
-import { DocsController } from './docs-controller.js?v=20260730-2';
-import { EditorController } from './editor-controller.js?v=20260730-2';
-import { ExamplesController } from './examples-controller.js?v=20260730-2';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-3';
+import { FontManager } from '../modules/font-manager.js?v=20260730-3';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-3';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-3';
+import { FileManager } from '../modules/file-manager.js?v=20260730-3';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-3';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-3';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-3';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-3';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-3';
+import { MetricsManager } from '../modules/metrics-manager.js?v=20260730-3';
+import { ConfigController } from './config-controller.js?v=20260730-3';
+import { DocsController } from './docs-controller.js?v=20260730-3';
+import { EditorController } from './editor-controller.js?v=20260730-3';
+import { ExamplesController } from './examples-controller.js?v=20260730-3';
 
 export class PlaygroundController {
     constructor(dom, store) {
         this.dom = dom;
         this.store = store;
         this.pendingExampleLoad = Promise.resolve();
+        this.isRunning = false;
+        // Bumped whenever the pending run is superseded, so a slow solve cannot paint its
+        // results over a framework the user has since switched away from.
+        this._runGeneration = 0;
         this.pendingGraphUpdate = Promise.resolve();
         this.initializeManagers();
         this.initializeControllers();
@@ -108,6 +112,30 @@ export class PlaygroundController {
                 return this.pendingGraphUpdate;
             });
             await this.pendingExampleLoad;
+
+            // Solve once on load so the page opens on a worked example rather than an empty
+            // results pane. Deliberately not awaited: app.js continues bootstrapping while
+            // this runs. `?autorun=0` opts out, which the browser specs use when they need to
+            // exercise the click path itself.
+            const autorun = new URLSearchParams(window.location.search).get('autorun') !== '0';
+            if (autorun && this.clingoManager.clingoReady) {
+                this.initialRun = this.runWABA({ initial: true });
+            } else {
+                this.markReady();
+            }
+        } else {
+            this.markReady();
+        }
+    }
+
+    /**
+     * Publishes an observable "the page has finished its first run" signal. Without it a test
+     * can only wait on #intro-status, which flips before init has finished, so it resumes into
+     * a half-initialised page.
+     */
+    markReady() {
+        if (this.dom.document?.body) {
+            this.dom.document.body.dataset.wabaReady = '1';
         }
     }
 
@@ -254,12 +282,17 @@ export class PlaygroundController {
         }
     }
 
-    async runWABA() {
+    async runWABA({ initial = false } = {}) {
         if (this.isRunning) {
             return;
         }
         this.isRunning = true;
-        UIManager.showLoadingOverlay('Running WABA...', 'Computing extensions and visualizing results');
+        const generation = (this._runGeneration = this._runGeneration + 1);
+        // The initial run is unprompted, so covering the whole UI with a modal overlay for it
+        // would be startling; the user did not ask for it and cannot tell what is happening.
+        if (!initial) {
+            UIManager.showLoadingOverlay('Running WABA...', 'Computing extensions and visualizing results');
+        }
 
         try {
             await Promise.all([this.pendingExampleLoad, this.pendingGraphUpdate]);
@@ -286,14 +319,26 @@ export class PlaygroundController {
                 return;
             }
 
+            // A run that has been superseded (the user switched example or re-ran) must not
+            // paint. Without this a slow solve reported its predecessor's extensions against
+            // the newly loaded framework -- reproducibly, and routinely once a run fires on
+            // load. GraphManager already guards its own updates this way.
+            if (generation !== this._runGeneration) {
+                return;
+            }
+
             await this.updateGraph(framework);
+            if (generation !== this._runGeneration) {
+                return;
+            }
             this.outputManager.displayResults(
                 result.result,
                 result.elapsed,
                 (inAssumptions, discarded, successful) => this.graphManager.highlightExtension(inAssumptions, discarded, successful),
                 () => this.graphManager.resetGraphColors(),
                 result.effectiveConfig,
-                framework
+                framework,
+                result.defenceCosts
             );
             UIManager.hideOutputEmptyState();
         } catch (error) {
@@ -301,7 +346,11 @@ export class PlaygroundController {
             this.outputManager.log(`❌ Error: ${error.message}`, 'error');
         } finally {
             this.isRunning = false;
-            UIManager.hideLoadingOverlay();
+            if (!initial) {
+                UIManager.hideLoadingOverlay();
+            } else {
+                this.markReady();
+            }
         }
     }
 
@@ -340,6 +389,8 @@ export class PlaygroundController {
     }
 
     clearPreviousRun() {
+        // Anything in flight is now stale.
+        this._runGeneration += 1;
         this.outputManager.clearPreviousRun(() => this.graphManager.resetGraphColors());
     }
 

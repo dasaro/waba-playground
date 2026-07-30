@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260730-2';
+import { wabaModules } from '../waba-modules.js?v=20260730-3';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -93,7 +93,14 @@ export function normalizeConfig(config = {}) {
         : (SEMIRING_POLARITY[semiringKey] || 'higher');
     const semiringFamily = explicitFamily || SEMIRING_FAMILY_OF[semiringKey] || semiringKey;
     const abaRecovery = Boolean(config.abaRecovery);
-    const defaultPolicy = abaRecovery ? 'neutral' : (config.defaultPolicy || 'legacy');
+    // 'legacy' was retired from the surface: it contributes a single constant (delta) that is
+    // identical to 'neutral' for godel/arctic/lukasiewicz/bottleneck_cost and identical to
+    // 'aba' for tropical, so every (algebra, legacy) pair is reachable without it. Saved
+    // configs naming it are mapped rather than rejected.
+    const requestedPolicy = config.defaultPolicy === 'legacy'
+        ? (config.semiring === 'tropical' || config.semiringKey === 'tropical' ? 'aba' : 'neutral')
+        : config.defaultPolicy;
+    const defaultPolicy = abaRecovery ? 'neutral' : (requestedPolicy || 'neutral');
     const objective = config.objective || DEFAULT_OBJECTIVE;
     const objectiveParts = deriveObjectiveParts(objective);
     const monoid = config.monoid || objectiveParts.monoid;
