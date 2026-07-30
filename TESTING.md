@@ -8,7 +8,7 @@ The playground has three validation layers:
 
 ## Commands
 
-From `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground`:
+From `.`:
 
 ```bash
 npm run sync:check

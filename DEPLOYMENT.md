@@ -2,16 +2,16 @@
 
 GitHub Pages releases are versioned from one source:
 
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/app-version.js`
+- `core/app-version.js`
 
 Every cache-busting `?v=` reference is synchronized from that file by:
 
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/bump-version.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/sync-version-refs.js`
+- `scripts/bump-version.js`
+- `scripts/sync-version-refs.js`
 
 ## Release Flow
 
-From `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground`:
+From `.`:
 
 1. Sync the browser bundle if the WABA logic snapshot changed.
 

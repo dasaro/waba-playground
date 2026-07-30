@@ -11,3 +11,9 @@ clingo-wasm-0.3.2.tgz
 synced-modules.txt
 test-results/
 tmp-*.lp
+
+# The only live wasm is dist/clingo.wasm (modules/wasm-config.js rewrites every
+# .wasm request into dist/). Byte-identical copies at the repo root and under
+# lib/dist/ were 5 MB of dead payload on every clone.
+/clingo.wasm
+lib/dist/clingo.wasm

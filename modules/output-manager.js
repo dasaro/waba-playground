@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-15';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-15';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-15';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-15';
+import { PopupManager } from './popup-manager.js?v=20260730-16';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-16';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-16';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-16';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -39,6 +39,7 @@ export class OutputManager {
         // attack back to its supporting assumptions.
         this.frameworkRules = new Map();
         this.frameworkAssumptions = new Set();
+        this.frameworkWeights = new Map();
     }
 
     // ===================================
@@ -58,11 +59,32 @@ export class OutputManager {
         return select?.options?.[select.selectedIndex]?.text || select?.value || 'godel';
     }
 
+    static isDefenceSemantics(semantics) {
+        return ['admissible', 'complete', 'preferred'].includes(semantics);
+    }
+
     static describeReading(config) {
         if (config.abaRecovery) return 'no discarding (ABA recovery)';
+        // A defence semantics carries its OWN sum-bounded budget over the objections it
+        // declines to answer, and composes with no_discard -- so budgetMode is 'none' by
+        // construction. Reporting "no discarding" for it was a flat contradiction of the
+        // beta the run actually spent.
+        if (OutputManager.isDefenceSemantics(config.semantics)) {
+            return `unanswered objections \u2264 \u03b2 (${config.semantics})`;
+        }
         if (config.budgetMode === 'none') return 'no discarding';
         const bound = config.budgetMode === 'lb' ? '\u2265' : '\u2264';
         return `${config.monoid} of concessions ${bound} \u03b2`;
+    }
+
+    /**
+     * The algebra only reaches the answer through a price. When nothing may be conceded and
+     * the semantics has no budget of its own, no weight is ever consulted, so naming the
+     * algebra in the stats line credited a control that did not act on the run.
+     */
+    static weightsWereConsulted(config) {
+        if (OutputManager.isDefenceSemantics(config.semantics)) return true;
+        return !config.abaRecovery && config.budgetMode !== 'none';
     }
 
     // ===================================
@@ -80,7 +102,15 @@ export class OutputManager {
         // witness alone — fall back to the framework source.
         this.frameworkRules = new Map();
         this.frameworkAssumptions = new Set();
+        // atom -> Set of declared weights, so a duplicate (which core/base.lp rejects) can be
+        // named instead of surfacing as a bare "no extensions"
+        this.frameworkWeights = new Map();
         if (frameworkCode) {
+            for (const m of frameworkCode.matchAll(/\bweight\s*\(\s*([^,\s]+)\s*,\s*([^)]+?)\s*\)/g)) {
+                const values = this.frameworkWeights.get(m[1]) || new Set();
+                values.add(m[2].trim());
+                this.frameworkWeights.set(m[1], values);
+            }
             for (const rule of ParserUtils.parseRules(frameworkCode)) {
                 this.frameworkRules.set(rule.id, { head: rule.head, body: rule.body });
             }
@@ -103,6 +133,17 @@ export class OutputManager {
                 const plural = nonFlat.length > 1;
                 this.log(`⚠️ No extensions: this framework is NOT flat — the assumption${plural ? 's' : ''} ${nonFlat.join(', ')} appear${plural ? '' : 's'} as a rule head.`, 'warning');
                 this.log('Weighted ABA is defined for FLAT frameworks only: an assumption must never be derivable by a rule. Remove the rule(s) deriving the assumption(s) above (or rename them to ordinary atoms).', 'info');
+            } else if (this.frameworkCycles().length > 0) {
+                // core/base.lp rejects a derivation cycle outright: a cyclic derivation has no
+                // well-defined propagated weight. No budget can rescue it, so the budget hint
+                // sends the user tuning controls forever.
+                const cycles = this.frameworkCycles();
+                this.log(`⚠️ No extensions: the rules are not well-founded — ${cycles.join(', ')} depend${cycles.length > 1 ? '' : 's'} on themselves.`, 'warning');
+                this.log('A derivation cycle (p ← q, q ← p) has no well-defined propagated weight, so the framework is rejected rather than mis-priced. Break the cycle.', 'info');
+            } else if (this.frameworkDuplicateWeights().length > 0) {
+                const dup = this.frameworkDuplicateWeights();
+                this.log(`⚠️ No extensions: ${dup.join(', ')} carr${dup.length > 1 ? 'y' : 'ies'} more than one weight.`, 'warning');
+                this.log('weight/2 must be a partial FUNCTION: two weights for one atom split a single conflict into several independently discardable attacks, so the budget would double-charge. Keep one weight per atom.', 'info');
             } else {
                 this.log('⚠️ No extensions found', 'warning');
                 this.log('Try adjusting the budget or framework constraints', 'info');
@@ -209,7 +250,7 @@ export class OutputManager {
             <strong>Execution Stats:</strong>
             ${witnesses.length} extension(s) found |
             Computed in ${elapsed}s |
-            Algebra: ${this.semiringLabel()} |
+            Algebra: ${this.semiringLabel()}${OutputManager.weightsWereConsulted(config) ? '' : ' (unused \u2014 no weight is priced)'} |
             Reading: ${OutputManager.describeReading(config)}
         `;
     }
@@ -620,6 +661,44 @@ export class OutputManager {
 
         // Genuinely not derived from any rule (a fact with empty body) -> attack from ⊤
         return [];
+    }
+
+    /**
+     * Atoms that transitively derive themselves. core/base.lp rejects these
+     * (`derivation_cycle`), which otherwise surfaces as a bare "no extensions".
+     */
+    frameworkCycles() {
+        const edges = new Map();
+        for (const rule of this.frameworkRules.values()) {
+            if (!rule.head) {
+                continue;
+            }
+            const body = edges.get(rule.head) || new Set();
+            (rule.body || []).forEach((atom) => body.add(atom));
+            edges.set(rule.head, body);
+        }
+        const reaches = (from, target, seen) => {
+            for (const next of edges.get(from) || []) {
+                if (next === target) {
+                    return true;
+                }
+                if (!seen.has(next)) {
+                    seen.add(next);
+                    if (reaches(next, target, seen)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        return [...edges.keys()].filter((atom) => reaches(atom, atom, new Set()));
+    }
+
+    /** Atoms carrying more than one distinct weight, which core/base.lp rejects. */
+    frameworkDuplicateWeights() {
+        return [...(this.frameworkWeights || new Map()).entries()]
+            .filter(([, values]) => values instanceof Set && values.size > 1)
+            .map(([atom]) => atom);
     }
 
     parseAnswerSet(predicates) {

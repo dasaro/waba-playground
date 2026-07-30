@@ -45,9 +45,24 @@ function resolveIncludes(content, basedir) {
     });
 }
 
-if (!fs.existsSync(path.join(WABA_ROOT, 'core', 'base.lp'))) {
-    console.log(`waba-modules freshness check SKIPPED (no WABA sources at ${WABA_ROOT}).`);
+// Setting WABA_ROOT is an explicit request to check against THAT tree, so a skip there is
+// a broken invocation, not an absent one: the gate is always run with WABA_ROOT= set, and
+// a typo in the path used to turn the whole freshness check into a silent no-op.
+const strict = Boolean(process.env.WABA_ROOT) || process.env.WABA_STRICT_SYNC === '1';
+
+function cannotCheck(reason) {
+    if (strict) {
+        console.error(`waba-modules freshness check FAILED: ${reason}`);
+        console.error('WABA_ROOT was set explicitly, so this is treated as an error rather '
+            + 'than a skip. Unset it to allow the check to be skipped.');
+        process.exit(1);
+    }
+    console.log(`waba-modules freshness check SKIPPED: ${reason}`);
     process.exit(0);
+}
+
+if (!fs.existsSync(path.join(WABA_ROOT, 'core', 'base.lp'))) {
+    cannotCheck(`no WABA sources at ${WABA_ROOT}`);
 }
 
 const stale = [];
@@ -72,10 +87,8 @@ for (const [section, dir] of Object.entries(SECTION_DIRS)) {
 // unrelated checkout). Treat that as "cannot check", not as a failure - only a tree that
 // supplies every bundled module can witness genuine staleness.
 if (missing.length > 0) {
-    console.log(`waba-modules freshness check SKIPPED: ${WABA_ROOT} is not the source tree `
-        + `(${missing.length} bundled module(s) absent there, e.g. ${missing[0]}).`);
-    console.log('Set WABA_ROOT to the WABA checkout this bundle is generated from to enable the check.');
-    process.exit(0);
+    cannotCheck(`${WABA_ROOT} is not the source tree `
+        + `(${missing.length} bundled module(s) absent there, e.g. ${missing[0]})`);
 }
 
 if (stale.length > 0) {

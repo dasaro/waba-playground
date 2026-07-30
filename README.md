@@ -4,11 +4,11 @@
 
 Core references:
 
-- architecture: [ARCHITECTURE.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/ARCHITECTURE.md)
-- audit baseline: [AUDIT.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/AUDIT.md)
-- testing and release gate: [TESTING.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/TESTING.md)
-- deployment flow: [DEPLOYMENT.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/DEPLOYMENT.md)
-- release notes: [CHANGELOG.md](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/CHANGELOG.md)
+- architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
+- audit baseline: [AUDIT.md](AUDIT.md)
+- testing and release gate: [TESTING.md](TESTING.md)
+- deployment flow: [DEPLOYMENT.md](DEPLOYMENT.md)
+- release notes: [CHANGELOG.md](CHANGELOG.md)
 
 The app remains GitHub-Pages compatible:
 
@@ -27,7 +27,7 @@ unsupported combination. Seven controls, down from eleven:
 | Algebra | `godel`, `arctic`, `lukasiewicz` (strength); `tropical`, `bottleneck_cost` (cost) | named directly; the polarity is a property of the algebra, not a separate knob |
 | Łukasiewicz bound `k` | integer | shown only for `lukasiewicz`; passed as `-c k=N` |
 | Semantics | `cf`, `stable`, `admissible`, `complete`, `preferred` | all five are budgeted; `preferred` is post-filtered |
-| Unweighted assumptions (δ) | `legacy`, `aba`, `neutral` | which default weight an unweighted assumption carries |
+| Unweighted assumptions (δ) | `aba`, `neutral` | which default weight an unweighted assumption carries; `legacy` was retired as provably redundant (it equalled `neutral` for four algebras and `aba` for tropical) |
 | ABA recovery | on/off | pins transparent δ and forbids every discard |
 | Budget reading | none, total ≤ β, worst ≤ β, every ≥ β | exactly the three canonical (monoid, bound) pairings |
 | Results | all, cheapest, dearest | enumerate or optimise |
@@ -53,24 +53,12 @@ framework that declares its own `#const beta`. The output filter is always `proj
 
 The startup configuration is wrapper-aligned:
 
-- legacy defaults
+- `neutral` default policy (δ = the algebra's ⊗-identity)
 - `budget mode = none`
 - enumerate mode
 - `conflict_cycle` (Three-Way Standoff) as the initial loaded example (which applies its own budgeted preset)
 
 Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, keeps `budget mode = none` so it remains a faithful classical ABA comparison case.
-
-## Analysis Panel
-
-The analysis panel is now decision-oriented rather than witness-oriented.
-
-- extensions are grouped by their accepted assumptions before analysis
-- grouped extensions are ranked by the active objective, or by minimum `β*` in exploration mode
-- assumptions receive a `Decision Score` via a Borda-style aggregation over those ranked extensions
-- robustness is reported as presence in the near-best set `S`
-- level advantage reports whether the best extension containing an assumption outranks the best extension without it
-
-This makes the panel more useful for “best course of action” or “best assumption” workflows, where the main question is which assumptions survive in the strongest ranked alternatives.
 
 `preferred` is exact. The browser does not use `asprin`; it performs the same plain-`clingo`
 multi-pass flow as the CLI surface:
@@ -80,7 +68,7 @@ multi-pass flow as the CLI surface:
 
 ## Synced Modules
 
-`npm run sync` regenerates [waba-modules.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/waba-modules.js) from the public WABA manifest only:
+`npm run sync` regenerates [waba-modules.js](waba-modules.js) from the public WABA manifest only:
 
 - `core/base.lp`
 - supported semiring modules: `godel`, `bottleneck_cost`, `arctic`, `tropical`, `lukasiewicz`
@@ -94,7 +82,7 @@ multi-pass flow as the CLI surface:
 
 Sync fails hard on missing files. There are no placeholder fallbacks.
 
-Schema validation for the generated bundle lives in [scripts/check-sync-schema.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/check-sync-schema.js).
+Schema validation for the generated bundle lives in [scripts/check-sync-schema.js](scripts/check-sync-schema.js).
 
 ## Curated Examples
 
@@ -169,7 +157,7 @@ have been retired from the playground selector.
 
 ## Development
 
-From [waba-playground](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground):
+From [waba-playground](.):
 
 ```bash
 npm run sync

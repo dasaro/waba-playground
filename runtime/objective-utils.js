@@ -41,6 +41,11 @@ export function normalizeAggregateValue(value) {
     return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+/**
+ * Render a weight for display. HTML-ESCAPED, because weights come from user-supplied .lp/.waba
+ * files: ASP permits a quoted-string term, so `weight(a, "<img src=x onerror=...>")` reached
+ * innerHTML verbatim on the discarded-attack and derived-atom lines.
+ */
 export function displayValue(value) {
     if (value === POS_INF) {
         return '+inf';
@@ -48,7 +53,12 @@ export function displayValue(value) {
     if (value === NEG_INF) {
         return '-inf';
     }
-    return String(value);
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 export function computeAggregateFromDiscarded(discardedAttacks, monoid) {

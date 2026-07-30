@@ -4,9 +4,9 @@
 
 ## Source Of Truth
 
-- Logical source of truth: `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/WABA`
-- Browser snapshot: `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/waba-modules.js`
-- Snapshot generator: `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/sync-modules.js`
+- Logical source of truth: `../WABA`
+- Browser snapshot: `waba-modules.js`
+- Snapshot generator: `scripts/sync-modules.js`
 
 The playground does not fetch logic from the sibling `WABA/` repo at runtime.
 
@@ -16,10 +16,10 @@ The playground does not fetch logic from the sibling `WABA/` repo at runtime.
 
 Files:
 
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/app-version.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/dom-registry.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/store.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/types.js`
+- `core/app-version.js`
+- `core/dom-registry.js`
+- `core/store.js`
+- `core/types.js`
 
 Responsibilities:
 
@@ -32,11 +32,11 @@ Responsibilities:
 
 Files:
 
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/config-service.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/program-builder.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/answer-set-parser.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/objective-utils.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/module-schema.js`
+- `runtime/config-service.js`
+- `runtime/program-builder.js`
+- `runtime/answer-set-parser.js`
+- `runtime/objective-utils.js`
+- `runtime/module-schema.js`
 
 Responsibilities:
 
@@ -55,12 +55,12 @@ Rule:
 
 Files:
 
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/config-controller.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/docs-controller.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/editor-controller.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/examples-controller.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/playground-controller.js`
-- `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/editor/simple-format.js`
+- `features/config-controller.js`
+- `features/docs-controller.js`
+- `features/editor-controller.js`
+- `features/examples-controller.js`
+- `features/playground-controller.js`
+- `features/editor/simple-format.js`
 
 Responsibilities:
 
@@ -76,7 +76,7 @@ Rule:
 
 ### 4. Modules
 
-Files under `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/`
+Files under `modules/`
 
 Responsibilities:
 
@@ -99,13 +99,13 @@ The browser preserves exactly this public surface:
 
 - semiring family: `godel`, `tropical` (with polarity), plus standalone `lukasiewicz`
 - polarity: `higher`, `lower` (n/a for `lukasiewicz`)
-- default policy: `legacy`, `aba`, `neutral`
+- default policy: `aba`, `neutral` (`legacy` retired: provably redundant)
 - monoid: `sum`, `max`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
-- semantics: `cf`, `stable`, `admissible`, `complete`, `grounded`, `preferred`
-  (defence semantics run on the no-discard surface)
-- exact `preferred`/`grounded` via browser-side multi-pass plain `clingo`
+- semantics: `cf`, `stable`, `admissible`, `complete`, `preferred`
+  (the three defence semantics carry their own budget and run on the no-discard surface)
+- exact `preferred` via browser-side multi-pass plain `clingo`
 
 Supported bounded presets:
 
@@ -145,7 +145,7 @@ Implementation:
 
 ## Startup Flow
 
-`/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/app.js` is bootstrap only:
+`app.js` is bootstrap only:
 
 1. create DOM registry
 2. create store

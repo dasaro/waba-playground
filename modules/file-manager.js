@@ -283,6 +283,13 @@ export class FileManager {
             console.warn(`Unrecognized .waba line format: "${line}"`);
         }
 
+        // A file whose lines are all unrecognised used to yield four empty arrays, which loads as
+        // an EMPTY framework and then reports SATISFIABLE with one extension -- a wrong-format
+        // file reading as a successful run over a framework the user never loaded.
+        if (assumptions.length === 0 && rules.length === 0 && contraries.length === 0) {
+            throw new Error('This does not look like a .waba file: no assumptions, rules or '
+                + 'contraries could be read from it.');
+        }
         return { assumptions, rules, contraries, weights, description: descriptionLines.join('\n').trim() };
     }
 }

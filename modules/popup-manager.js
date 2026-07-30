@@ -2,9 +2,18 @@
  * PopupManager - Handles popup displays for nodes, edges, and derivation chains
  */
 export class PopupManager {
+    /**
+     * Node/edge titles are HTMLElements, not strings: graph-manager parses the builders' HTML
+     * into an element before handing it to vis (vis escapes a string title). This used to run a
+     * regex against that Element, which stringifies to "[object HTMLDivElement]" -- no match, so
+     * every click popup silently rendered nothing in all three graph modes.
+     */
     static renderTooltipContent(content) {
         if (!content) {
             return '';
+        }
+        if (typeof content !== 'string') {
+            return content.outerHTML !== undefined ? content.outerHTML : String(content);
         }
         if (/<[a-z][\s\S]*>/i.test(content)) {
             return content;

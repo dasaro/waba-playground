@@ -1,17 +1,17 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260730-15';
-import { FontManager } from '../modules/font-manager.js?v=20260730-15';
-import { UIManager } from '../modules/ui-manager.js?v=20260730-15';
-import { PanelManager } from '../modules/panel-manager.js?v=20260730-15';
-import { FileManager } from '../modules/file-manager.js?v=20260730-15';
-import { GraphManager } from '../modules/graph-manager.js?v=20260730-15';
-import { PopupManager } from '../modules/popup-manager.js?v=20260730-15';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-15';
-import { OutputManager } from '../modules/output-manager.js?v=20260730-15';
-import { ExportManager } from '../modules/export-manager.js?v=20260730-15';
-import { ConfigController } from './config-controller.js?v=20260730-15';
-import { DocsController } from './docs-controller.js?v=20260730-15';
-import { EditorController } from './editor-controller.js?v=20260730-15';
-import { ExamplesController } from './examples-controller.js?v=20260730-15';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-16';
+import { FontManager } from '../modules/font-manager.js?v=20260730-16';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-16';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-16';
+import { FileManager } from '../modules/file-manager.js?v=20260730-16';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-16';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-16';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-16';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-16';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-16';
+import { ConfigController } from './config-controller.js?v=20260730-16';
+import { DocsController } from './docs-controller.js?v=20260730-16';
+import { EditorController } from './editor-controller.js?v=20260730-16';
+import { ExamplesController } from './examples-controller.js?v=20260730-16';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -23,6 +23,10 @@ export class PlaygroundController {
         // results over a framework the user has since switched away from.
         this._runGeneration = 0;
         this.pendingGraphUpdate = Promise.resolve();
+        // Count of in-flight example loads and graph rebuilds, mirrored onto
+        // body[data-waba-pending] so a test can wait on the app settling instead of guessing
+        // a sleep long enough. See track().
+        this._pending = 0;
         this.initializeManagers();
         this.initializeControllers();
     }
@@ -77,7 +81,7 @@ export class PlaygroundController {
         this.themeManager.initTheme();
         this.fontManager.initFontSize();
         this.editorController.init(() => {
-            this.pendingGraphUpdate = this.regenerateGraph();
+            this.pendingGraphUpdate = this.track(this.regenerateGraph());
         });
 
         await this.clingoManager.initClingo();
@@ -106,10 +110,10 @@ export class PlaygroundController {
 
         const selectedExample = this.dom.exampleSelect.value;
         if (selectedExample) {
-            this.pendingExampleLoad = this.examplesController.loadExample(selectedExample, (frameworkCode) => {
-                this.pendingGraphUpdate = this.updateGraph(frameworkCode);
+            this.pendingExampleLoad = this.track(this.examplesController.loadExample(selectedExample, (frameworkCode) => {
+                this.pendingGraphUpdate = this.track(this.updateGraph(frameworkCode));
                 return this.pendingGraphUpdate;
-            });
+            }));
             await this.pendingExampleLoad;
 
             // Solve once on load so the page opens on a worked example rather than an empty
@@ -138,6 +142,26 @@ export class PlaygroundController {
         }
     }
 
+    /**
+     * Wraps an async UI transition so the page publishes whether it is still settling.
+     * The browser suite used to bridge these with `waitForTimeout(1200)` and friends -- 18 of
+     * them -- which is both slow and a coin flip on a loaded machine: a graph rebuild that
+     * takes 1300ms silently tested the PREVIOUS framework.
+     */
+    track(promise) {
+        this._pending += 1;
+        const body = this.dom.document?.body;
+        if (body) body.dataset.wabaPending = String(this._pending);
+        const settle = () => {
+            this._pending -= 1;
+            if (body) body.dataset.wabaPending = String(this._pending);
+        };
+        return Promise.resolve(promise).then(
+            (value) => { settle(); return value; },
+            (error) => { settle(); throw error; }
+        );
+    }
+
     attachEventListeners() {
         this.dom.runBtn.addEventListener('click', () => this.runWABA());
         this.dom.clearBtn.addEventListener('click', () => this.clearOutput());
@@ -146,14 +170,16 @@ export class PlaygroundController {
             // in the upload path; without this the previous run's answer sets stay on screen
             // and read as though they belonged to the newly selected example.
             this.clearPreviousRun();
-            this.pendingExampleLoad = this.examplesController.loadExample(event.target.value, (frameworkCode) => {
-                this.pendingGraphUpdate = this.updateGraph(frameworkCode);
-                return this.pendingGraphUpdate;
-            });
+            this.pendingExampleLoad = this.track(
+                this.examplesController.loadExample(event.target.value, (frameworkCode) => {
+                    this.pendingGraphUpdate = this.track(this.updateGraph(frameworkCode));
+                    return this.pendingGraphUpdate;
+                })
+            );
         });
 
         this.dom.fileUploadBtn.addEventListener('click', () => this.dom.fileUploadInput.click());
-        this.dom.fileUploadInput.addEventListener('change', (event) => this.handleFileUploadEvent(event));
+        this.dom.fileUploadInput.addEventListener('change', (event) => this.track(this.handleFileUploadEvent(event)));
 
         this.initDragAndDrop();
 
@@ -168,7 +194,7 @@ export class PlaygroundController {
         ].filter(Boolean).forEach((element) => {
             element.addEventListener('change', () => {
                 this.configController.syncUi();
-                this.pendingGraphUpdate = this.regenerateGraph();
+                this.pendingGraphUpdate = this.track(this.regenerateGraph());
             });
         });
 
@@ -186,7 +212,7 @@ export class PlaygroundController {
                 this.docsController.setLegendMode(radio.value);
                 this.outputManager.clearActiveExtension();
                 this.graphManager.resetGraphColors();
-                this.pendingGraphUpdate = this.regenerateGraph();
+                this.pendingGraphUpdate = this.track(this.regenerateGraph());
             });
         });
 
@@ -259,14 +285,14 @@ export class PlaygroundController {
                 this.dom.inputMode.value = 'advanced';
                 this.editorController.applyModeVisibility('advanced');
                 this.editorController.loadClingoCode(content, null);
-                this.pendingGraphUpdate = this.updateGraph(content);
+                this.pendingGraphUpdate = this.track(this.updateGraph(content));
                 await this.pendingGraphUpdate;
                 this.outputManager.log(`📁 Loaded .lp file: ${fileName}`, 'info');
             } else if (extension === 'waba') {
                 this.clearPreviousRun();
                 const parsed = this.fileManager.parseWabaFile(content);
                 this.editorController.loadParsedWaba(parsed);
-                this.pendingGraphUpdate = this.updateGraph(this.editorController.getFrameworkCode());
+                this.pendingGraphUpdate = this.track(this.updateGraph(this.editorController.getFrameworkCode()));
                 await this.pendingGraphUpdate;
                 this.outputManager.log(`📁 Loaded .waba file: ${fileName}`, 'info');
             } else {
@@ -297,6 +323,12 @@ export class PlaygroundController {
             await Promise.all([this.pendingExampleLoad, this.pendingGraphUpdate]);
             const framework = this.editorController.getFrameworkCode();
             if (!framework) {
+                // Clear FIRST: the early return used to leave the previous run's extensions,
+                // stats and graph highlight asserting a framework no longer in the editor, with
+                // the contradicting warning scrolled off-screen.
+                this.clearOutput();
+                this.outputManager.clearActiveExtension();
+                this.graphManager.resetGraphColors();
                 this.outputManager.log('⚠️ No framework code to run', 'warning');
                 return;
             }
@@ -340,6 +372,11 @@ export class PlaygroundController {
                 result.defenceCosts
             );
             UIManager.hideOutputEmptyState();
+            // Panel collapse state is persisted in localStorage, so a user who once collapsed
+            // Results kept it collapsed on every later visit -- a run then completed with the
+            // extensions written into a panel that shows nothing, which reads as a silent
+            // failure. Results are the point of pressing Run, so surface them.
+            this.panelManager.expandPanel('output');
         } catch (error) {
             console.error('Error in runWABA:', error);
             this.outputManager.log(`❌ Error: ${error.message}`, 'error');

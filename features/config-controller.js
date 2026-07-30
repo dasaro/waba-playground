@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-15';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-16';
 
 export class ConfigController {
     constructor(dom) {
@@ -28,6 +28,26 @@ export class ConfigController {
         return optimization === 'maximize' ? 'max' : 'min';
     }
 
+    /**
+     * `min`/`max` on a number input are only enforced by native form validation, which this
+     * page never runs -- typing 999999 into Timeout, or clearing beta entirely, went straight
+     * to the solver (or silently became the `|| default` fallback, which for beta meant a
+     * typed "-" ran as 0 with no sign that anything had been ignored). Clamp against the
+     * field's own declared range and write the clamped value BACK, so the control always
+     * shows what actually ran.
+     */
+    static readNumber(input, fallback) {
+        if (!input) return fallback;
+        const raw = parseInt(input.value, 10);
+        let value = Number.isFinite(raw) ? raw : fallback;
+        const min = parseInt(input.min, 10);
+        const max = parseInt(input.max, 10);
+        if (Number.isFinite(min)) value = Math.max(min, value);
+        if (Number.isFinite(max)) value = Math.min(max, value);
+        if (String(value) !== input.value) input.value = String(value);
+        return value;
+    }
+
     getCurrentConfig() {
         // The two composite selectors below replaced five interlocking ones. `budget-select`
         // offers only the three canonical (monoid, bound) pairings, so an invalid pairing is
@@ -44,10 +64,14 @@ export class ConfigController {
             semantics: this.dom.semanticsSelect.value,
             optMode,
             // normalizeConfig zeroes this under ABA recovery, so the raw field is read here.
-            beta: parseInt(this.dom.budgetInput.value, 10) || 0,
-            lukK: parseInt(this.dom.lukKInput?.value, 10) || 10,
-            numModels: parseInt(this.dom.numModelsInput.value, 10) || 0,
-            timeout: (parseInt(this.dom.timeoutInput.value, 10) || 60) * 1000,
+            beta: ConfigController.readNumber(this.dom.budgetInput, 0),
+            // NOTE: k defaults to 10 here but to 1000 in bin/waba. This divergence is
+            // deliberate and surfaced in the field's own note: the shipped examples use
+            // small-integer weights, and Lukasiewicz's max(0, a+b-k) erodes any such
+            // derivation to 0 at k = 1000. Pass --luk-k 10 to reproduce a playground run.
+            lukK: ConfigController.readNumber(this.dom.lukKInput, 10),
+            numModels: ConfigController.readNumber(this.dom.numModelsInput, 0),
+            timeout: ConfigController.readNumber(this.dom.timeoutInput, 60) * 1000,
             filterType: 'projection'
         });
     }
@@ -133,10 +157,25 @@ export class ConfigController {
             tropical: 'min-lb',
             bottleneck_cost: 'min-lb'
         };
+        // The reading selector is pinned to 'none' while a defence semantics or ABA recovery
+        // is active, and the user's own choice lives in `_savedReading`. Snapshot BEFORE the
+        // preselect so the preselect can write through to whichever slot currently holds it:
+        // it used to write the pinned select, which the pin below immediately overwrote, so
+        // changing algebra while on `admissible` and then returning to `stable` restored the
+        // reading from before the defence detour and the preselect was silently lost.
+        const readingPinned = isDefence || abaRecovery;
+        if (readingPinned && this._savedReading === undefined) {
+            this._savedReading = this.dom.budgetSelect.value;
+        }
+
         if (this._lastAlgebra !== undefined && this._lastAlgebra !== algebra) {
-            const previousReading = this.dom.budgetSelect.value;
+            const previousReading = readingPinned ? this._savedReading : this.dom.budgetSelect.value;
             const reading = RECOMMENDED_BUDGET[algebra] || 'sum-ub';
-            this.dom.budgetSelect.value = reading;
+            if (readingPinned) {
+                this._savedReading = reading;
+            } else {
+                this.dom.budgetSelect.value = reading;
+            }
             // The two bounds run in OPPOSITE directions: under `ub` a bigger beta is more
             // permissive, under `lb` a bigger beta is more restrictive (every concession must
             // be worth at least beta). So carrying a beta tuned for one across to the other
@@ -173,15 +212,7 @@ export class ConfigController {
         // Snapshot the user's choice while it is pinned, or switching to admissible and back
         // silently leaves the reading on "No discarding" -- and then cf/stable report no cost,
         // which looks like the cost regression all over again.
-        if (isDefence || abaRecovery) {
-            // Snapshot before the FIRST pin, whichever of the two pins it. The restore arm
-            // previously lacked this guard, so toggling ABA recovery while a defence semantics
-            // was selected ran after the recovery block and un-pinned the budget it had just
-            // set -- yielding a config validateConfig rejects ("ABA recovery cannot be combined
-            // with a bounded budget mode") while the greyed select still displayed the offender.
-            if (this._savedReading === undefined) {
-                this._savedReading = this.dom.budgetSelect.value;
-            }
+        if (readingPinned) {
             this.dom.budgetSelect.value = 'none';
         } else if (this._savedReading !== undefined) {
             this.dom.budgetSelect.value = this._savedReading;
@@ -190,9 +221,12 @@ export class ConfigController {
 
         const budgetActive = !abaRecovery && (isDefence || this.dom.budgetSelect.value !== 'none');
 
-        // `preferred` is computed by subset-maximal filtering over enumerated candidates,
-        // so it needs every candidate rather than the optimal ones.
-        const forceEnumerate = semantics === 'preferred';
+        // `preferred` is computed by subset-maximal filtering over enumerated candidates, so
+        // it needs every candidate rather than the optimal ones. The other two defence
+        // semantics compose with no_discard, so program-builder emits no monoid and no
+        // objective: optN would hand clingo `--quiet=1` with nothing to optimise, printing
+        // only the last model. The control was inert at best and lossy at worst.
+        const forceEnumerate = isDefence;
         if (forceEnumerate) {
             this.dom.resultsSelect.value = 'all';
         }

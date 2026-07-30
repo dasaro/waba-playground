@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-15';
-import { ParserUtils } from './parser-utils.js?v=20260730-15';
-import { UIManager } from './ui-manager.js?v=20260730-15';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-15';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-15';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-15';
+import { GraphUtils } from './graph-utils.js?v=20260730-16';
+import { ParserUtils } from './parser-utils.js?v=20260730-16';
+import { UIManager } from './ui-manager.js?v=20260730-16';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-16';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-16';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-16';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.

@@ -17,22 +17,21 @@ This records the refactor baseline and the contract intentionally preserved.
 
 | Subsystem | Main Files | Status | Notes |
 |---|---|---|---|
-| Bootstrap | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/app.js` | refactored | now bootstrap-only |
-| DOM access | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/dom-registry.js` | hardened | single DOM registry replaces scattered global lookups |
-| Shared state | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/store.js` | acceptable | lightweight state only |
-| Config normalization | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/config-service.js` | hardened | supported-surface validation moved out of bootstrap |
-| Program composition | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/program-builder.js` | hardened | canonical split: semiring/default/monoid/optimize/constraint |
-| Generated bundle schema | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/module-schema.js` | hardened | explicit schema check added |
-| Solver runtime | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/clingo-manager.js` | fixed | real WASM initialization and serialized solver queue |
-| Preferred orchestration | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/clingo-manager.js` | fixed | exact preferred stable again after queueing and no-discard preset |
-| Result parsing | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/runtime/answer-set-parser.js` | improved | explicit parsed object shape |
-| Output rendering | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/output-manager.js` | improved | objective math delegated to runtime helpers |
-| Graph rendering | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js` | partially refactored | still large, but solver access and config dependency are explicit |
-| Simple Mode conversion | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/features/editor/simple-format.js` | isolated | round-trippable and unit-tested |
-| Analysis panel | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/metrics-manager.js` | improved | extension-grouped decision scoring |
-| Export | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/export-manager.js` | preserved | no scope expansion |
-| GitHub Pages path handling | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/wasm-config.js` | fixed | asset URLs resolved relative to current page |
-| Release/versioning | `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/app-version.js`, `/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/scripts/bump-version.js` | improved | one version source plus sync script |
+| Bootstrap | `app.js` | refactored | now bootstrap-only |
+| DOM access | `core/dom-registry.js` | hardened | single DOM registry replaces scattered global lookups |
+| Shared state | `core/store.js` | acceptable | lightweight state only |
+| Config normalization | `runtime/config-service.js` | hardened | supported-surface validation moved out of bootstrap |
+| Program composition | `runtime/program-builder.js` | hardened | canonical split: semiring/default/monoid/optimize/constraint |
+| Generated bundle schema | `runtime/module-schema.js` | hardened | explicit schema check added |
+| Solver runtime | `modules/clingo-manager.js` | fixed | real WASM initialization and serialized solver queue |
+| Preferred orchestration | `modules/clingo-manager.js` | fixed | exact preferred stable again after queueing and no-discard preset |
+| Result parsing | `runtime/answer-set-parser.js` | improved | explicit parsed object shape |
+| Output rendering | `modules/output-manager.js` | improved | objective math delegated to runtime helpers |
+| Graph rendering | `modules/graph-manager.js` | partially refactored | still large, but solver access and config dependency are explicit |
+| Simple Mode conversion | `features/editor/simple-format.js` | isolated | round-trippable and unit-tested |
+| Export | `modules/export-manager.js` | preserved | no scope expansion |
+| GitHub Pages path handling | `modules/wasm-config.js` | fixed | asset URLs resolved relative to current page |
+| Release/versioning | `core/app-version.js`, `scripts/bump-version.js` | improved | one version source plus sync script |
 | Docs | root markdown files | consolidated | canonical docs now live at repo root |
 
 ## Removed Or Retired Artifacts
@@ -42,7 +41,8 @@ These do not belong to the current public architecture:
 - backup app copies
 - one-off debugging and investigation notes
 - obsolete test HTML pages
-- stale historical folders such as `backup-cytoscape/`
+- stale historical folders such as `backup-cytoscape/` (kept on disk, git-ignored)
+- duplicate `clingo.wasm` copies at the repo root and `lib/dist/`; `dist/clingo.wasm` is the only one loaded
 - dead `Semantics/` leftovers
 
 ## Residual Debt

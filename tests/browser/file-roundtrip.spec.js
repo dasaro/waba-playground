@@ -1,11 +1,21 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Where the captured downloads are kept so they can be validated with the real clingo
 // afterwards. A browser test cannot run clingo itself.
-const DUMP = process.env.ROUNDTRIP_DUMP
-    || '/private/tmp/claude-501/-Users-fdasaro-Desktop-GitHub-WABA/0e289e06-4548-4b51-89b5-0fdcb33dc8ed/scratchpad/roundtrip';
+const DUMP = process.env.ROUNDTRIP_DUMP || path.join(os.tmpdir(), 'waba-roundtrip');
+
+// Deterministic replacement for `waitForTimeout`: the controller publishes the number of
+// in-flight example loads / graph rebuilds on body[data-waba-pending], so this returns as soon
+// as the page has actually settled instead of after a guessed interval that a loaded machine
+// can overrun.
+async function settled(page) {
+    await page.waitForFunction(
+        () => (document.body.dataset.wabaPending || '0') === '0', null, { timeout: 60000 });
+}
 
 async function waitForReady(page) {
     await page.goto('/?autorun=0');
@@ -71,7 +81,7 @@ for (const example of EXAMPLES) {
         await waitForReady(page);
 
         await page.selectOption('#example-select', example);
-        await page.waitForTimeout(1200);
+        await settled(page);
         const before = await solve(page);
         expect(before.length, `${example} produced no extensions to compare`).toBeGreaterThan(0);
 
@@ -83,7 +93,7 @@ for (const example of EXAMPLES) {
         await page.setInputFiles('#file-upload-input', {
             name: `${example}.lp`, mimeType: 'text/plain', buffer: Buffer.from(lp.content)
         });
-        await page.waitForTimeout(1200);
+        await settled(page);
         await expect(page.locator('#example-select')).toHaveValue('__uploaded__');
         const after = await solve(page);
 
@@ -98,7 +108,7 @@ for (const example of EXAMPLES) {
         await waitForReady(page);
 
         await page.selectOption('#example-select', example);
-        await page.waitForTimeout(1200);
+        await settled(page);
         const before = await solve(page);
         expect(before.length, `${example} produced no extensions to compare`).toBeGreaterThan(0);
 
@@ -109,7 +119,7 @@ for (const example of EXAMPLES) {
         await page.setInputFiles('#file-upload-input', {
             name: `${example}.waba`, mimeType: 'text/plain', buffer: Buffer.from(waba.content)
         });
-        await page.waitForTimeout(1200);
+        await settled(page);
         const after = await solve(page);
 
         expect(after, `${example}: .waba round-trip changed the result`).toEqual(before);
@@ -121,7 +131,7 @@ test('both export formats preserve the description', async ({ page }) => {
     test.setTimeout(180000);
     await waitForReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
-    await page.waitForTimeout(1200);
+    await settled(page);
 
     const MARKER = 'ROUNDTRIP DESCRIPTION MARKER 4711';
     await page.locator('#simple-edit-description-btn').click();
@@ -139,7 +149,7 @@ test('both export formats preserve the description', async ({ page }) => {
         await page.setInputFiles('#file-upload-input', {
             name, mimeType: 'text/plain', buffer: Buffer.from(file.content)
         });
-        await page.waitForTimeout(1400);
+        await settled(page);
         await expect(page.locator('#simple-description-preview'),
             `${name} lost the description on import`).toContainText(MARKER);
     }
@@ -148,7 +158,11 @@ test('both export formats preserve the description', async ({ page }) => {
 // The playground's own exports are one shape; the repository's curated frameworks are another
 // (compact `head(r1,x). body(r1,y).` runs, `#const beta`, `budget(beta)`, block comments). A
 // user loading their own .lp hits that second shape, so it has to be exercised too.
-const CANONICAL = '/Users/fdasaro/Desktop/GitHub-WABA/WABA/examples';
+// Resolved the same way scripts/sync-modules.js resolves the core tree, so this suite is
+// not pinned to one machine's home directory.
+const WABA_ROOT = process.env.WABA_ROOT
+    || path.join(fileURLToPath(new URL('../../..', import.meta.url)), 'WABA');
+const CANONICAL = path.join(WABA_ROOT, 'examples');
 const CANONICAL_FILES = fs.existsSync(CANONICAL)
     ? fs.readdirSync(CANONICAL, { withFileTypes: true })
         .filter((d) => d.isDirectory())
@@ -167,7 +181,7 @@ for (const file of CANONICAL_FILES) {
         await page.setInputFiles('#file-upload-input', {
             name: path.basename(file), mimeType: 'text/plain', buffer: fs.readFileSync(file)
         });
-        await page.waitForTimeout(1400);
+        await settled(page);
         await expect(page.locator('#example-select')).toHaveValue('__uploaded__');
         // The editor must actually hold it, not silently swallow the upload.
         expect((await page.locator('#code-editor').inputValue()).length).toBeGreaterThan(30);
@@ -188,7 +202,7 @@ test('Download All Extensions writes every displayed extension', async ({ page }
     test.setTimeout(120000);
     await waitForReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
-    await page.waitForTimeout(1200);
+    await settled(page);
     const shown = await solve(page);
     expect(shown.length).toBeGreaterThan(0);
 

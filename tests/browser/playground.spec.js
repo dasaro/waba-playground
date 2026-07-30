@@ -16,8 +16,19 @@ const RETIRED_CONTROLS = [
 // and built the graph, so waiting on it resumes into a half-initialised page.
 async function waitForClingoReady(page, { autorun = false } = {}) {
     await page.goto(autorun ? '/' : '/?autorun=0');
-    await expect(page.locator('#intro-status')).toContainText(/Clingo WASM loaded successfully|Loading Clingo WASM/);
     await page.waitForFunction(() => document.body.dataset.wabaReady === '1', null, { timeout: 60000 });
+    // Asserted AFTER readiness. It used to accept /loaded successfully|Loading/, which covers
+    // every state the element can be in, so the check could not fail.
+    await expect(page.locator('#intro-status')).toContainText('Clingo WASM loaded successfully');
+}
+
+// Deterministic replacement for `waitForTimeout`: the controller publishes the number of
+// in-flight example loads / graph rebuilds on body[data-waba-pending], so this returns as soon
+// as the page has actually settled instead of after a guessed interval that a loaded machine
+// can overrun.
+async function settled(page) {
+    await page.waitForFunction(
+        () => (document.body.dataset.wabaPending || '0') === '0', null, { timeout: 60000 });
 }
 
 test('a normal load solves the default example without any interaction', async ({ page }) => {
@@ -141,6 +152,97 @@ test('extensions are ordered best-first, in the direction the bound implies', as
     expect(def, 'beta* should ascend').toEqual([...def].sort((a, b) => a - b));
 });
 
+// Every other spec here asserts SHAPE -- that some cost badge exists, that the order is
+// monotone -- so the whole suite passed while the browser computed different extensions from
+// the CLI. These pin the NUMBERS. Ground truth is `bin/waba` on the same framework:
+//
+//   waba run --framework cc.lp --semiring godel --semantics stable \
+//            --budget-mode ub --objective sum-min --beta 8 --default-policy neutral \
+//            --opt-mode ignore
+//     in(climate) in(welfare)  discarded_attack(against_welfare,welfare,3)
+//     in(growth)  in(welfare)  discarded_attack(against_growth,growth,5)
+//     in(growth)  in(climate)  discarded_attack(against_climate,climate,8)
+//
+//   --semantics admissible, same algebra:  beta=0 -> 1,  3 -> 3,  5 -> 5,  8 -> 7
+const STANDOFF_STABLE = [
+    { in: ['climate', 'welfare'], cost: 3 },
+    { in: ['growth', 'welfare'], cost: 5 },
+    { in: ['climate', 'growth'], cost: 8 }
+];
+
+async function runAndReadExtensions(page) {
+    await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+    await page.click('#run-btn');
+    await page.waitForFunction(() => document.querySelectorAll('.answer-header').length > 0,
+        null, { timeout: 90000 });
+    return page.locator('.answer-set').evaluateAll((els) => els.map((el) => ({
+        in: [...el.querySelectorAll('.chip.in')]
+            .map((c) => c.textContent.replace(/[^\w]/g, '')).sort(),
+        cost: parseInt(
+            el.querySelector('.extension-cost-badge')?.textContent.replace(/[^0-9-]/g, ''), 10)
+    })));
+}
+
+test('the Three-Way Standoff reproduces the CLI extensions exactly', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'stable');
+    await page.selectOption('#budget-select', 'sum-ub');
+    await page.fill('#budget-input', '8');
+
+    const found = await runAndReadExtensions(page);
+    expect(found).toEqual(STANDOFF_STABLE);
+});
+
+test('the budget buys exactly the extensions the CLI says it buys', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'stable');
+    await page.selectOption('#budget-select', 'sum-ub');
+
+    // beta below the cheapest rebuttal buys nothing: the odd cycle is a classical deadlock.
+    for (const [beta, expected] of [[0, 0], [2, 0], [3, 1], [5, 2], [8, 3]]) {
+        await page.fill('#budget-input', String(beta));
+        await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+        await page.click('#run-btn');
+        await page.waitForFunction(() => !document.getElementById('run-btn').disabled,
+            null, { timeout: 90000 });
+        await expect(page.locator('.answer-header'),
+            `beta=${beta} should admit ${expected} stable extension(s)`).toHaveCount(expected);
+    }
+});
+
+test('budgeted admissible matches the CLI count and beta* at every budget',
+    async ({ page }) => {
+        test.setTimeout(240000);
+        await waitForClingoReady(page);
+        await page.selectOption('#example-select', 'conflict_cycle');
+        await page.selectOption('#semiring-select', 'godel');
+        await page.selectOption('#semantics-select', 'admissible');
+
+        for (const [beta, expected] of [[0, 1], [3, 3], [5, 5], [8, 7]]) {
+            await page.fill('#budget-input', String(beta));
+            await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+            await page.click('#run-btn');
+            await page.waitForFunction(() => !document.getElementById('run-btn').disabled,
+                null, { timeout: 120000 });
+            await expect(page.locator('.answer-header'),
+                `beta=${beta} should admit ${expected} admissible extension(s)`)
+                .toHaveCount(expected);
+        }
+
+        // beta* per set, from the enumeration above: the empty set needs nothing, {welfare}
+        // and {climate,welfare} need 3, {growth} and {growth,welfare} need 5, {climate} and
+        // {climate,growth} need 8. Sorted ascending, that is the badge sequence.
+        const betaStars = await page.locator('.extension-cost-badge').evaluateAll(
+            (els) => els.map((el) => parseInt(el.textContent.replace(/[^0-9-]/g, ''), 10)));
+        expect(betaStars).toEqual([0, 3, 3, 5, 5, 8, 8]);
+    });
+
 test('the Standard set-graph refuses frameworks with too many candidate sets', async ({ page }) => {
     await waitForClingoReady(page);
 
@@ -194,10 +296,18 @@ test('collapsible panels toggle cleanly', async ({ page }) => {
     for (const panelId of ['config', 'output', 'graph']) {
         const panel = page.locator(`.panel[data-panel="${panelId}"]`);
         const toggle = panel.locator('.panel-toggle');
+        const body = panel.locator('.panel-body, .panel-content').first();
+        const bodyExists = await body.count() > 0;
         await toggle.click();
         await expect(panel).toHaveAttribute('data-collapsed', 'true');
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        // The attribute alone proves only that the handler ran; assert the content is
+        // actually gone, so a broken [data-collapsed] rule cannot pass this test.
+        if (bodyExists) await expect(body).toBeHidden();
         await toggle.click();
         await expect(panel).toHaveAttribute('data-collapsed', 'false');
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        if (bodyExists) await expect(body).toBeVisible();
     }
 });
 
@@ -372,7 +482,7 @@ test('an uploaded framework cannot inject HTML into the results', async ({ page 
             + `head(r1, cx). body(r1, b).\nhead(r2, cb). body(r2, "${payload}").\n`
         )
     });
-    await page.waitForTimeout(600);
+    await settled(page);
     await page.selectOption('#budget-select', 'sum-ub');
     await page.fill('#budget-input', '100');
     await page.click('#run-btn');
@@ -386,6 +496,111 @@ test('an uploaded framework cannot inject HTML into the results', async ({ page 
     expect(probe.executed).toBe(false);
     expect(probe.liveNodes).toBe(0);
     expect(probe.shownAsText).toBe(true);
+});
+
+test('clicking a node opens a populated popup', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+
+    // Regression: graph-manager parses each builder's HTML into an HTMLElement before giving
+    // it to vis (vis escapes a string title), but PopupManager ran a /<[a-z]/ regex against
+    // that Element -- which stringifies to "[object HTMLDivElement]". No match, no fallback
+    // taken, so every click popup rendered an empty box in all three graph modes.
+    //
+    // Ask vis where a node actually is rather than sweeping the canvas: node positions are
+    // physics-driven, so a blind grid of clicks is exactly the flakiness this suite is
+    // removing elsewhere.
+    // Centre a node under the canvas midpoint and click there. Barnes-Hut keeps moving the
+    // nodes, so reading a position and then clicking it races the physics; focus() pins the
+    // node to a known point instead.
+    await page.locator('#cy').scrollIntoViewIfNeeded();
+    const target = await page.evaluate(async () => {
+        const gm = window.playground?.graphManager;
+        const ids = gm?.networkData?.nodes?.getIds?.() || [];
+        if (!gm?.network || ids.length === 0) return null;
+        gm.network.focus(ids[0], { scale: 1, animation: false });
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        const box = document.getElementById('cy').getBoundingClientRect();
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    });
+    expect(target, 'the graph drew no nodes to click').not.toBeNull();
+
+    await page.mouse.click(target.x, target.y);
+    const popup = page.locator('.node-popup');
+    await expect(popup).toHaveCount(1);
+    const popupText = (await popup.first().innerText()).trim();
+    expect(popupText, 'the popup opened but rendered nothing').not.toBe('[object HTMLDivElement]');
+    expect(popupText.length).toBeGreaterThan(2);
+});
+
+test('a file that is not a framework is refused instead of solving as empty',
+    async ({ page }) => {
+        await waitForClingoReady(page);
+
+        // Regression: parseWabaFile dropped every unrecognised line silently, so a wrong-format
+        // upload became four empty arrays -- an EMPTY framework, which then reported
+        // SATISFIABLE with one extension over a framework the user never loaded.
+        await page.setInputFiles('#file-upload-input', {
+            name: 'notes.waba',
+            mimeType: 'text/plain',
+            buffer: Buffer.from('Shopping list\n- milk\n- bread\n')
+        });
+        await settled(page);
+
+        await expect(page.locator('#output')).toContainText(/does not look like a \.waba file/i);
+        await expect(page.locator('.answer-header')).toHaveCount(0);
+    });
+
+test('running with an empty editor clears the previous run', async ({ page }) => {
+    test.setTimeout(90000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+    await page.click('#run-btn');
+    await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
+
+    // Regression: the "No framework code to run" early return left the previous extensions,
+    // stats and graph highlight on screen, asserting a framework no longer in the editor.
+    await page.selectOption('#input-mode', 'advanced');
+    await page.fill('#code-editor', '');
+    await page.click('#run-btn');
+
+    await expect(page.locator('#output')).toContainText('No framework code to run');
+    await expect(page.locator('.answer-header')).toHaveCount(0);
+});
+
+test('a collapsed Results panel is reopened when a run lands', async ({ page }) => {
+    test.setTimeout(90000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+
+    // Collapse state persists in localStorage, so a user who once collapsed Results kept
+    // every later run invisible -- which reads as the solver having failed.
+    const panel = page.locator('.panel[data-panel="output"]');
+    await panel.locator('.panel-toggle').click();
+    await expect(panel).toHaveAttribute('data-collapsed', 'true');
+
+    await page.click('#run-btn');
+    await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
+    await expect(panel).toHaveAttribute('data-collapsed', 'false');
+});
+
+test('out-of-range numeric input is clamped and reflected back', async ({ page }) => {
+    await waitForClingoReady(page);
+
+    // `min`/`max` are only enforced by native form validation, which this page never runs.
+    await page.fill('#timeout-input', '99999');
+    await page.fill('#num-models-input', '-4');
+    await page.locator('#budget-input').focus();
+    const clamped = await page.evaluate(
+        () => window.playground.configController.getCurrentConfig());
+    expect(clamped.timeout).toBe(600000);
+    expect(clamped.numModels).toBe(0);
+    await expect(page.locator('#timeout-input')).toHaveValue('600');
+    await expect(page.locator('#num-models-input')).toHaveValue('0');
 });
 
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
@@ -460,6 +675,9 @@ test('the extension download survives the removal of the analysis panel', async 
     await page.goto('/version-check.html');
     await expect(page.locator('#status')).toContainText('Modules loaded successfully', { timeout: 60000 });
     await expect(page.locator('#status')).toContainText('GraphManager.initFullscreen() exists');
+    // The page's whole purpose is detecting a stale cached bundle, which it never checked.
+    await expect(page.locator('#status')).toContainText(/Serving version \d{8}-\d+/);
+    await expect(page.locator('#status .fail')).toHaveCount(0);
 });
 
 test('graph tooltips are populated and leak no internal ids, in every mode', async ({ page }) => {
@@ -473,7 +691,7 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
 
     for (const mode of ['Assumption-Branching', 'Assumption-Direct']) {
         await page.locator('.mode-option', { hasText: mode }).click();
-        await page.waitForTimeout(1500);
+        await settled(page);
         const audit = await page.evaluate(() => {
             const gm = window.playground.graphManager;
             const text = (t) => (!t ? '' : (typeof t === 'string' ? t : (t.innerText || t.textContent || '')));
@@ -526,9 +744,9 @@ test('graph tooltips are populated and leak no internal ids, in every mode', asy
 
     // Selecting an extension must annotate NODES, not only edges.
     await page.locator('.mode-option', { hasText: 'Assumption-Branching' }).click();
-    await page.waitForTimeout(1200);
+    await settled(page);
     await page.locator('.answer-header').first().click();
-    await page.waitForTimeout(1200);
+    await settled(page);
     const state = await page.evaluate(() => {
         const gm = window.playground.graphManager;
         // State is a CHIP now, not a "State:" / "In this extension:" prose row.
@@ -579,7 +797,7 @@ test('ABA recovery actually recovers classical ABA for the defence semantics', a
     test.setTimeout(180000);
     await waitForClingoReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
-    await page.waitForTimeout(1500);
+    await settled(page);
     await page.selectOption('#semiring-select', 'godel');
     await page.selectOption('#semantics-select', 'admissible');
     // the preset carries beta = 8, which is what used to leak through
@@ -619,7 +837,7 @@ test('the hover panel appears next to the node it describes', async ({ page }) =
     test.setTimeout(120000);
     await waitForClingoReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
-    await page.waitForTimeout(1600);
+    await settled(page);
 
     const probe = await page.evaluate(async () => {
         const gm = window.playground.graphManager;
@@ -703,9 +921,9 @@ test('the legend matches what the diagrams actually draw', async ({ page }) => {
         ['kpg_impact_vs_deccan', 'Assumption-Direct']
     ]) {
         await page.selectOption('#example-select', example);
-        await page.waitForTimeout(1400);
+        await settled(page);
         await page.locator('.mode-option', { hasText: mode }).click();
-        await page.waitForTimeout(2200);
+        await settled(page);
         const drawn = await page.evaluate(() => {
             const gm = window.playground.graphManager;
             const hex = (c) => (typeof c === 'string' ? c : (c && (c.background || c.color)) || null);
@@ -825,7 +1043,7 @@ test("the UI's beta overrides a framework that pins its own #const beta", async 
             + 'head(r2, cb). body(r2, wb). head(r2b, wb).\n'
         )
     });
-    await page.waitForTimeout(600);
+    await settled(page);
     await page.selectOption('#semiring-select', 'godel');
     await page.selectOption('#semantics-select', 'cf');
     await page.selectOption('#budget-select', 'sum-ub');

@@ -2017,8 +2017,7 @@ button:focus-visible,
 select:focus-visible,
 .select:focus-visible,
 textarea:focus-visible,
-input[type="radio"]:focus-visible,
-input[type="text"]:focus-visible {
+input:focus-visible {
     outline: 3px solid var(--primary-color);
     outline-offset: 2px;
 }
