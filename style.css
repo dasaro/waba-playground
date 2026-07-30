@@ -854,45 +854,20 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     padding-right: var(--space-xs);
 }
 
-.simple-description-box {
-    margin-bottom: var(--space-md);
-    padding: var(--space-sm);
-    background:
-        linear-gradient(180deg, rgba(102, 126, 234, 0.08), transparent 65%),
-        var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-}
-
-.simple-description-box[hidden],
+/* Both the read view and the edit field live in the description card and are swapped by the
+   [hidden] attribute, so it has to actually hide them. */
+.simple-description-bar [hidden],
 .simple-add-comment-container[hidden] {
     display: none !important;
-}
-
-.description-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-xs);
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
-    font-weight: 600;
-}
-
-.description-header-actions {
-    display: inline-flex;
-    gap: var(--space-xs);
 }
 
 .description-content {
     width: 100%;
     min-height: 92px;
     padding: var(--space-sm) var(--space-md);
-    background: transparent;
+    background: var(--bg-secondary);
     color: var(--text-primary);
-    border: 1px dashed var(--border-color);
+    border: 1px solid var(--primary-color);
     border-radius: var(--radius-md);
     font-family: inherit;
     font-size: var(--text-sm);

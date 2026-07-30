@@ -262,6 +262,64 @@ test('curated example description renders in the description bar', async ({ page
     expect(long.scrolls, 'a long description should scroll inside its own box').toBe(true);
 });
 
+test('the description is edited in place, not in a second box', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await expect(page.locator('#simple-description-preview')).toBeVisible({ timeout: 10000 });
+
+    const preview = page.locator('#simple-description-preview');
+    const field = page.locator('#simple-description-content');
+    const editBtn = page.locator('#simple-edit-description-btn');
+
+    // The separate "Edit Description" card is gone; the field shares the card with the preview,
+    // so it can no longer show the same text twice.
+    await expect(page.locator('#simple-description-box')).toHaveCount(0);
+    expect(await page.evaluate(() => {
+        const p = document.getElementById('simple-description-preview');
+        const t = document.getElementById('simple-description-content');
+        return p.parentElement === t.parentElement && p.parentElement.id === 'simple-description-bar';
+    })).toBe(true);
+
+    // read mode
+    await expect(preview).toBeVisible();
+    await expect(field).toBeHidden();
+    await expect(editBtn).toHaveText('Edit');
+
+    // Edit swaps the field into the same slot and focuses it
+    await editBtn.click();
+    await expect(field).toBeVisible();
+    await expect(preview).toBeHidden();
+    await expect(editBtn).toHaveText('Done');
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('simple-description-content');
+
+    // Clearing the field must NOT tear it away mid-edit -- keying visibility on "has text"
+    // alone made the description impossible to empty and retype.
+    await field.fill('');
+    await expect(field).toBeVisible();
+    await expect(page.locator('#simple-description-bar')).toBeVisible();
+
+    await field.fill('MARKER edited in place.');
+    await editBtn.click();
+    await expect(editBtn).toHaveText('Edit');
+    await expect(preview).toContainText('MARKER edited in place.');
+    await expect(field).toBeHidden();
+
+    // and the edit reaches the framework, which in Simple mode is only generated on switch
+    await page.selectOption('#input-mode', 'advanced');
+    await expect(page.locator('#code-editor')).toHaveValue(/MARKER edited in place\./, { timeout: 15000 });
+    await page.selectOption('#input-mode', 'simple');
+    await expect(preview).toContainText('MARKER edited in place.');
+
+    // Remove clears the card and brings back the Add affordance; Add reopens in place
+    await page.locator('#simple-remove-description-btn').click();
+    await expect(page.locator('#simple-description-bar')).toBeHidden();
+    await expect(page.locator('#simple-add-comment-container')).toBeVisible();
+    await page.locator('#simple-add-comment-btn').click();
+    await expect(field).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('simple-description-content');
+});
+
 test('every curated example applies its algebra to the control surface', async ({ page }) => {
     await waitForClingoReady(page);
     // Regression: the presets carried semiringFamily+polarity, which applyConfigToUI could

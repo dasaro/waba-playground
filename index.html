@@ -7,7 +7,7 @@
     <!-- Cache-busting handled via ?v= version parameters on module imports -->
 
     <title>WABA Playground - Static WABA Frontend</title>
-    <link rel="stylesheet" href="style.css?v=20260730-6">
+    <link rel="stylesheet" href="style.css?v=20260730-7">
     <!-- vis.js for network visualization -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
@@ -18,11 +18,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-6"></script>
+    <script src="modules/prism-waba.js?v=20260730-7"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-6"></script>
-    <script src="clingo.web.js?v=20260730-6"></script>
+    <script src="modules/wasm-config.js?v=20260730-7"></script>
+    <script src="clingo.web.js?v=20260730-7"></script>
 </head>
 <body>
     <div class="container">
@@ -235,18 +235,9 @@ contrary(b, c_b)."></textarea>
                                 </div>
                             </div>
                             <div id="simple-description-preview" class="description-preview" role="note"></div>
+                            <textarea id="simple-description-content" class="description-content" placeholder="Describe what this framework shows..." rows="4" aria-label="Description" hidden></textarea>
                         </div>
 
-                        <!-- Description Box (shown only when editing) -->
-                        <div id="simple-description-box" class="simple-description-box" hidden>
-                            <div class="description-header">
-                                <span>Edit Description</span>
-                                <button id="simple-hide-description-editor-btn" class="remove-description-btn" title="Hide description editor" type="button">
-                                    ✕
-                                </button>
-                            </div>
-                            <textarea id="simple-description-content" class="description-content" placeholder="Enter description here..." rows="3"></textarea>
-                        </div>
 
                         <!-- Add Comment Button (shown only when no description exists) -->
                         <div id="simple-add-comment-container" class="simple-add-comment-container">
@@ -945,6 +936,6 @@ budget(100).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-6"></script>
+    <script type="module" src="app.js?v=20260730-7"></script>
 </body>
 </html>

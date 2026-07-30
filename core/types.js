@@ -109,12 +109,10 @@
  * @property {HTMLElement | null} loadingElapsed
  * @property {HTMLElement | null} simpleDescriptionBar
  * @property {HTMLElement | null} simpleDescriptionPreview
- * @property {HTMLElement | null} simpleDescriptionBox
  * @property {HTMLTextAreaElement | null} simpleDescriptionContent
  * @property {HTMLElement | null} simpleAddCommentBtn
  * @property {HTMLElement | null} simpleAddCommentContainer
  * @property {HTMLElement | null} simpleEditDescriptionBtn
- * @property {HTMLElement | null} simpleHideDescriptionEditorBtn
  * @property {HTMLElement | null} simpleRemoveDescriptionBtn
  * @property {HTMLElement | null} isolatedAssumptionsBanner
  * @property {HTMLElement | null} isolatedAssumptionsList

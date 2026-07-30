@@ -1,5 +1,5 @@
-import { PrismEditor } from '../modules/prism-editor.js?v=20260730-6';
-import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-6';
+import { PrismEditor } from '../modules/prism-editor.js?v=20260730-7';
+import { buildClingoFromSimpleFields, extractSimpleFields } from './editor/simple-format.js?v=20260730-7';
 
 export class EditorController {
     constructor(dom, store, fileManager) {
@@ -102,11 +102,7 @@ export class EditorController {
         }
 
         if (this.dom.simpleEditDescriptionBtn) {
-            this.dom.simpleEditDescriptionBtn.addEventListener('click', () => this.openDescriptionEditor());
-        }
-
-        if (this.dom.simpleHideDescriptionEditorBtn) {
-            this.dom.simpleHideDescriptionEditorBtn.addEventListener('click', () => this.hideDescriptionEditor());
+            this.dom.simpleEditDescriptionBtn.addEventListener('click', () => this.toggleDescriptionEditor());
         }
 
         if (this.dom.simpleRemoveDescriptionBtn) {
@@ -201,28 +197,33 @@ export class EditorController {
             this.dom.simpleDescriptionPreview.textContent = description;
         }
 
-        if (this.dom.simpleDescriptionBar) {
-            if (hasDescription) {
-                this.dom.simpleDescriptionBar.removeAttribute('hidden');
-            } else {
-                this.dom.simpleDescriptionBar.setAttribute('hidden', '');
-            }
-        }
+        const editing = this.isDescriptionEditorOpen;
+        // While editing, the card stays up even with an empty field. Keying visibility on
+        // hasDescription alone would tear the textarea out from under the cursor the moment the
+        // text was cleared, so it could never be emptied and retyped.
+        const showBar = hasDescription || editing;
 
-        if (this.dom.simpleDescriptionBox) {
-            if (hasDescription && this.isDescriptionEditorOpen) {
-                this.dom.simpleDescriptionBox.removeAttribute('hidden');
-            } else {
-                this.dom.simpleDescriptionBox.setAttribute('hidden', '');
+        const toggle = (element, shown) => {
+            if (!element) {
+                return;
             }
-        }
+            if (shown) {
+                element.removeAttribute('hidden');
+            } else {
+                element.setAttribute('hidden', '');
+            }
+        };
 
-        if (this.dom.simpleAddCommentContainer) {
-            if (hasDescription) {
-                this.dom.simpleAddCommentContainer.setAttribute('hidden', '');
-            } else {
-                this.dom.simpleAddCommentContainer.removeAttribute('hidden');
-            }
+        toggle(this.dom.simpleDescriptionBar, showBar);
+        // The preview and the textarea share one slot in the card, so editing happens exactly
+        // where the text is read rather than in a second card that repeated it.
+        toggle(this.dom.simpleDescriptionPreview, !editing);
+        toggle(this.dom.simpleDescriptionContent, editing);
+        toggle(this.dom.simpleAddCommentContainer, !showBar);
+
+        if (this.dom.simpleEditDescriptionBtn) {
+            this.dom.simpleEditDescriptionBtn.textContent = editing ? 'Done' : 'Edit';
+            this.dom.simpleEditDescriptionBtn.setAttribute('aria-pressed', String(editing));
         }
     }
 
@@ -233,15 +234,18 @@ export class EditorController {
 
         this.isDescriptionEditorOpen = true;
         this.dom.simpleDescriptionContent.value = 'Enter your description here';
+        // Reveal before focusing: a hidden field cannot take focus or a selection.
+        this.updateSimpleDescription();
         this.dom.simpleDescriptionContent.focus();
         this.dom.simpleDescriptionContent.select();
-        this.updateSimpleDescription();
     }
 
-    openDescriptionEditor() {
-        this.isDescriptionEditorOpen = true;
+    toggleDescriptionEditor() {
+        this.isDescriptionEditorOpen = !this.isDescriptionEditorOpen;
         this.updateSimpleDescription();
-        this.dom.simpleDescriptionContent?.focus();
+        if (this.isDescriptionEditorOpen) {
+            this.dom.simpleDescriptionContent?.focus();
+        }
     }
 
     hideDescriptionEditor() {

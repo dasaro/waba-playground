@@ -1,4 +1,4 @@
-import { GraphUtils } from './graph-utils.js?v=20260730-6';
+import { GraphUtils } from './graph-utils.js?v=20260730-7';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
@@ -7,7 +7,7 @@ import {
     buildJunctionTooltip,
     buildSupportEdgeTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260730-6';
+} from './graph-tooltip-builder.js?v=20260730-7';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
