@@ -2317,6 +2317,126 @@ contrary(assume_auxiliary_h1, excessive_complexity).
     },
     metadata: {
         "generatedFrom": "ABA-variants/WABA",
+        "semiringInfo": {
+            "arctic": {
+                "oplus": "max",
+                "otimes": "+",
+                "oplusIdentity": "#inf",
+                "otimesIdentity": "0",
+                "polarity": "higher",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": null
+            },
+            "bottleneck_cost": {
+                "oplus": "min",
+                "otimes": "max",
+                "oplusIdentity": "#sup",
+                "otimesIdentity": "#inf",
+                "polarity": "lower",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": null
+            },
+            "godel": {
+                "oplus": "max",
+                "otimes": "min",
+                "oplusIdentity": "#inf",
+                "otimesIdentity": "#sup",
+                "polarity": "higher",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": null
+            },
+            "godel_low": {
+                "oplus": "min",
+                "otimes": "max",
+                "oplusIdentity": "#sup",
+                "otimesIdentity": "#inf",
+                "polarity": "lower",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": "bottleneck_cost"
+            },
+            "lukasiewicz": {
+                "oplus": "max",
+                "otimes": "bounded +",
+                "oplusIdentity": "0",
+                "otimesIdentity": "k",
+                "polarity": "higher",
+                "constants": [
+                    {
+                        "name": "k",
+                        "default": 1000
+                    }
+                ],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": null
+            },
+            "tropical": {
+                "oplus": "min",
+                "otimes": "+",
+                "oplusIdentity": "#sup",
+                "otimesIdentity": "0",
+                "polarity": "lower",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": null
+            },
+            "tropical_high": {
+                "oplus": "max",
+                "otimes": "+",
+                "oplusIdentity": "#inf",
+                "otimesIdentity": "0",
+                "polarity": "higher",
+                "constants": [],
+                "defaultPolicies": [
+                    "aba",
+                    "neutral"
+                ],
+                "aliasOf": "arctic"
+            }
+        },
+        "semanticsInfo": {
+            "admissible": {
+                "defence": true,
+                "polarityDependentBound": true
+            },
+            "cf": {
+                "defence": false,
+                "polarityDependentBound": false
+            },
+            "complete": {
+                "defence": true,
+                "polarityDependentBound": true
+            },
+            "stable": {
+                "defence": false,
+                "polarityDependentBound": false
+            },
+            "preferred": {
+                "defence": true,
+                "polarityDependentBound": true
+            }
+        },
         "semiringFamilies": [
             "godel",
             "tropical"

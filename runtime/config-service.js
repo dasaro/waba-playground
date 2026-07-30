@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260730-38';
+import { wabaModules } from '../waba-modules.js?v=20260730-42';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -13,27 +13,43 @@ const OBJECTIVE_MAP = {
     'min-max': { monoid: 'min', optimization: 'maximize' }
 };
 const DEFAULT_OBJECTIVE = 'sum-min';
-// Polarity per bundle semiring module key (also the semiring allow-list in validateConfig).
-const SEMIRING_POLARITY = {
-    godel: 'higher',
-    godel_low: 'lower',
-    tropical: 'lower',
-    tropical_high: 'higher',
-    arctic: 'higher',
-    bottleneck_cost: 'lower',
-    // Łukasiewicz is a standalone family (bounded-sum ⊗, ⊕=max) with no polarity
-    // variants — it resolves directly to itself. Listed here so validateConfig
-    // accepts it as a supported semiring.
-    lukasiewicz: 'higher'
-};
+// Polarity per semiring module key, DERIVED from the bundle.
+//
+// This used to be a hand-written table, re-typed from the .lp files -- along with a
+// RECOMMENDED_BUDGET table, an `isLukasiewicz` special case and a prose table elsewhere. Every
+// bound direction in the app follows from the polarity, so a mistyped entry produced a control
+// that looked right and computed the wrong thing, and adding an algebra to WABA/ meant editing
+// four JS files plus an <option> list. The generator now reads `oplus(max|min).` straight out
+// of each module, so there is exactly one source.
+export const SEMIRING_INFO = wabaModules.metadata.semiringInfo || {};
+const SEMIRING_POLARITY = Object.fromEntries(
+    Object.entries(SEMIRING_INFO).map(([key, info]) => [key, info.polarity])
+);
 
-// wABA budgeted DEFENCE (Dunne et al. AIJ 2011 Def 6, lifted to structured ABA). These take
-// beta directly -- their own SUM inconsistency budget lives inside the module -- and compose
-// with no_discard, so they take no monoid/bound pairing. Mirrors bin/waba's set of the same
-// name. Any semantics that is not directly budgeted (cf/stable) is one of these.
-const DIRECTLY_BUDGETED_SEMANTICS = new Set(['cf', 'stable']);
+/** The algebras a user may pick: every module that is not an alias for another. */
+export function selectableSemirings() {
+    return Object.entries(SEMIRING_INFO)
+        .filter(([, info]) => !info.aliasOf)
+        .map(([key, info]) => ({ key, ...info }));
+}
+
+/** The tunable constants an algebra declares (`#const k = 1000.` -> one control, and -c k). */
+export function semiringConstants(semiringKey) {
+    return SEMIRING_INFO[semiringKey]?.constants || [];
+}
+
+// wABA budgeted DEFENCE (Dunne et al. AIJ 2011 Def 6, lifted to structured ABA). Detected in
+// the generator by whether the module prices a `pay` set -- that is exactly what makes it carry
+// its own budget, take beta directly and reject a monoid/bound pairing. It was a literal
+// ['admissible','complete','preferred'] in four places.
+const SEMANTICS_INFO = wabaModules.metadata.semanticsInfo || {};
 export function isBudgetedDefence(semantics) {
-    return SUPPORTED_SEMANTICS.has(semantics) && !DIRECTLY_BUDGETED_SEMANTICS.has(semantics);
+    return Boolean(SEMANTICS_INFO[semantics]?.defence);
+}
+
+/** True when this semantics' bound direction follows the algebra's polarity. */
+export function hasPolarityDependentBound(semantics) {
+    return Boolean(SEMANTICS_INFO[semantics]?.polarityDependentBound);
 }
 
 // Reverse of metadata.canonicalSemiring: module key -> the family it is the variant of.

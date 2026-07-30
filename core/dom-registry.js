@@ -24,6 +24,7 @@ export function createDomRegistry(doc = document) {
         semanticsNote: byId('semantics-note'),
         lukKInput: byId('luk-k-input'),
         lukKContainer: byId('luk-k-container'),
+        lukKLabel: byId('luk-k-label'),
         resultsSelect: byId('results-select'),
         exampleSelect: byId('example-select'),
         budgetInput: byId('budget-input'),

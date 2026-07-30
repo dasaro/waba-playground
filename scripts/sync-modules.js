@@ -17,9 +17,13 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { resolveWabaRoot } from './waba-root.js';
 
 const PLAYGROUND_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const WABA_ROOT = process.env.WABA_ROOT || path.join(PLAYGROUND_ROOT, '..', 'WABA');
+// Resolved by CONTENT via the shared resolver, not by position: the bare `../WABA` default
+// points at a stale pre-modular sibling checkout on this layout. See scripts/waba-root.js.
+const { root: FOUND_ROOT } = resolveWabaRoot(PLAYGROUND_ROOT);
+const WABA_ROOT = FOUND_ROOT || process.env.WABA_ROOT || path.join(PLAYGROUND_ROOT, '..', 'WABA');
 const OUTPUT_FILE = path.join(PLAYGROUND_ROOT, 'waba-modules.js');
 const GENERATOR = path.join(WABA_ROOT, 'bin', 'sync-playground.mjs');
 

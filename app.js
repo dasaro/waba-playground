@@ -1,11 +1,11 @@
 // WABA Playground bootstrap
-// VERSION: 20260730-38 - managed via core/app-version.js and release scripts
+// VERSION: 20260730-42 - managed via core/app-version.js and release scripts
 
-import { createDomRegistry } from './core/dom-registry.js?v=20260730-38';
-import { createStore } from './core/store.js?v=20260730-38';
-import { PlaygroundController } from './features/playground-controller.js?v=20260730-38';
-import { examples } from './examples.js?v=20260730-38';
-import { APP_VERSION } from './core/app-version.js?v=20260730-38';
+import { createDomRegistry } from './core/dom-registry.js?v=20260730-42';
+import { createStore } from './core/store.js?v=20260730-42';
+import { PlaygroundController } from './features/playground-controller.js?v=20260730-42';
+import { examples } from './examples.js?v=20260730-42';
+import { APP_VERSION } from './core/app-version.js?v=20260730-42';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const dom = createDomRegistry(document);

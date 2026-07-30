@@ -65,6 +65,7 @@
  * @property {HTMLSelectElement} resultsSelect
  * @property {HTMLInputElement} lukKInput
  * @property {HTMLElement} lukKContainer
+ * @property {HTMLElement} lukKLabel
  * @property {HTMLSelectElement} exampleSelect
  * @property {HTMLInputElement} budgetInput
  * @property {HTMLElement | null} budgetInputLabel

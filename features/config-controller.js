@@ -1,4 +1,7 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-38';
+import {
+    normalizeConfig, isBudgetedDefence, selectableSemirings, semiringConstants, SEMIRING_INFO
+} from '../runtime/config-service.js?v=20260730-42';
+import { wabaModules } from '../waba-modules.js?v=20260730-42';
 
 export class ConfigController {
     constructor(dom) {
@@ -111,6 +114,65 @@ export class ConfigController {
         this._betaFor = undefined;
     }
 
+    /**
+     * Build the Algebra and Semantics option lists from the module bundle.
+     *
+     * These were hand-written <option> lists in index.html, duplicating what the .lp sources
+     * already declare. Adding an algebra to WABA/ therefore meant editing this list, the
+     * polarity table, the recommended-pairing table, the prose table and an `isLukasiewicz`
+     * special case -- and any one of them left stale produced a control that looked correct and
+     * computed something else. Everything below is read from
+     * waba-modules.js -> metadata, which the generator extracts from the .lp files themselves.
+     */
+    populateFromBundle() {
+        const OPLUS_LABEL = {
+            higher: 'Strength (⊕ = max: a bigger weight is a harder objection)',
+            lower: 'Cost (⊕ = min: a smaller weight is better supported)'
+        };
+        const PRETTY = {
+            godel: 'Gödel', arctic: 'Arctic', lukasiewicz: 'Łukasiewicz',
+            tropical: 'Tropical', bottleneck_cost: 'Bottleneck'
+        };
+        const doc = this.dom.document;
+        const select = this.dom.semiringSelect;
+        if (select) {
+            select.innerHTML = '';
+            for (const polarity of ['higher', 'lower']) {
+                const inGroup = selectableSemirings().filter((s) => s.polarity === polarity);
+                if (inGroup.length === 0) continue;
+                const group = doc.createElement('optgroup');
+                group.label = OPLUS_LABEL[polarity];
+                for (const algebra of inGroup) {
+                    const option = doc.createElement('option');
+                    option.value = algebra.key;
+                    // A new algebra with no entry in PRETTY still appears, under its module key.
+                    option.textContent = `${PRETTY[algebra.key] || algebra.key} (⊗ = ${algebra.otimes})`;
+                    group.appendChild(option);
+                }
+                select.appendChild(group);
+            }
+            if ([...select.options].some((o) => o.value === 'godel')) select.value = 'godel';
+        }
+
+        const SEMANTICS_LABEL = {
+            cf: 'Conflict-free', stable: 'Stable', admissible: 'Admissible',
+            complete: 'Complete', preferred: 'Preferred'
+        };
+        const semanticsSelect = this.dom.semanticsSelect;
+        if (semanticsSelect) {
+            semanticsSelect.innerHTML = '';
+            for (const key of wabaModules.metadata.supportedSemantics) {
+                const option = doc.createElement('option');
+                option.value = key;
+                option.textContent = SEMANTICS_LABEL[key] || key;
+                semanticsSelect.appendChild(option);
+            }
+            if ([...semanticsSelect.options].some((o) => o.value === 'stable')) {
+                semanticsSelect.value = 'stable';
+            }
+        }
+    }
+
     populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
         this.dom.exampleSelect.innerHTML = '<option value="">-- Select Example --</option>';
 
@@ -146,8 +208,10 @@ export class ConfigController {
 
         // Defence semantics carry their own SUM inconsistency budget and take beta directly,
         // exactly as bin/waba does; they reject a monoid/bound pairing.
-        const isDefence = ['admissible', 'complete', 'preferred'].includes(semantics);
-        const isLukasiewicz = algebra === 'lukasiewicz';
+        const isDefence = isBudgetedDefence(semantics);
+        // Which algebras carry a tunable constant is declared by the modules (`#const k = ...`),
+        // not by a name check here.
+        const constants = semiringConstants(algebra);
 
         // Choosing an algebra preselects the canonical (monoid, bound) pairing for its
         // polarity. oplus = max reads a weight as STRENGTH (bigger = harder to overrule), so
@@ -156,13 +220,11 @@ export class ConfigController {
         // bound is a floor on each concession. These are exactly the pairings bin/waba's
         // CANONICAL_PRESETS admits. It fires only on an actual algebra change, so a manual
         // budget choice (or a preset's) is never overwritten by an unrelated syncUi.
-        const RECOMMENDED_BUDGET = {
-            godel: 'sum-ub',
-            arctic: 'sum-ub',
-            lukasiewicz: 'sum-ub',
-            tropical: 'min-lb',
-            bottleneck_cost: 'min-lb'
-        };
+        // Derived from the polarity rather than listed per algebra: strength bounds the total
+        // conceded ABOVE, cost bounds each concession BELOW. These are exactly bin/waba's
+        // CANONICAL_PRESETS, and a new algebra gets the right pairing with no edit here.
+        const recommendedFor = (key) =>
+            (SEMIRING_INFO[key]?.polarity === 'lower' ? 'min-lb' : 'sum-ub');
         // The reading selector is pinned to 'none' while a defence semantics or ABA recovery
         // is active, and the user's own choice lives in `_savedReading`. Snapshot BEFORE the
         // preselect so the preselect can write through to whichever slot currently holds it:
@@ -176,7 +238,7 @@ export class ConfigController {
 
         if (this._lastAlgebra !== undefined && this._lastAlgebra !== algebra) {
             const previousReading = readingPinned ? this._savedReading : this.dom.budgetSelect.value;
-            const reading = RECOMMENDED_BUDGET[algebra] || 'sum-ub';
+            const reading = recommendedFor(algebra);
             if (readingPinned) {
                 this._savedReading = reading;
             } else {
@@ -213,7 +275,10 @@ export class ConfigController {
 
         // k only exists for Lukasiewicz.
         if (this.dom.lukKContainer) {
-            this.dom.lukKContainer.style.display = isLukasiewicz ? 'block' : 'none';
+            this.dom.lukKContainer.style.display = constants.length > 0 ? 'block' : 'none';
+            if (constants.length > 0 && this.dom.lukKLabel) {
+                this.dom.lukKLabel.textContent = `Bound ${constants[0].name}`;
+            }
         }
 
         // ABA recovery pins transparent defaults and forbids discarding.
@@ -278,14 +343,20 @@ export class ConfigController {
                 : 'Conflict-based: β pays for the attacks this set supports.';
         }
         if (this.dom.semiringAliasNote) {
-            const POLARITY = {
-                godel: 'strength — an objection is only as strong as its weakest premise',
-                arctic: 'strength — independent premises accumulate',
-                lukasiewicz: 'strength — a chain of premises erodes toward 0',
-                tropical: 'cost — a cheaply derived objection is a well-supported one',
-                bottleneck_cost: 'cost — an objection costs as much as its dearest premise'
+            // The gloss is per-algebra prose, but the POLARITY word comes from the module, so
+            // a new algebra always gets a truthful first clause even with no gloss written yet.
+            const GLOSS = {
+                godel: 'an objection is only as strong as its weakest premise',
+                arctic: 'independent premises accumulate',
+                lukasiewicz: 'a chain of premises erodes toward 0',
+                tropical: 'a cheaply derived objection is a well-supported one',
+                bottleneck_cost: 'an objection costs as much as its dearest premise'
             };
-            this.dom.semiringAliasNote.textContent = POLARITY[algebra] || '';
+            const info = SEMIRING_INFO[algebra];
+            const word = info?.polarity === 'lower' ? 'cost' : 'strength';
+            this.dom.semiringAliasNote.textContent = GLOSS[algebra]
+                ? `${word} — ${GLOSS[algebra]}`
+                : `${word} — ⊗ = ${info?.otimes}, ⊕ = ${info?.oplus}`;
         }
 
         this.updateNumModelsVisibility();
@@ -294,7 +365,7 @@ export class ConfigController {
 
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
-        const isDefence = ['admissible', 'complete', 'preferred'].includes(config.semantics);
+        const isDefence = isBudgetedDefence(config.semantics);
         const READING = {
             'sum-ub': 'The concessions must sum to no more than β.',
             'max-ub': 'No single concession may exceed β.',

@@ -1,7 +1,7 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260730-38';
+import { wabaModules } from '../waba-modules.js?v=20260730-42';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
@@ -9,11 +9,11 @@ import {
     isBudgetedDefence,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260730-38';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-38';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-38';
-import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-38';
-import { ParserUtils } from './parser-utils.js?v=20260730-38';
+} from '../runtime/config-service.js?v=20260730-42';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-42';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-42';
+import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-42';
+import { ParserUtils } from './parser-utils.js?v=20260730-42';
 
 // Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.

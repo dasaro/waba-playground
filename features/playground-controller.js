@@ -1,17 +1,17 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260730-38';
-import { FontManager } from '../modules/font-manager.js?v=20260730-38';
-import { UIManager } from '../modules/ui-manager.js?v=20260730-38';
-import { PanelManager } from '../modules/panel-manager.js?v=20260730-38';
-import { FileManager } from '../modules/file-manager.js?v=20260730-38';
-import { GraphManager } from '../modules/graph-manager.js?v=20260730-38';
-import { PopupManager } from '../modules/popup-manager.js?v=20260730-38';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-38';
-import { OutputManager } from '../modules/output-manager.js?v=20260730-38';
-import { ExportManager } from '../modules/export-manager.js?v=20260730-38';
-import { ConfigController } from './config-controller.js?v=20260730-38';
-import { DocsController } from './docs-controller.js?v=20260730-38';
-import { EditorController } from './editor-controller.js?v=20260730-38';
-import { ExamplesController } from './examples-controller.js?v=20260730-38';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-42';
+import { FontManager } from '../modules/font-manager.js?v=20260730-42';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-42';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-42';
+import { FileManager } from '../modules/file-manager.js?v=20260730-42';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-42';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-42';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-42';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-42';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-42';
+import { ConfigController } from './config-controller.js?v=20260730-42';
+import { DocsController } from './docs-controller.js?v=20260730-42';
+import { EditorController } from './editor-controller.js?v=20260730-42';
+import { ExamplesController } from './examples-controller.js?v=20260730-42';
 
 export class PlaygroundController {
     constructor(dom, store) {

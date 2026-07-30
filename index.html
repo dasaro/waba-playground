@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260730-38">
+    <link rel="stylesheet" href="style.css?v=20260730-42">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-38"></script>
+    <script src="modules/prism-waba.js?v=20260730-42"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-38"></script>
-    <script src="clingo.web.js?v=20260730-38"></script>
+    <script src="modules/wasm-config.js?v=20260730-42"></script>
+    <script src="clingo.web.js?v=20260730-42"></script>
 </head>
 <body>
     <div class="container">
@@ -82,29 +82,19 @@
                     <div class="config-grid">
                         <div class="config-item">
                             <label for="semiring-select">Algebra</label>
-                            <select id="semiring-select" class="select">
-                                <optgroup label="Strength (⊕ = max: a bigger weight is a harder objection)">
-                                    <option value="godel" selected>Gödel (⊗ = min)</option>
-                                    <option value="arctic">Arctic (⊗ = +)</option>
-                                    <option value="lukasiewicz">Łukasiewicz (bounded +)</option>
-                                </optgroup>
-                                <optgroup label="Cost (⊕ = min: a smaller weight is better supported)">
-                                    <option value="tropical">Tropical (⊗ = +)</option>
-                                    <option value="bottleneck_cost">Bottleneck (⊗ = max)</option>
-                                </optgroup>
-                            </select>
+                            <!-- Options are BUILT AT RUNTIME from waba-modules.js, which the
+                                 generator derives from the .lp sources. Hand-writing them meant
+                                 adding an algebra to WABA/ required editing this list plus four
+                                 JS files, and a stale entry offered a control that silently
+                                 computed the wrong thing. See ConfigController.populateFromBundle. -->
+                            <select id="semiring-select" class="select"></select>
                             <div id="semiring-alias-note" class="config-note">Chooses how declared leaf weights propagate along derivations.</div>
                         </div>
 
                         <div class="config-item">
                             <label for="semantics-select">Semantics</label>
-                            <select id="semantics-select" class="select">
-                                <option value="cf">Conflict-free</option>
-                                <option value="stable" selected>Stable</option>
-                                <option value="admissible">Admissible</option>
-                                <option value="complete">Complete</option>
-                                <option value="preferred">Preferred</option>
-                            </select>
+                            <!-- Also built from the bundle. -->
+                            <select id="semantics-select" class="select"></select>
                             <div id="semantics-note" class="config-note">All five are budgeted; β relaxes them.</div>
                         </div>
 
@@ -120,7 +110,7 @@
                         </div>
 
                         <div class="config-item" id="luk-k-container" style="display:none">
-                            <label for="luk-k-input">Łukasiewicz bound k</label>
+                            <label for="luk-k-input" id="luk-k-label">Bound k</label>
                             <input type="number" id="luk-k-input" class="select" value="10" min="1" max="1000000">
                             <div class="config-note">⊗ = max(0, a+b−k), so a derivation erodes by (k − w) at every step. k must sit at your weight scale: far above it everything collapses to 0, far below it nothing erodes. The shipped Łukasiewicz example works at k = 1000 with weights near 900. To reproduce a run with <code>bin/waba</code>, pass <code>--luk-k</code> the value shown in this field — its own default is 1000.</div>
                         </div>
@@ -633,6 +623,6 @@ contrary(b, c).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-38"></script>
+    <script type="module" src="app.js?v=20260730-42"></script>
 </body>
 </html>

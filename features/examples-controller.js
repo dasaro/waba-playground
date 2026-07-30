@@ -1,5 +1,5 @@
-import { examples } from '../examples.js?v=20260730-38';
-import { wabaModules } from '../waba-modules.js?v=20260730-38';
+import { examples } from '../examples.js?v=20260730-42';
+import { wabaModules } from '../waba-modules.js?v=20260730-42';
 
 // Curated examples carry their prose in a `description` field. The editor's description
 // bar/box is driven by the "% //" special syntax (see editor/simple-format.js), so bridge
@@ -25,6 +25,9 @@ export class ExamplesController {
     }
 
     populate() {
+        // Algebra and Semantics first: their options come from the module bundle, and an
+        // example preset may select one of them.
+        this.configController.populateFromBundle();
         this.configController.populateExampleSelect(examples, 'conflict_cycle');
     }
 
