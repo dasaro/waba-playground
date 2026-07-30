@@ -808,37 +808,33 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
 
 .simple-description-bar {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: var(--space-sm);
     margin-bottom: var(--space-md);
-    padding: var(--space-xs);
-    background: var(--bg-primary);
+    padding: var(--space-sm) var(--space-md);
+    background:
+        linear-gradient(180deg, rgba(102, 126, 234, 0.06), transparent 70%),
+        var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
 }
 
-.simple-description-bar[hidden] {
-    display: none !important;
-}
-
-.description-chip-group {
-    position: relative;
-    display: inline-flex;
-}
-
-.description-trigger-btn {
-    display: inline-flex;
+.description-bar-header {
+    display: flex;
     align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-md);
-    border-radius: 999px;
-    border: 1px solid rgba(102, 126, 234, 0.24);
-    background: rgba(102, 126, 234, 0.08);
-    color: var(--primary-color);
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.description-label {
     font-size: var(--text-sm);
     font-weight: 700;
-    cursor: default;
+    color: var(--primary-color);
+    letter-spacing: 0.02em;
+}
+
+.simple-description-bar[hidden] {
+    display: none !important;
 }
 
 .description-actions {
@@ -848,50 +844,14 @@ h3 { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-md)
     justify-content: flex-end;
 }
 
-.description-hover-panel {
-    position: absolute;
-    left: 0;
-    top: calc(100% + 10px);
-    width: min(26rem, calc(100vw - 5rem));
-    padding: var(--space-md);
-    background: var(--tooltip-bg);
-    border: 1px solid var(--tooltip-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px);
-    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
-    z-index: 25;
-    pointer-events: none;
-    backdrop-filter: blur(12px);
-}
-
-.description-hover-panel::before {
-    content: '';
-    position: absolute;
-    top: -7px;
-    left: 18px;
-    width: 12px;
-    height: 12px;
-    background: var(--tooltip-bg);
-    border-top: 1px solid var(--tooltip-border);
-    border-left: 1px solid var(--tooltip-border);
-    transform: rotate(45deg);
-}
-
-.description-chip-group:hover .description-hover-panel,
-.description-chip-group:focus-within .description-hover-panel {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
 .description-preview {
     font-size: var(--text-sm);
     line-height: 1.65;
     color: var(--text-primary);
     white-space: pre-wrap;
+    max-height: 11em;
+    overflow-y: auto;
+    padding-right: var(--space-xs);
 }
 
 .simple-description-box {
@@ -2137,7 +2097,6 @@ button:focus-visible,
         justify-content: flex-start;
     }
 
-    .description-hover-panel,
     .comment-hint {
         width: min(18rem, calc(100vw - 3rem));
     }

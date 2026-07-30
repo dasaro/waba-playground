@@ -226,11 +226,40 @@ test('curated example description renders in the description bar', async ({ page
     await page.selectOption('#example-select', 'conflict_cycle');
     await expect(page.locator('#simple-description-bar')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#simple-description-preview')).toContainText('weakest link');
+
+    // It reads IN PLACE, above the assumptions/rules grid -- not in a hover panel. The trigger
+    // chip and its absolutely-positioned tooltip are gone.
+    const preview = page.locator('#simple-description-preview');
+    await expect(preview).toBeVisible();
+    await expect(page.locator('#simple-description-trigger')).toHaveCount(0);
+    await expect(page.locator('.description-hover-panel')).toHaveCount(0);
+    const layout = await page.evaluate(() => {
+        const p = document.getElementById('simple-description-preview');
+        const grid = document.querySelector('.simple-grid');
+        return {
+            position: getComputedStyle(p).position,
+            aboveGrid: p.getBoundingClientRect().bottom <= grid.getBoundingClientRect().top + 2,
+            bounded: p.getBoundingClientRect().height <= 200
+        };
+    });
+    expect(layout.position, 'the description should sit in the flow, not float').toBe('static');
+    expect(layout.aboveGrid, 'the description should render above the grid').toBe(true);
+    // Curated descriptions reach ~1200 characters, so the box is capped and scrolls internally
+    // rather than pushing the editor off screen.
+    expect(layout.bounded, 'the description box should stay bounded').toBe(true);
     const editorValue = await page.locator('#code-editor').inputValue();
     expect(editorValue.startsWith('% //')).toBe(true);
 
     await page.selectOption('#example-select', 'detective_locked_house');
     await expect(page.locator('#simple-description-preview')).toContainText('locked house');
+    // ~1200 characters: still visible, still bounded, and it scrolls in its own box.
+    const long = await page.evaluate(() => {
+        const p = document.getElementById('simple-description-preview');
+        return { chars: p.textContent.trim().length, h: p.getBoundingClientRect().height, scrolls: p.scrollHeight > p.clientHeight };
+    });
+    expect(long.chars).toBeGreaterThan(800);
+    expect(long.h).toBeLessThanOrEqual(200);
+    expect(long.scrolls, 'a long description should scroll inside its own box').toBe(true);
 });
 
 test('every curated example applies its algebra to the control surface', async ({ page }) => {

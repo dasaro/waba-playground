@@ -67,8 +67,6 @@ export function createDomRegistry(doc = document) {
         loadingSubtext: byId('loading-subtext'),
         loadingElapsed: byId('loading-elapsed'),
         simpleDescriptionBar: byId('simple-description-bar'),
-        simpleDescriptionTrigger: byId('simple-description-trigger'),
-        simpleDescriptionHoverPanel: byId('simple-description-hover-panel'),
         simpleDescriptionPreview: byId('simple-description-preview'),
         simpleDescriptionBox: byId('simple-description-box'),
         simpleDescriptionContent: byId('simple-description-content'),

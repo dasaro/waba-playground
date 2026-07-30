@@ -108,8 +108,6 @@
  * @property {HTMLElement | null} loadingSubtext
  * @property {HTMLElement | null} loadingElapsed
  * @property {HTMLElement | null} simpleDescriptionBar
- * @property {HTMLElement | null} simpleDescriptionTrigger
- * @property {HTMLElement | null} simpleDescriptionHoverPanel
  * @property {HTMLElement | null} simpleDescriptionPreview
  * @property {HTMLElement | null} simpleDescriptionBox
  * @property {HTMLTextAreaElement | null} simpleDescriptionContent
