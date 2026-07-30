@@ -433,7 +433,6 @@ oplus(max).
 oplus_identity(#inf).
 otimes_identity(0).
 
-semiring_default_weight(legacy,0).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,0).
 
@@ -441,14 +440,21 @@ semiring_default_weight(neutral,0).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -578,7 +584,6 @@ otimes(max).
 oplus_identity(#sup).
 otimes_identity(#inf).
 
-semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#inf).
 
@@ -586,14 +591,21 @@ semiring_default_weight(neutral,#inf).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -709,7 +721,6 @@ otimes(min).
 oplus_identity(#inf).
 otimes_identity(#sup).
 
-semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#sup).
 
@@ -717,14 +728,21 @@ semiring_default_weight(neutral,#sup).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -845,7 +863,6 @@ otimes(max).
 oplus_identity(#sup).
 otimes_identity(#inf).
 
-semiring_default_weight(legacy,#inf).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,#inf).
 
@@ -853,14 +870,21 @@ semiring_default_weight(neutral,#inf).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -980,7 +1004,6 @@ oplus(max).
 oplus_identity(0).
 otimes_identity(k).
 
-semiring_default_weight(legacy,k).
 %% aba default is #sup (un-discardable): an unweighted assumption then behaves as a
 %% plain ABA assumption whose attack survives any finite budget, so β=0 / no_discard
 %% recovers classical ABA at every k. (In luk's ⊗, a #sup premise saturates to the
@@ -992,14 +1015,21 @@ semiring_default_weight(neutral,k).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -1117,7 +1147,6 @@ oplus(min).
 oplus_identity(#sup).
 otimes_identity(0).
 
-semiring_default_weight(legacy,#sup).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,0).
 
@@ -1125,14 +1154,21 @@ semiring_default_weight(neutral,0).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -1266,7 +1302,6 @@ oplus(max).
 oplus_identity(#inf).
 otimes_identity(0).
 
-semiring_default_weight(legacy,0).
 semiring_default_weight(aba,#sup).
 semiring_default_weight(neutral,0).
 
@@ -1274,14 +1309,21 @@ semiring_default_weight(neutral,0).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
@@ -1410,23 +1452,27 @@ explicit_default_policy(aba).
 %%
 %% Semiring modules provide semiring_default_weight(policy, value).
 %% Callers may optionally load one explicit policy module from defaults/.
-%% If none is loaded, legacy behavior is preserved.
+%% If none is loaded the \`neutral\` policy applies: delta = the semiring's ⊗-identity, so an
+%% unweighted assumption is TRANSPARENT in a conjunction.
+%%
+%% This used to default to a third policy, \`legacy\`, retired on 2026-07-30. A policy
+%% contributes exactly one constant, and legacy's coincided with \`neutral\` for godel, arctic,
+%% lukasiewicz and bottleneck_cost, and with \`aba\` for tropical -- so it was a third name for
+%% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
+%% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
 configured_default_policy :- explicit_default_policy(_).
 
 :- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
 
 active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(legacy) :- not configured_default_policy.
+active_default_policy(neutral) :- not configured_default_policy.
 
 default_assumption_weight(W) :-
     active_default_policy(P),
     semiring_default_weight(P, W).
 
 :- active_default_policy(P), not semiring_default_weight(P, _).
-`,
-        "legacy": `%% Preserve the pre-refactor default behavior for unweighted assumptions.
-explicit_default_policy(legacy).
 `,
         "neutral": `%% Use the semiring-specific conjunction-neutral default for unweighted assumptions.
 explicit_default_policy(neutral).
@@ -1581,7 +1627,7 @@ some_discard :- discarded_attack(_,_,_).
 
 %% Exact classical-ABA recovery is constraint/no_discard.lp (forbids ALL discards, for
 %% ANY weight) — NOT ub with beta=0. A budget of 0 here is a genuine budget=0: the cost
-%% semirings' ⊗-identity (#inf, the "negligible-cost" weight of an unweighted legacy
+%% semirings' ⊗-identity (#inf, the "negligible-cost" weight of an unweighted
 %% attack or a fact-derived contrary) is free to discard at any budget by design — a
 %% zero-cost attack costs nothing to drop. For plain ABA use no_discard, or the \`aba\`
 %% default policy (unweighted attacks are then #sup, hence un-discardable above).
@@ -2273,7 +2319,6 @@ contrary(assume_auxiliary_h1, excessive_complexity).
         "defaults": [
             "aba",
             "base",
-            "legacy",
             "neutral"
         ],
         "monoids": [
