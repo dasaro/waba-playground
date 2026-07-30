@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-16';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-16';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-16';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-16';
+import { PopupManager } from './popup-manager.js?v=20260730-17';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-17';
+import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-17';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-17';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -475,10 +475,10 @@ export class OutputManager {
 
         // Textual Result (Clingo-like format) - Collapsible
         contentHTML += '<div class="assumption-section textual-result-section">';
-        contentHTML += '<span class="section-label textual-result-toggle" data-extension="${answerNumber}" style="cursor: pointer; user-select: none;">';
+        contentHTML += `<span class="section-label textual-result-toggle" data-extension="${answerNumber}" style="cursor: pointer; user-select: none;">`;
         contentHTML += '<span class="toggle-icon">▶</span> Textual Result';
         contentHTML += '</span>';
-        contentHTML += '<div class="textual-result" data-extension="${answerNumber}" style="display: none;">';
+        contentHTML += `<div class="textual-result" data-extension="${answerNumber}" style="display: none;">`;
 
         // Build textual representation
         let textualLines = [];
