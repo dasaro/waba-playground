@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-17';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-17';
-import { ParserUtils, escapeHtml } from './parser-utils.js?v=20260730-17';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-17';
+import { PopupManager } from './popup-manager.js?v=20260730-18';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-18';
+import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-18';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-18';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -65,12 +65,21 @@ export class OutputManager {
 
     static describeReading(config) {
         if (config.abaRecovery) return 'no discarding (ABA recovery)';
-        // A defence semantics carries its OWN sum-bounded budget over the objections it
-        // declines to answer, and composes with no_discard -- so budgetMode is 'none' by
-        // construction. Reporting "no discarding" for it was a flat contradiction of the
-        // beta the run actually spent.
+        // A defence semantics carries its OWN budget over the objections it declines to
+        // answer, and composes with no_discard -- so budgetMode is 'none' by construction.
+        // Reporting "no discarding" for it was a flat contradiction of the beta it spent.
+        //
+        // The DIRECTION follows the polarity, exactly as semantics/admissible.lp derives it.
+        // Under strength (oplus = max) a bigger weight is a harder objection, so the total
+        // conceded is bounded ABOVE: `#sum{paid} <= beta`. Under cost (oplus = min) a smaller
+        // weight is a BETTER-supported objection, so bounding above would licence dismissing
+        // precisely the best-supported ones; the bound reverses to `#min{paid} >= beta` and a
+        // bigger beta is more RESTRICTIVE. Hard-coding <= told a tropical user to raise beta
+        // for more results when raising it removes them.
         if (OutputManager.isDefenceSemantics(config.semantics)) {
-            return `unanswered objections \u2264 \u03b2 (${config.semantics})`;
+            return config.polarity === 'lower'
+                ? `every unanswered objection \u2265 \u03b2 (${config.semantics})`
+                : `unanswered objections \u2264 \u03b2 (${config.semantics})`;
         }
         if (config.budgetMode === 'none') return 'no discarding';
         const bound = config.budgetMode === 'lb' ? '\u2265' : '\u2264';
@@ -83,8 +92,13 @@ export class OutputManager {
      * algebra in the stats line credited a control that did not act on the run.
      */
     static weightsWereConsulted(config) {
+        // abaRecovery FIRST, in the same order describeReading tests it. Recovery zeroes beta
+        // and loads no_discard, so not even a defence semantics' own budget prices anything --
+        // checking the defence case first credited the algebra while the line beside it said
+        // "no discarding (ABA recovery)".
+        if (config.abaRecovery) return false;
         if (OutputManager.isDefenceSemantics(config.semantics)) return true;
-        return !config.abaRecovery && config.budgetMode !== 'none';
+        return config.budgetMode !== 'none';
     }
 
     // ===================================
@@ -105,16 +119,22 @@ export class OutputManager {
         // atom -> Set of declared weights, so a duplicate (which core/base.lp rejects) can be
         // named instead of surfacing as a bare "no extensions"
         this.frameworkWeights = new Map();
-        if (frameworkCode) {
-            for (const m of frameworkCode.matchAll(/\bweight\s*\(\s*([^,\s]+)\s*,\s*([^)]+?)\s*\)/g)) {
+        // Comments stripped FIRST: clingo never sees them, so neither may the diagnosis. A
+        // single `% weight(a, 5).` left in while trying another value was enough to make the
+        // no-extensions branch accuse the user of a duplicate weight on a framework
+        // core/base.lp accepts -- and a commented-out head/body pair was enough to report a
+        // derivation cycle that does not exist.
+        const source = frameworkCode ? stripAspComments(frameworkCode) : '';
+        if (source) {
+            for (const m of source.matchAll(/\bweight\s*\(\s*([^,\s]+)\s*,\s*([^)]+?)\s*\)/g)) {
                 const values = this.frameworkWeights.get(m[1]) || new Set();
                 values.add(m[2].trim());
                 this.frameworkWeights.set(m[1], values);
             }
-            for (const rule of ParserUtils.parseRules(frameworkCode)) {
+            for (const rule of ParserUtils.parseRules(source)) {
                 this.frameworkRules.set(rule.id, { head: rule.head, body: rule.body });
             }
-            for (const a of ParserUtils.parseAssumptions(frameworkCode)) {
+            for (const a of ParserUtils.parseAssumptions(source)) {
                 this.frameworkAssumptions.add(a);
             }
         }
@@ -388,7 +408,16 @@ export class OutputManager {
             contentHTML += '</div>';
         }
 
-        // Successful attacks
+        // Successful attacks.
+        //
+        // NOTE: this section, "Derived Atoms" and "Active Contraries" below, and the
+        // supported_with_weight lines in the Textual Result, are all gated on predicates that
+        // filter/projection.lp does not #show -- and config-controller pins filterType to
+        // 'projection' for every run. They are therefore unreachable today. They are kept
+        // rather than deleted because they are the renderer for filter/standard.lp, which is
+        // in the bundle and one config change away; deleting them would silently make a
+        // standard-filter run render less than it did. Do NOT document them as things the
+        // user will see.
         if (parsed.successful.length > 0) {
             contentHTML += '<div class="assumption-section">';
             contentHTML += '<span class="section-label">Active Attacks:</span>';

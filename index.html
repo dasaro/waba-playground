@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260730-17">
+    <link rel="stylesheet" href="style.css?v=20260730-18">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260730-17"></script>
+    <script src="modules/prism-waba.js?v=20260730-18"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260730-17"></script>
-    <script src="clingo.web.js?v=20260730-17"></script>
+    <script src="modules/wasm-config.js?v=20260730-18"></script>
+    <script src="clingo.web.js?v=20260730-18"></script>
 </head>
 <body>
     <div class="container">
@@ -122,7 +122,7 @@
                         <div class="config-item" id="luk-k-container" style="display:none">
                             <label for="luk-k-input">Łukasiewicz bound k</label>
                             <input type="number" id="luk-k-input" class="select" value="10" min="1" max="1000000">
-                            <div class="config-note">⊗ = max(0, a+b−k). Keep k near your weight scale; far above it, derivations erode to 0. The playground defaults to 10 for these small-integer examples; <code>bin/waba</code> defaults to 1000, so pass <code>--luk-k 10</code> to reproduce a run here.</div>
+                            <div class="config-note">⊗ = max(0, a+b−k), so a derivation erodes by (k − w) at every step. k must sit at your weight scale: far above it everything collapses to 0, far below it nothing erodes. The shipped Łukasiewicz example works at k = 1000 with weights near 900. To reproduce a run with <code>bin/waba</code>, pass <code>--luk-k</code> the value shown in this field — its own default is 1000.</div>
                         </div>
 
                         <div class="config-item">
@@ -855,26 +855,17 @@ contrary(b, attack_element).</code></pre>
                             <dt><strong>Assumptions</strong></dt>
                             <dd>A green <span class="chip in"><span class="chip-icon">&#10003;</span>chip</span> per accepted assumption, a grey <span class="chip out"><span class="chip-icon">&#10007;</span>chip</span> per rejected one.</dd>
 
-                            <dt><strong>Active Attacks</strong></dt>
-                            <dd>Written <code>a1, a2 &#8866; c [t]</code>: the assumptions on the left derive the attacking element <code>c</code>, which defeats <code>t</code>. A <code>&#8868;</code> on the left means the element needs no assumption at all.</dd>
-
                             <dt><strong>Discarded Attacks</strong></dt>
-                            <dd>Same shape with <code>&#8892;</code>, plus the weight that was paid for declining it. These are what the budget buys.</dd>
-
-                            <dt><strong>Derived Atoms</strong></dt>
-                            <dd>Non-assumption conclusions that hold, each with its propagated weight. Click one to see the rule that derives it.</dd>
-
-                            <dt><strong>Active Contraries</strong></dt>
-                            <dd>Every contrary that is supported, and whether its target survived.</dd>
+                            <dd>Written <code>a1, a2 &#8892; c [t]</code>: the assumptions on the left derive the objection <code>c</code> against <code>t</code>, and this set declined to answer it &mdash; at the weight shown. These are what the budget buys. A <code>&#8868;</code> on the left means the objection needs no assumption at all. The supporting assumptions are reconstructed from your framework source, because the witness does not carry them.</dd>
 
                             <dt><strong>Textual Result</strong></dt>
-                            <dd>Collapsed by default: the raw <code>in/1</code>, <code>supported_with_weight/2</code>, <code>discarded_attack/3</code>, <code>budget_value/1</code> and <code>cost/1</code> atoms, as clingo reported them.</dd>
+                            <dd>Collapsed by default: the raw <code>in/1</code>, <code>discarded_attack/3</code> and <code>budget_value/1</code> atoms as clingo reported them, plus the computed <code>cost/1</code>. That is the whole witness &mdash; the output filter is always <code>projection</code>, which shows nothing else.</dd>
                         </dl>
                     </div>
 
                     <div class="results-section">
                         <h4>📈 Execution stats</h4>
-                        <p>One line under the cards: how many extensions were found, how long the solve took, which algebra ran, and the reading the budget was given &mdash; for instance <code>sum of concessions &le; &beta;</code>, or <code>unanswered objections &le; &beta;</code> under a defence semantics. When nothing may be conceded and the semantics has no budget of its own, the algebra is flagged <em>unused</em>, because no weight is priced on such a run.</p>
+                        <p>One line under the cards: how many extensions were found, how long the solve took, which algebra ran, and the reading the budget was given &mdash; <code>sum of concessions &le; &beta;</code> for a bounded run, or <code>unanswered objections &le; &beta;</code> under a defence semantics. Note the direction follows the algebra's polarity: under a <em>cost</em> algebra (Tropical, Bottleneck-cost) the defence bound reverses to <code>every unanswered objection &ge; &beta;</code>, so a <strong>bigger &beta; is more restrictive</strong>, not more permissive. Whenever nothing is priced at all &mdash; ABA recovery, or no discarding on a conflict-based semantics &mdash; the algebra is flagged <em>unused</em>, because changing it cannot change a single extension.</p>
                     </div>
 
                     <div class="results-section">
@@ -908,6 +899,6 @@ contrary(b, attack_element).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260730-17"></script>
+    <script type="module" src="app.js?v=20260730-18"></script>
 </body>
 </html>

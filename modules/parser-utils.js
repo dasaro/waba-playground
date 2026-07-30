@@ -23,6 +23,54 @@ export function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+/**
+ * Remove ASP comments so a commented-out fact is not read as a live one.
+ *
+ * Every regex-based reader in this file scans the raw framework text, which means a line the
+ * user commented out while trying an alternative still contributes rules, weights and
+ * assumptions. That is not cosmetic: the no-extensions diagnosis accuses the user of a
+ * duplicate `weight/2` or a derivation cycle that exists only in a comment, and clingo -- which
+ * does strip them -- reports no such guard violation.
+ *
+ * Handles `%* ... *%` blocks and `%` line comments, and does not treat a `%` inside a
+ * double-quoted ASP term as a comment marker.
+ *
+ * @param {string} code
+ * @returns {string} the same text with comments blanked, line structure preserved
+ */
+export function stripAspComments(code) {
+    let out = '';
+    let i = 0;
+    let inString = false;
+    while (i < code.length) {
+        const c = code[i];
+        if (inString) {
+            out += c;
+            if (c === '\\' && i + 1 < code.length) { out += code[i + 1]; i += 2; continue; }
+            if (c === '"') inString = false;
+            i += 1;
+            continue;
+        }
+        if (c === '"') { inString = true; out += c; i += 1; continue; }
+        if (c === '%' && code[i + 1] === '*') {
+            const end = code.indexOf('*%', i + 2);
+            const block = code.slice(i, end === -1 ? code.length : end + 2);
+            // keep the newlines so reported line numbers stay meaningful
+            out += block.replace(/[^\n]/g, ' ');
+            i = end === -1 ? code.length : end + 2;
+            continue;
+        }
+        if (c === '%') {
+            const nl = code.indexOf('\n', i);
+            i = nl === -1 ? code.length : nl;
+            continue;
+        }
+        out += c;
+        i += 1;
+    }
+    return out;
+}
+
 export class ParserUtils {
     /**
      * Parse assumption predicates from ASP code

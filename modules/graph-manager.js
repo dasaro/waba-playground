@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-17';
-import { ParserUtils } from './parser-utils.js?v=20260730-17';
-import { UIManager } from './ui-manager.js?v=20260730-17';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-17';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-17';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-17';
+import { GraphUtils } from './graph-utils.js?v=20260730-18';
+import { ParserUtils } from './parser-utils.js?v=20260730-18';
+import { UIManager } from './ui-manager.js?v=20260730-18';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-18';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-18';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-18';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
@@ -268,14 +268,24 @@ export class GraphManager {
         this.updateIsolatedAssumptionsOverlay();
 
         this.runGraphLayout(true);
-        setTimeout(() => {
-            this.network.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-        }, 600);
+        // The camera keeps moving for ~1.1 s after this method returns: a deferred fit at
+        // +600 ms whose animation runs another 500. Anything that reads a node's SCREEN
+        // position before that (a hover probe, a click) computes it from a transform that no
+        // longer holds. Expose the settle as a promise so callers can wait on the real event
+        // instead of a sleep sized by guesswork.
+        const FIT_DELAY = 600;
+        const FIT_DURATION = 500;
+        this.cameraSettled = new Promise((resolve) => {
+            setTimeout(() => {
+                this.network.fit({
+                    animation: {
+                        duration: FIT_DURATION,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                setTimeout(resolve, FIT_DURATION + 50);
+            }, FIT_DELAY);
+        });
     }
 
     /**

@@ -31,6 +31,15 @@ async function settled(page) {
         () => (document.body.dataset.wabaPending || '0') === '0', null, { timeout: 60000 });
 }
 
+// Waits for a solve to finish. NOT `!runBtn.disabled`: that property is written exactly once
+// in the whole app (clingo-manager's give-up branch) and never cleared, so waiting on it
+// returned on the first poll and every `toHaveCount(0)` after it asserted against the DOM the
+// test had just blanked -- unfalsifiable by construction.
+async function runFinished(page) {
+    await page.waitForFunction(
+        () => document.body.dataset.wabaRunning === '0', null, { timeout: 120000 });
+}
+
 test('a normal load solves the default example without any interaction', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -209,8 +218,7 @@ test('the budget buys exactly the extensions the CLI says it buys', async ({ pag
         await page.fill('#budget-input', String(beta));
         await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
         await page.click('#run-btn');
-        await page.waitForFunction(() => !document.getElementById('run-btn').disabled,
-            null, { timeout: 90000 });
+        await runFinished(page);
         await expect(page.locator('.answer-header'),
             `beta=${beta} should admit ${expected} stable extension(s)`).toHaveCount(expected);
     }
@@ -228,8 +236,7 @@ test('budgeted admissible matches the CLI count and beta* at every budget',
             await page.fill('#budget-input', String(beta));
             await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
             await page.click('#run-btn');
-            await page.waitForFunction(() => !document.getElementById('run-btn').disabled,
-                null, { timeout: 120000 });
+            await runFinished(page);
             await expect(page.locator('.answer-header'),
                 `beta=${beta} should admit ${expected} admissible extension(s)`)
                 .toHaveCount(expected);
@@ -601,6 +608,132 @@ test('out-of-range numeric input is clamped and reflected back', async ({ page }
     expect(clamped.numModels).toBe(0);
     await expect(page.locator('#timeout-input')).toHaveValue('600');
     await expect(page.locator('#num-models-input')).toHaveValue('0');
+});
+
+test('the stats line reports the bound direction the algebra actually applies',
+    async ({ page }) => {
+        test.setTimeout(120000);
+        await waitForClingoReady(page);
+        await page.selectOption('#example-select', 'conflict_cycle');
+        await settled(page);
+        await page.selectOption('#semantics-select', 'admissible');
+
+        // semantics/admissible.lp derives the bound from the POLARITY: `#sum{paid} <= beta`
+        // under oplus=max, `#min{paid} >= beta` under oplus=min. Hard-coding "<= beta" told a
+        // cost-algebra user to RAISE beta for more results, when raising it removes them.
+        await page.selectOption('#semiring-select', 'godel');
+        await page.fill('#budget-input', '8');
+        await page.click('#run-btn');
+        await runFinished(page);
+        await expect(page.locator('#stats')).toContainText('unanswered objections ≤ β');
+
+        await page.selectOption('#semiring-select', 'tropical');
+        await page.fill('#budget-input', '0');
+        await page.click('#run-btn');
+        await runFinished(page);
+        await expect(page.locator('#stats')).toContainText('every unanswered objection ≥ β');
+    });
+
+test('the algebra is flagged unused whenever no weight is priced', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+
+    // ABA recovery zeroes beta and loads no_discard, so NOTHING is priced -- including a
+    // defence semantics' own budget. weightsWereConsulted() used to short-circuit on the
+    // defence check before it ever looked at abaRecovery, so the stats line credited the
+    // algebra and denied the discarding in the same sentence.
+    const abaToggle = page.locator('label.switch-toggle[for="aba-recovery-toggle"] .switch-slider');
+    for (const semantics of ['stable', 'admissible']) {
+        await page.selectOption('#semantics-select', semantics);
+        if (!await page.locator('#aba-recovery-toggle').isChecked()) await abaToggle.click();
+        await page.click('#run-btn');
+        await runFinished(page);
+        await expect(page.locator('#stats'), `${semantics} under ABA recovery`)
+            .toContainText('no weight is priced');
+        await expect(page.locator('#stats')).toContainText('no discarding (ABA recovery)');
+    }
+});
+
+test('a commented-out fact is not read as a live one', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+
+    // The no-extensions diagnosis scanned the raw source, so `% weight(a, 5).` left in while
+    // trying another value was enough to accuse the user of a duplicate weight -- on a
+    // framework core/base.lp accepts without complaint. Same for a commented-out head/body
+    // pair and the derivation-cycle diagnosis. clingo strips comments; so must we.
+    await page.setInputFiles('#file-upload-input', {
+        name: 'commented.lp',
+        mimeType: 'text/plain',
+        buffer: Buffer.from(
+            '% weight(a, 5).\n'
+            + '% head(r9, p). body(r9, q).\n'
+            + 'assumption(a). assumption(b). assumption(c).\n'
+            + 'weight(a, 10). weight(b, 3). weight(c, 3).\n'
+            + 'head(r1, ca). body(r1, b).\n'
+            + 'head(r2, cb). body(r2, c).\n'
+            + 'head(r3, cc). body(r3, a).\n'
+            + 'head(r5, q). body(r5, p).\n'
+            + 'contrary(a, ca). contrary(b, cb). contrary(c, cc).\n'
+        )
+    });
+    await settled(page);
+    await page.selectOption('#budget-select', 'none');
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    // The odd cycle really is UNSAT with nothing conceded -- but for the cycle, not for a
+    // duplicate weight or a derivation cycle that exist only inside comments.
+    const output = await page.locator('#output').innerText();
+    expect(output, 'accused the user of a weight that is commented out')
+        .not.toMatch(/more than one weight/);
+    expect(output, 'reported a derivation cycle that is commented out')
+        .not.toMatch(/depend.? on themselves|not well-founded/i);
+});
+
+test('a failed run reopens the Results panel too', async ({ page }) => {
+    test.setTimeout(90000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+
+    // The expand was on the success path only, so the four paths that write a FAILURE into
+    // #output still wrote it into a display:none panel -- a failure the user cannot see.
+    const panel = page.locator('.panel[data-panel="output"]');
+    await panel.locator('.panel-toggle').click();
+    await expect(panel).toHaveAttribute('data-collapsed', 'true');
+
+    await page.selectOption('#input-mode', 'advanced');
+    await page.fill('#code-editor', '');
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    await expect(panel).toHaveAttribute('data-collapsed', 'false');
+    await expect(page.locator('#output')).toContainText('No framework code to run');
+});
+
+test('a defence detour returns the budget and the Results choice intact', async ({ page }) => {
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'conflict_cycle');
+    await settled(page);
+    await page.selectOption('#semantics-select', 'stable');
+    await page.selectOption('#budget-select', 'sum-ub');
+    await page.fill('#budget-input', '8');
+    await page.selectOption('#results-select', 'min');
+
+    // Two destructive writes: the algebra preselect's beta reset fired through the defence
+    // pin and never restored, and resultsSelect was overwritten with no snapshot at all.
+    await page.selectOption('#semantics-select', 'admissible');
+    await page.selectOption('#semiring-select', 'tropical');
+    await expect(page.locator('#budget-input')).toHaveValue('0');
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'stable');
+
+    await expect(page.locator('#budget-select')).toHaveValue('sum-ub');
+    await expect(page.locator('#budget-input'), 'beta lost across the detour').toHaveValue('8');
+    await expect(page.locator('#results-select'), 'Results choice lost').toHaveValue('min');
 });
 
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-17';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-18';
 
 export class ConfigController {
     constructor(dom) {
@@ -65,10 +65,13 @@ export class ConfigController {
             optMode,
             // normalizeConfig zeroes this under ABA recovery, so the raw field is read here.
             beta: ConfigController.readNumber(this.dom.budgetInput, 0),
-            // NOTE: k defaults to 10 here but to 1000 in bin/waba. This divergence is
-            // deliberate and surfaced in the field's own note: the shipped examples use
-            // small-integer weights, and Lukasiewicz's max(0, a+b-k) erodes any such
-            // derivation to 0 at k = 1000. Pass --luk-k 10 to reproduce a playground run.
+            // The empty-field fallback is 10; bin/waba's own default is 1000. Neither is a
+            // universal right answer -- k has to sit at the framework's weight scale, and a
+            // preset that needs a particular k carries it (testimony_erosion ships k = 1000
+            // over weights of 900, where the erosion it demonstrates only exists). Do NOT
+            // describe 10 as "the playground default for small-integer examples": the one
+            // Lukasiewicz example shipped is not small-integer, and at k = 10 it does not
+            // even terminate.
             lukK: ConfigController.readNumber(this.dom.lukKInput, 10),
             numModels: ConfigController.readNumber(this.dom.numModelsInput, 0),
             timeout: ConfigController.readNumber(this.dom.timeoutInput, 60) * 1000,
@@ -103,6 +106,9 @@ export class ConfigController {
         // A freshly applied config supersedes any held ABA-recovery snapshot.
         this._savedPolicy = undefined;
         this._savedReading = undefined;
+        this._savedResults = undefined;
+        // The preset owns beta, so per-direction memory from before it is stale.
+        this._betaFor = undefined;
     }
 
     populateExampleSelect(examples, defaultKey = 'conflict_cycle') {
@@ -182,10 +188,25 @@ export class ConfigController {
             // silently yields nothing -- switching to a cost algebra with the presets' beta=8
             // returned zero extensions. When the reading flips, move beta to that reading's
             // permissive end so the run still shows something to tighten from.
-            const flipped = previousReading !== 'none'
-                && previousReading.split('-')[1] !== reading.split('-')[1];
-            if (flipped && reading.endsWith('-lb')) {
-                this.dom.budgetInput.value = '0';
+            const previousBound = previousReading === 'none' ? null : previousReading.split('-')[1];
+            const bound = reading.split('-')[1];
+            if (previousBound && previousBound !== bound) {
+                // Remember beta PER DIRECTION and restore it, rather than only forcing the new
+                // direction's permissive end. Forcing alone was one-way: leaving a strength
+                // algebra reset beta to 0 and coming back left it at 0, which under `ub` (and
+                // under a defence semantics, whose own bound follows the same polarity) means
+                // nothing is affordable -- so a there-and-back trip through Tropical silently
+                // turned a working beta=8 into an empty result.
+                this._betaFor = this._betaFor || {};
+                this._betaFor[previousBound] = this.dom.budgetInput.value;
+                const remembered = this._betaFor[bound];
+                if (remembered !== undefined) {
+                    this.dom.budgetInput.value = remembered;
+                } else if (bound === 'lb') {
+                    // Nothing remembered yet: 0 is the permissive end of a lower bound, so the
+                    // run still shows something to tighten from.
+                    this.dom.budgetInput.value = '0';
+                }
             }
         }
         this._lastAlgebra = algebra;
@@ -228,7 +249,17 @@ export class ConfigController {
         // only the last model. The control was inert at best and lossy at worst.
         const forceEnumerate = isDefence;
         if (forceEnumerate) {
+            // Snapshot and restore, exactly as the budget reading does. Overwriting outright
+            // meant a look at a defence semantics permanently discarded the user's choice:
+            // Stable -> Admissible -> Stable came back on "All extensions" with no way to know
+            // it had been changed.
+            if (this._savedResults === undefined) {
+                this._savedResults = this.dom.resultsSelect.value;
+            }
             this.dom.resultsSelect.value = 'all';
+        } else if (this._savedResults !== undefined) {
+            this.dom.resultsSelect.value = this._savedResults;
+            this._savedResults = undefined;
         }
 
         this.dom.defaultPolicySelect.disabled = abaRecovery;

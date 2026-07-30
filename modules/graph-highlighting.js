@@ -1,4 +1,4 @@
-import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-17';
+import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-18';
 function colorToRGBA(color, opacity = 0.3) {
     if (typeof color === 'object' && color.color) {
         color = color.color;

@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveWabaRoot } from '../../scripts/waba-root.js';
 
 // Where the captured downloads are kept so they can be validated with the real clingo
 // afterwards. A browser test cannot run clingo itself.
@@ -158,18 +159,34 @@ test('both export formats preserve the description', async ({ page }) => {
 // The playground's own exports are one shape; the repository's curated frameworks are another
 // (compact `head(r1,x). body(r1,y).` runs, `#const beta`, `budget(beta)`, block comments). A
 // user loading their own .lp hits that second shape, so it has to be exercised too.
-// Resolved the same way scripts/sync-modules.js resolves the core tree, so this suite is
-// not pinned to one machine's home directory.
-const WABA_ROOT = process.env.WABA_ROOT
-    || path.join(fileURLToPath(new URL('../../..', import.meta.url)), 'WABA');
-const CANONICAL = path.join(WABA_ROOT, 'examples');
-const CANONICAL_FILES = fs.existsSync(CANONICAL)
+// The tree that OWNS the bundle, resolved by CONTENT via the shared resolver.
+//
+// Resolving it "the same way sync-modules.js does" -- the sibling ../WABA -- looked right and
+// was wrong: that sibling is a stale pre-modular checkout, so this suite silently stopped
+// exercising the shipped reference frameworks (probabilistic.lp and the ASPforABA journal
+// example vanished) and started exercising 25 deprecated ones instead. sync-modules.js gets
+// away with that default because a wrong tree makes it exit 1; here a wrong tree just
+// enumerates different files and stays green.
+const { root: WABA_ROOT, candidates: CANDIDATE_ROOTS } = resolveWabaRoot(
+    fileURLToPath(new URL('../..', import.meta.url))
+);
+const CANONICAL = WABA_ROOT ? path.join(WABA_ROOT, 'examples') : null;
+
+const CANONICAL_FILES = CANONICAL && fs.existsSync(CANONICAL)
     ? fs.readdirSync(CANONICAL, { withFileTypes: true })
         .filter((d) => d.isDirectory())
         .flatMap((d) => fs.readdirSync(path.join(CANONICAL, d.name))
             .filter((f) => f.endsWith('.lp'))
             .map((f) => path.join(CANONICAL, d.name, f)))
     : [];
+
+// An empty enumeration must be a failure, not silence: zero canonical tests looks exactly
+// like zero canonical regressions.
+test('the canonical framework suite found a source tree to run against', () => {
+    expect(WABA_ROOT, `no WABA checkout with bin/sync-playground.mjs among ${CANDIDATE_ROOTS.join(', ')}`)
+        .toBeTruthy();
+    expect(CANONICAL_FILES.length, 'the canonical example set is empty').toBeGreaterThan(0);
+});
 
 for (const file of CANONICAL_FILES) {
     test(`loads the canonical framework ${path.basename(file)}`, async ({ page }) => {

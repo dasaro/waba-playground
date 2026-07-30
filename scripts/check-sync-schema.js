@@ -17,9 +17,12 @@ import { fileURLToPath } from 'url';
 
 import { validateWabaModulesShape } from '../runtime/module-schema.js';
 import { wabaModules } from '../waba-modules.js';
+import { resolveWabaRoot } from './waba-root.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const WABA_ROOT = process.env.WABA_ROOT || path.join(ROOT, '..', 'WABA');
+// Resolved by CONTENT -- see scripts/waba-root.js for why position is not enough.
+const { root: FOUND_ROOT, explicit: ROOT_EXPLICIT } = resolveWabaRoot(ROOT);
+const WABA_ROOT = FOUND_ROOT || process.env.WABA_ROOT || path.join(ROOT, '..', 'WABA');
 
 validateWabaModulesShape();
 console.log('waba-modules schema check passed.');
@@ -45,16 +48,22 @@ function resolveIncludes(content, basedir) {
     });
 }
 
-// Setting WABA_ROOT is an explicit request to check against THAT tree, so a skip there is
-// a broken invocation, not an absent one: the gate is always run with WABA_ROOT= set, and
-// a typo in the path used to turn the whole freshness check into a silent no-op.
-const strict = Boolean(process.env.WABA_ROOT) || process.env.WABA_STRICT_SYNC === '1';
+// Strict whenever a real source tree was located: at that point "cannot check" means the
+// bundle and the tree disagree about which modules exist, which is exactly the staleness this
+// gate is for. Keying strictness on `process.env.WABA_ROOT` instead left it off in the one
+// invocation that matters, since nothing in package.json sets it.
+// A genuine fresh clone with no core tree beside it still skips; WABA_STRICT_SYNC=1 forces
+// even that to fail.
+const strict = Boolean(FOUND_ROOT) || ROOT_EXPLICIT || process.env.WABA_STRICT_SYNC === '1';
 
 function cannotCheck(reason) {
     if (strict) {
         console.error(`waba-modules freshness check FAILED: ${reason}`);
-        console.error('WABA_ROOT was set explicitly, so this is treated as an error rather '
-            + 'than a skip. Unset it to allow the check to be skipped.');
+        console.error(ROOT_EXPLICIT
+            ? 'WABA_ROOT was set explicitly, so it is authoritative: point it at the WABA '
+                + 'checkout that owns this bundle (the one carrying bin/sync-playground.mjs), '
+                + 'or unset it to let the check locate that tree itself.'
+            : 'A WABA checkout was located, so the bundle must match it. Re-run `npm run sync`.');
         process.exit(1);
     }
     console.log(`waba-modules freshness check SKIPPED: ${reason}`);

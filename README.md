@@ -182,14 +182,18 @@ That covers:
 - pure-module tests
 - headless browser smoke tests
 
-The graph/output layers still consume the same semantic runtime predicates:
+The output filter is always `projection`, so a witness carries exactly:
 
 - `in/1`
 - `out/1`
-- `supported_with_weight/2`
-- `attacks_successfully_with_weight/3`
 - `discarded_attack/3`
 - `budget_value/1` in bounded runs
+- the two advisories, `weight_on_derived_dominated/3` and `framework_budget_ignored/1`
+
+`supported_with_weight/2` and `attacks_successfully_with_weight/3` are **not** among them:
+`filter/standard.lp` is never loaded. Anything the UI wants to say about derivations or
+attack provenance is reconstructed from the framework SOURCE, not read out of the witness
+(see `OutputManager.frameworkRules` / `findSupportingAssumptions`).
 
 The live browser surface also inherits one documented implementation limit from the mature WABA repo:
 

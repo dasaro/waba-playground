@@ -1,17 +1,17 @@
-import { ThemeManager } from '../modules/theme-manager.js?v=20260730-17';
-import { FontManager } from '../modules/font-manager.js?v=20260730-17';
-import { UIManager } from '../modules/ui-manager.js?v=20260730-17';
-import { PanelManager } from '../modules/panel-manager.js?v=20260730-17';
-import { FileManager } from '../modules/file-manager.js?v=20260730-17';
-import { GraphManager } from '../modules/graph-manager.js?v=20260730-17';
-import { PopupManager } from '../modules/popup-manager.js?v=20260730-17';
-import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-17';
-import { OutputManager } from '../modules/output-manager.js?v=20260730-17';
-import { ExportManager } from '../modules/export-manager.js?v=20260730-17';
-import { ConfigController } from './config-controller.js?v=20260730-17';
-import { DocsController } from './docs-controller.js?v=20260730-17';
-import { EditorController } from './editor-controller.js?v=20260730-17';
-import { ExamplesController } from './examples-controller.js?v=20260730-17';
+import { ThemeManager } from '../modules/theme-manager.js?v=20260730-18';
+import { FontManager } from '../modules/font-manager.js?v=20260730-18';
+import { UIManager } from '../modules/ui-manager.js?v=20260730-18';
+import { PanelManager } from '../modules/panel-manager.js?v=20260730-18';
+import { FileManager } from '../modules/file-manager.js?v=20260730-18';
+import { GraphManager } from '../modules/graph-manager.js?v=20260730-18';
+import { PopupManager } from '../modules/popup-manager.js?v=20260730-18';
+import { ClingoManager } from '../modules/clingo-manager.js?v=20260730-18';
+import { OutputManager } from '../modules/output-manager.js?v=20260730-18';
+import { ExportManager } from '../modules/export-manager.js?v=20260730-18';
+import { ConfigController } from './config-controller.js?v=20260730-18';
+import { DocsController } from './docs-controller.js?v=20260730-18';
+import { EditorController } from './editor-controller.js?v=20260730-18';
+import { ExamplesController } from './examples-controller.js?v=20260730-18';
 
 export class PlaygroundController {
     constructor(dom, store) {
@@ -312,6 +312,7 @@ export class PlaygroundController {
             return;
         }
         this.isRunning = true;
+        this.setRunningFlag(true);
         const generation = (this._runGeneration = this._runGeneration + 1);
         // The initial run is unprompted, so covering the whole UI with a modal overlay for it
         // would be startling; the user did not ask for it and cannot tell what is happening.
@@ -372,22 +373,36 @@ export class PlaygroundController {
                 result.defenceCosts
             );
             UIManager.hideOutputEmptyState();
-            // Panel collapse state is persisted in localStorage, so a user who once collapsed
-            // Results kept it collapsed on every later visit -- a run then completed with the
-            // extensions written into a panel that shows nothing, which reads as a silent
-            // failure. Results are the point of pressing Run, so surface them.
-            this.panelManager.expandPanel('output');
         } catch (error) {
             console.error('Error in runWABA:', error);
             this.outputManager.log(`❌ Error: ${error.message}`, 'error');
         } finally {
             this.isRunning = false;
+            this.setRunningFlag(false);
+            // EVERY exit path lands here, so this is the only place that can guarantee the
+            // Results panel is open. Putting it on the success path meant the four paths that
+            // write a FAILURE into #output -- empty editor, solver not ready, a rejected
+            // config, a solver error -- still wrote it into a display:none panel. A failure
+            // the user cannot see is worse than a result they cannot see.
+            this.panelManager.expandPanel('output');
             if (!initial) {
                 UIManager.hideLoadingOverlay();
             } else {
                 this.markReady();
             }
         }
+    }
+
+    /**
+     * Publishes whether a solve is in flight, on body[data-waba-running].
+     *
+     * There is no other observable: #run-btn.disabled is written exactly once in the whole
+     * app (clingo-manager's give-up branch) and never cleared, so a test waiting on
+     * `!runBtn.disabled` returns on its first poll and asserts against the pre-run DOM.
+     */
+    setRunningFlag(running) {
+        const body = this.dom.document?.body;
+        if (body) body.dataset.wabaRunning = running ? '1' : '0';
     }
 
     async regenerateGraph() {
@@ -422,6 +437,14 @@ export class PlaygroundController {
         });
 
         await this.graphManager.updateGraph(frameworkCode, mode, this.clingoManager, this.configController.getCurrentConfig());
+        // Register the camera settle in the pending counter WITHOUT awaiting it. The counter
+        // therefore covers the deferred fit (so a test that reads a screen position waits for
+        // it), while the run path -- which awaits pendingGraphUpdate -- is not delayed by the
+        // ~1.1 s animation. Tracked here, before this promise resolves, so the counter never
+        // dips to 0 in between.
+        if (this.graphManager.cameraSettled) {
+            this.track(this.graphManager.cameraSettled);
+        }
     }
 
     clearPreviousRun() {
