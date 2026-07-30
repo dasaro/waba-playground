@@ -6,6 +6,7 @@ globalThis.document ??= { documentElement: { getAttribute: () => 'dark' } };
 
 const { buildDirectAssumptionGraph, buildBranchingAssumptionGraph } =
     await import('../../modules/graph-assumption-builder.js');
+const { ParserUtils } = await import('../../modules/parser-utils.js');
 
 const derivedNode = (g, atom) => g.visNodes.find((n) => n.isDerived && n.atom === atom);
 const attackTo = (g, target) => g.visEdges.find((e) => e.to === target
@@ -152,4 +153,73 @@ test('an unattacked assumption (underivable contrary) stays isolated', () => {
     assert.equal(g.visEdges.length, 0, 'no attack edge when the contrary can never be supported');
     assert.deepEqual(g.isolatedNodes.map((n) => n.id), ['a']);
     assert.ok(!g.visNodes.some((n) => n.isTop), 'an underivable contrary must NOT be drawn as a ⊤ fact attack');
+});
+
+test('a commented-out fact never reaches the graph', () => {
+    // The parsers strip comments themselves now. When it was the caller's job, output-manager
+    // stripped and the three graph builders did not, so a rule the user had disabled still
+    // drew an attack the framework does not license, and a disabled assumption inflated the
+    // count that trips the set-graph cap.
+    const src = [
+        'assumption(a). assumption(b).',
+        'contrary(a,na). contrary(b,nb).',
+        '% head(r1, na). body(r1, b).',
+        'head(r2, nb). body(r2, a).',
+        '% assumption(f).'
+    ].join('\n');
+    assert.deepEqual(ParserUtils.parseRules(src).map((r) => r.id), ['r2']);
+    assert.deepEqual(ParserUtils.parseAssumptions(src), ['a', 'b']);
+});
+
+test('branching draws one attack edge per alternative derivation, each with its own weight', () => {
+    // It drew ONE edge keyed on leafSets[0] -- an arbitrary support -- so on a disjunctive
+    // contrary the attack that decides the extension could be drawn dormant with the wrong
+    // number on it. Direct mode always got this right; the two must agree.
+    const assumptions = ['a', 'b', 'c'];
+    const contraries = [{ assumption: 'c', contrary: 'nc' }];
+    const rules = [{ id: 'r1', head: 'nc', body: ['a'] }, { id: 'r2', head: 'nc', body: ['b'] }];
+    const weights = { a: 5, b: 7 };
+
+    const seen = (graph) => graph.visEdges
+        .filter((e) => e.targetAssumption === 'c')
+        .map((e) => `${e.label}:${(e.jointWith || []).join('+')}`).sort();
+
+    assert.deepEqual(seen(buildBranchingAssumptionGraph(assumptions, contraries, rules, weights)),
+        ['5:a', '7:b'], 'both derivations must be drawn, each labelled with its own leaf');
+    assert.deepEqual(seen(buildDirectAssumptionGraph(assumptions, contraries, rules, weights)).length,
+        2, 'and direct mode must still agree');
+});
+
+test('a derivation cycle draws nothing, because the solver rejects the framework', () => {
+    // renderSupport seeded its cache with the derived id BEFORE recursing, so a cycle resolved
+    // to a non-null node: support edges in both directions plus a complete attack, supported by
+    // a self-supporting loop. core/base.lp rejects such a framework outright.
+    const graph = buildBranchingAssumptionGraph(['a'], [{ assumption: 'a', contrary: 'na' }],
+        [{ id: 'r1', head: 'na', body: ['m'] }, { id: 'r2', head: 'm', body: ['na'] }], { a: 1 });
+    assert.deepEqual(graph.visEdges, [], 'a well-foundedness violation must draw no attack');
+});
+
+test('support edges carry the leaves that feed them', () => {
+    // graph-highlighting fades a branch that never fired by reading edge.leafSet. Nothing
+    // populated it, so every support edge was drawn as carrying and the classification -- the
+    // whole reason branching mode reacts to a selection -- was dead.
+    const graph = buildBranchingAssumptionGraph(['a', 'b'], [{ assumption: 'b', contrary: 'nb' }],
+        [{ id: 'r1', head: 'nb', body: ['p'] }, { id: 'r2', head: 'p', body: ['a'] }], { a: 5, b: 3 });
+    const support = graph.visEdges.filter((e) => e.attackType === 'support');
+    assert.ok(support.length > 0);
+    assert.ok(support.every((e) => Array.isArray(e.leafSet) && e.leafSet.length > 0),
+        'every support edge must know which assumptions carry it');
+});
+
+test('a single-leaf attack label follows the algebra, not just the leaf', () => {
+    // core/base.lp derives supported_with_weight from an explicit weight/2 on the DERIVED atom
+    // too, and oplus combines the two: under oplus=min the declared weight wins. The label was
+    // fixed at the leaf's weight for every algebra. Ground truth from bin/waba on this exact
+    // framework: godel reports 5, tropical reports 2.
+    const args = [['a', 'b'], [{ assumption: 'b', contrary: 'nb' }],
+        [{ id: 'r1', head: 'nb', body: ['a'] }], { a: 5, nb: 2 }];
+    const label = (polarity) => buildDirectAssumptionGraph(...args, polarity)
+        .visEdges.filter((e) => e.to === 'b')[0].label;
+    assert.equal(label('higher'), '5', 'strength: oplus = max');
+    assert.equal(label('lower'), '2', 'cost: oplus = min, so the declared weight wins');
 });

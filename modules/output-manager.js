@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-36';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-36';
-import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-36';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-36';
+import { PopupManager } from './popup-manager.js?v=20260730-38';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-38';
+import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-38';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-38';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -224,7 +224,15 @@ export class OutputManager {
                     // discarded_attack/3), so their key is the probed β*, ascending: the
                     // extension needing the smallest budget comes first. Before this they were
                     // emitted in solver order, e.g. 0, 8, 8, 16, 3, 5, 5, 3.
-                    objectiveTuple: defenceCost !== undefined
+                    // An extension past the pricing cap has NO beta*, which is not the same
+                    // as beta* = 0. Falling through to the monoid tuple gave it [0,0,0] -- the
+                    // same key as a genuinely free extension -- so the unpriced rows sorted
+                    // ahead of ones with a measured beta* of 1, implying they were cheapest.
+                    // Sort them last instead.
+                    objectiveTuple: (defenceCost === undefined
+                        && ['admissible', 'complete', 'preferred'].includes(config.semantics))
+                        ? [1, 0, 0]
+                        : defenceCost !== undefined
                         // Best first: the cheapest beta* under a strength bound, the largest
                         // surviving beta* under a cost bound.
                         ? [0, 0, config.polarity === 'lower' ? -defenceCost : defenceCost]

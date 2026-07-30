@@ -1,7 +1,7 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-36';
+import { GraphUtils } from './graph-utils.js?v=20260730-38';
 
 export class ThemeManager {
     constructor(themeToggleBtn, themeIcon, network, networkData, onGraphRestyled = null) {
@@ -82,9 +82,16 @@ export class ThemeManager {
             edges: { font: { color: p.line, background: p.canvas } }
         });
 
+        // The snapshots buildResetUpdates restores from must move to the new palette too.
+        // Rewriting only the live colour left originalColor at the OUTGOING theme, so the next
+        // reset -- deselecting an extension, Reset Layout, or the pre-solve resetGraphColors --
+        // repainted the whole graph in the previous theme: dark-surface boxes on a white canvas.
+        // The snapshot is taken once, on the first highlight, and never refreshed, so the
+        // staleness was permanent for the life of that graph.
         const edges = networkData.edges.get();
         networkData.edges.update(edges.map((edge) => ({
             id: edge.id,
+            originalColor: { color: p.line, highlight: p.lineStrong, hover: p.lineStrong },
             font: { ...edge.font, color: p.line, background: p.canvas, strokeWidth: 0 },
             // Reset to base unconditionally; the highlight is re-applied below, against the
             // NEW palette. Skipping highlighted elements froze them at the old theme's values.
@@ -96,6 +103,11 @@ export class ThemeManager {
         const nodes = networkData.nodes.get();
         networkData.nodes.update(nodes.map((node) => ({
             id: node.id,
+            originalColor: {
+                background: node.shape === 'diamond' ? p.canvas : p.surface,
+                border: p.line,
+                highlight: { background: node.shape === 'diamond' ? p.canvas : p.surface, border: p.lineStrong }
+            },
             font: { ...node.font, color: p.ink },
             color: {
                 background: node.shape === 'diamond' ? p.canvas : p.surface,

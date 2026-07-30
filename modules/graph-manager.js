@@ -2,12 +2,12 @@
  * GraphManager - Handles graph visualization using vis.js
  * Note: This is a simplified version. Full graph update logic remains in app.js temporarily.
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-36';
-import { ParserUtils } from './parser-utils.js?v=20260730-36';
-import { UIManager } from './ui-manager.js?v=20260730-36';
-import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-36';
-import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-36';
-import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-36';
+import { GraphUtils } from './graph-utils.js?v=20260730-38';
+import { ParserUtils } from './parser-utils.js?v=20260730-38';
+import { UIManager } from './ui-manager.js?v=20260730-38';
+import { buildBranchingAssumptionGraph, buildDirectAssumptionGraph } from './graph-assumption-builder.js?v=20260730-38';
+import { buildHighlightUpdates, buildResetUpdates, renderIsolatedAssumptionsOverlay } from './graph-highlighting.js?v=20260730-38';
+import { buildSetAttackTooltip, buildSetNodeTooltip } from './graph-tooltip-builder.js?v=20260730-38';
 
 // vis.js shows a string `title` as escaped text; an HTMLElement is rendered as markup.
 // The tooltip builders emit an HTML string, so parse it into an element before handing it to vis.
@@ -422,7 +422,16 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
 `;
 
             // Run Clingo to enumerate all sets with their support and attacks
-            const result = await clingoManager.runRaw(setProgram, 0, ['--opt-mode=ignore'], 30000);
+            // -c k, or every Lukasiewicz weight drawn on this graph is computed at the
+            // module's own default k = 1000 whatever the k control says, while the Results
+            // panel prices the same attacks at the chosen k. On two 900-weight premises that is
+            // 1790 in the panel against 800 on the edge, with nothing to say two different
+            // constants are in play.
+            const rawArgs = ['--opt-mode=ignore'];
+            if (config?.semiringKey === 'lukasiewicz' && Number.isFinite(config.lukK)) {
+                rawArgs.push('-c', `k=${config.lukK}`);
+            }
+            const result = await clingoManager.runRaw(setProgram, 0, rawArgs, 30000);
 
             // Parse sets and their attacks
             const setsMap = new Map(); // Map from set_id -> {assumptions: [], supported: Set, attacks: []}
@@ -698,7 +707,10 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 assumptions,
                 contraries,
                 rules,
-                weights
+                weights,
+                // The edge label is ⊕-dependent, so the builder needs the algebra. Both mode
+                // handlers took `_config` and never used it.
+                _config?.polarity
             );
             this.applyGraphData(visNodes, visEdges, isolatedNodes);
 
@@ -726,7 +738,8 @@ set_attacks(A, X, W) :- supported_with_weight(X, W), contrary(A, X), assumption(
                 assumptions,
                 contraries,
                 rules,
-                weights
+                weights,
+                _config?.polarity
             );
             this.applyGraphData(visNodes, visEdges, isolatedNodes);
 

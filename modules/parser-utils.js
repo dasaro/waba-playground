@@ -71,6 +71,17 @@ export function stripAspComments(code) {
     return out;
 }
 
+/**
+ * NOTE: every parse* entry point strips comments itself.
+ *
+ * It used to be the caller's job, and the caller forgot: output-manager stripped, the three
+ * graph builders did not. A commented-out `% head(r1, na). body(r1, b).` therefore drew an
+ * attack the framework does not license, and a commented-out `% assumption(f).` inflated the
+ * count so a 5-assumption framework tripped the 32-set cap with a false "6 assumptions"
+ * message. clingo strips comments before it sees any of this, so the picture disagreed with
+ * the answer. Stripping here makes that class of mistake unreachable rather than merely fixed
+ * at the sites we happened to look at.
+ */
 export class ParserUtils {
     /**
      * Parse assumption predicates from ASP code
@@ -78,6 +89,7 @@ export class ParserUtils {
      * @returns {Array<string>} - Array of assumption atoms
      */
     static parseAssumptions(code) {
+        code = stripAspComments(code || '');
         const assumptions = [];
         const regex = /assumption\(([^)]+)\)\./g;
         let match;
@@ -93,6 +105,7 @@ export class ParserUtils {
      * @returns {Array<{assumption: string, contrary: string}>} - Array of contrary relations
      */
     static parseContraries(code) {
+        code = stripAspComments(code || '');
         const contraries = [];
         const regex = /contrary\(([^,]+),\s*([^)]+)\)\./g;
         let match;
@@ -112,6 +125,7 @@ export class ParserUtils {
      * @returns {Array<{id: string, head: string, body: Array<string>}>} - Array of rules
      */
     static parseRules(code) {
+        code = stripAspComments(code || '');
         const rules = [];
         const ruleMap = new Map(); // rule_id -> {head: ..., body: [...]}
 
@@ -172,6 +186,7 @@ export class ParserUtils {
      * @returns {Object<string, string>} - Map of atom -> weight
      */
     static parseWeights(code) {
+        code = stripAspComments(code || '');
         const weights = {};
         const regex = /weight\(([^,]+),\s*([^)]+)\)\./g;
         let match;

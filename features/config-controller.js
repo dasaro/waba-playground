@@ -1,4 +1,4 @@
-import { normalizeConfig } from '../runtime/config-service.js?v=20260730-36';
+import { normalizeConfig } from '../runtime/config-service.js?v=20260730-38';
 
 export class ConfigController {
     constructor(dom) {
@@ -304,7 +304,15 @@ export class ConfigController {
             this.dom.budgetIntentNote.textContent = config.abaRecovery
                 ? 'Every discard is forbidden, so this is plain ABA.'
                 : (isDefence
-                    ? 'This semantics carries its own budget (the objections it declines to answer must sum to no more than β), so this control does not apply.'
+                    // The DIRECTION follows the polarity, exactly as semantics/admissible.lp
+                    // derives it: oplus=max bounds the sum ABOVE, oplus=min bounds the minimum
+                    // BELOW. Saying "must sum to no more than β" for every algebra told a
+                    // Tropical user to lower β for a stricter result, when β=0 is that
+                    // semantics' most PERMISSIVE setting -- and the stats line after the run
+                    // said the opposite on the same screen.
+                    ? (config.polarity === 'lower'
+                        ? 'This semantics carries its own budget: every objection it declines to answer must be worth at least β, so a BIGGER β is more restrictive. This control does not apply.'
+                        : 'This semantics carries its own budget (the objections it declines to answer must sum to no more than β), so this control does not apply.')
                     : (READING[this.dom.budgetSelect.value]
                         || 'Nothing may be conceded, so this is plain ABA.'));
         }

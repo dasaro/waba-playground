@@ -1,4 +1,4 @@
-import { wabaModules } from '../waba-modules.js?v=20260730-36';
+import { wabaModules } from '../waba-modules.js?v=20260730-38';
 
 const SUPPORTED_SEMANTICS = new Set(wabaModules.metadata.supportedSemantics);
 const SUPPORTED_BOUNDED_PAIRS = new Set(
@@ -119,7 +119,26 @@ export function normalizeConfig(config = {}) {
     // 1 on the default example. Zeroed here, at the one point every config passes through, so a
     // preset or a restored config cannot bypass it either. bin/waba refuses the combination
     // outright (`--aba-recovery cannot be combined with ... --beta`).
-    const beta = abaRecovery ? 0 : requestedBeta;
+    // ABA recovery means NOTHING may be conceded -- but WHICH beta achieves that depends on
+    // the polarity, and zero is only right for half the algebras.
+    //
+    // semantics/admissible.lp derives its bound from the polarity: `oplus(max)` forbids any pay
+    // at beta = 0, whereas `oplus(min)` imposes `#min{paid} >= beta`, for which beta = 0 is
+    // VACUOUS and recovery arrives at a beta above every attack weight (CLAUDE.md: "the
+    // recovery budget is not universally 0"). So on Tropical or Bottleneck-cost with a defence
+    // semantics, recovery was pinning the most PERMISSIVE end and returning budget-relaxed sets
+    // while claiming to recover classical ABA -- with the beta field disabled, so the user
+    // could not correct it.
+    //
+    // The conflict-based path is unaffected: it loads constraint/no_discard.lp, which forbids
+    // every discard outright and ignores beta entirely.
+    const needsHighBeta = abaRecovery
+        && isBudgetedDefence(config.semantics)
+        && polarity === 'lower';
+    // Above any weight a framework realistically declares; core/base.lp requires integers, and
+    // clingo's integer range comfortably exceeds this.
+    const RECOVERY_CEILING = 1073741824;
+    const beta = abaRecovery ? (needsHighBeta ? RECOVERY_CEILING : 0) : requestedBeta;
     const numModels = Number.isFinite(config.numModels) ? config.numModels : parseInt(config.numModels || '0', 10) || 0;
     const timeout = Number.isFinite(config.timeout) ? config.timeout : 60000;
     const lukK = Number.isFinite(config.lukK) ? config.lukK : parseInt(config.lukK || '10', 10) || 10;

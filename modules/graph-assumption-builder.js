@@ -1,4 +1,4 @@
-import { GraphUtils } from './graph-utils.js?v=20260730-36';
+import { GraphUtils } from './graph-utils.js?v=20260730-38';
 import {
     buildAssumptionNodeTooltip,
     buildAttackEdgeTooltip,
@@ -7,7 +7,7 @@ import {
     buildJunctionTooltip,
     buildSupportEdgeTooltip,
     buildTopNodeTooltip
-} from './graph-tooltip-builder.js?v=20260730-36';
+} from './graph-tooltip-builder.js?v=20260730-38';
 
 // Cap on the number of minimal support sets enumerated per contrary, guarding
 // against combinatorial blow-up on pathological (deeply disjunctive) frameworks.
@@ -67,6 +67,30 @@ function edgeKind(kind) {
 
 function explicitWeight(weights, atom) {
     return Object.prototype.hasOwnProperty.call(weights, atom) ? weights[atom] : null;
+}
+
+/**
+ * The weight a single-leaf derivation actually carries, for the ACTIVE algebra.
+ *
+ * A single-premise chain carries the leaf's own weight under every ⊗ (⊗ of one element is that
+ * element) -- but that reasoning omits ⊕. core/base.lp ALSO derives supported_with_weight from
+ * an explicit weight/2 on the derived atom, and ⊕ combines the two. Under ⊕ = min (tropical,
+ * bottleneck_cost) a declared weight on the contrary therefore WINS over the leaf's, and the
+ * label the graph drew was the wrong number: on `weight(a,5)` with `weight(nb,2)` the solver
+ * reports 5 under godel/arctic and 2 under tropical/bottleneck_cost, while the edge said 5 for
+ * every algebra -- and the 2 case is affordable at β=2 where the drawn 5 is not.
+ *
+ * @param {Object} weights declared weight/2 facts
+ * @param {string} leaf the single supporting leaf
+ * @param {string} derived the derived atom the edge represents
+ * @param {'higher'|'lower'|undefined} polarity ⊕ = max for 'higher', ⊕ = min for 'lower'
+ */
+function chainWeight(weights, leaf, derived, polarity) {
+    const leafW = explicitWeight(weights, leaf);
+    const ownW = explicitWeight(weights, derived);
+    if (leafW === null) return ownW;
+    if (ownW === null || leaf === derived) return leafW;
+    return polarity === 'lower' ? Math.min(leafW, ownW) : Math.max(leafW, ownW);
 }
 
 function createAssumptionNode(assumption, weights, summary) {
@@ -301,12 +325,12 @@ function computeSupportSets(atom, rules, assumptionSet, visited, cap) {
 // multi-assumption / joint support set is drawn)
 // ---------------------------------------------------------------------------
 
-function pushSingleAttackEdge(visEdges, { leaf, assumption, contrary, weights, idx }) {
+function pushSingleAttackEdge(visEdges, { leaf, assumption, contrary, weights, idx, polarity }) {
     const isDirect = leaf === contrary; // the contrary is itself the attacking assumption
-    // A single-premise attack — possibly via a chain of single-premise rules — has
-    // propagated weight equal to the leaf assumption's own weight under EVERY
-    // semiring (⊗ of one element is that element). So this weight is safe to show.
-    const weight = explicitWeight(weights, leaf);
+    // A single-premise chain carries the leaf's own weight under every ⊗ -- but ⊕ combines it
+    // with any weight declared on the contrary itself, and under ⊕ = min the declared one wins.
+    // See chainWeight.
+    const weight = chainWeight(weights, leaf, contrary, polarity);
     const label = (weight === null || weight === undefined) ? '' : String(weight);
         visEdges.push(createAttackEdge({
         id: `${leaf}-attacks-${assumption}-via-${contrary}-${idx}`,
@@ -450,7 +474,7 @@ function pushBranchingJoint(visNodes, visEdges, { set, assumption, contrary, idx
     }));
 }
 
-function buildAssumptionGraph(assumptions, contraries, rules, weights, { branching }) {
+function buildAssumptionGraph(assumptions, contraries, rules, weights, { branching, polarity }) {
     const visNodes = [];
     const visEdges = [];
     const factBasedAttacks = [];
@@ -469,7 +493,7 @@ function buildAssumptionGraph(assumptions, contraries, rules, weights, { branchi
                     weight: explicitWeight(weights, contrary) ?? '?'
                 });
             } else if (set.length === 1) {
-                pushSingleAttackEdge(visEdges, { leaf: set[0], assumption, contrary, weights, idx });
+                pushSingleAttackEdge(visEdges, { leaf: set[0], assumption, contrary, weights, idx, polarity });
             } else if (branching) {
                 pushBranchingJoint(visNodes, visEdges, { set, assumption, contrary, idx });
             } else {
@@ -490,8 +514,8 @@ function buildAssumptionGraph(assumptions, contraries, rules, weights, { branchi
     };
 }
 
-export function buildDirectAssumptionGraph(assumptions, contraries, rules, weights) {
-    return buildAssumptionGraph(assumptions, contraries, rules, weights, { branching: false });
+export function buildDirectAssumptionGraph(assumptions, contraries, rules, weights, polarity) {
+    return buildAssumptionGraph(assumptions, contraries, rules, weights, { branching: false, polarity });
 }
 
 // ---------------------------------------------------------------------------
@@ -511,7 +535,7 @@ function derivedNodeColor() {
     };
 }
 
-export function buildBranchingAssumptionGraph(assumptions, contraries, rules, weights) {
+export function buildBranchingAssumptionGraph(assumptions, contraries, rules, weights, polarity) {
     const visNodes = [];
     const visEdges = [];
     const factBasedAttacks = [];
@@ -583,7 +607,13 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
             from, to,
             ...edgeKind('support'),
             title: buildSupportEdgeTooltip(meta),
-            attackType: 'support'
+            attackType: 'support',
+            // Read by graph-highlighting to fade a branch that never fired. NOTHING populated
+            // it, so `Array.isArray(undefined)` was false and every support edge was drawn as
+            // carrying -- the classification was dead and branching mode was still inert on
+            // selection. Null when the support is ambiguous (several minimal sets), which the
+            // highlighter treats as "do not claim either way" rather than guessing one.
+            leafSet: meta.leafSet ?? null
         }));
     };
 
@@ -599,7 +629,11 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         }
         const nextVisited = new Set(visited); nextVisited.add(atom);
         const derivedId = ensureDerivedNode(atom);
-        renderCache.set(atom, derivedId);
+        // Do NOT seed the cache before recursing. A cycle then resolves to a non-null id, the
+        // rule is marked fired, and support edges are emitted in BOTH directions plus an
+        // attack -- an attack supported by a self-supporting loop. core/base.lp rejects such a
+        // framework outright (well-foundedness) and computeSupportSets returns [], so branching
+        // was the only thing claiming it holds. Seed after the recursion instead.
         let fired = false;
         derivingRules.forEach((rule, ri) => {
             const body = rule.body || [];
@@ -611,20 +645,27 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
             const bodyNodes = body.map((bodyAtom) => renderSupport(bodyAtom, nextVisited));
             if (bodyNodes.some((n) => n === null)) return; // a body atom is unsupportable -> dead rule
             fired = true;
+            // The assumptions that must all be IN for this step to carry.
+            const leavesOf = (a) => {
+                const sets = computeSupportSets(a, rules, assumptionSet, new Set(), SUPPORT_SET_CAP);
+                return sets.length === 1 ? sets[0] : null;   // ambiguous support: do not guess
+            };
             if (bodyNodes.length === 1) {
-                pushSupportEdge(bodyNodes[0], derivedId, { fromAtom: body[0], toAtom: atom, ruleId: rule.id, body });
+                pushSupportEdge(bodyNodes[0], derivedId, { fromAtom: body[0], toAtom: atom, ruleId: rule.id, body, leafSet: leavesOf(body[0]) });
             } else {
                 const jId = ensureJunction(`junction_${atom}_${rule.id || ri}`, body, { head: atom, ruleId: rule.id });
                 bodyNodes.forEach((bn, bi) => pushSupportEdge(bn, jId, {
-                    fromAtom: body[bi], toAtom: atom, ruleId: rule.id, body, viaJunction: true
+                    fromAtom: body[bi], toAtom: atom, ruleId: rule.id, body, viaJunction: true,
+                    leafSet: leavesOf(body[bi])
                 }));
-                pushSupportEdge(jId, derivedId, { fromAtom: null, toAtom: atom, ruleId: rule.id, body });
+                pushSupportEdge(jId, derivedId, { fromAtom: null, toAtom: atom, ruleId: rule.id, body, leafSet: leavesOf(atom) });
             }
         });
         if (!fired) {
             renderCache.set(atom, null);
             return null;
         }
+        renderCache.set(atom, derivedId);
         return derivedId;
     };
 
@@ -641,38 +682,48 @@ export function buildBranchingAssumptionGraph(assumptions, contraries, rules, we
         }
         // The attack edge: the contrary's node defeats the stance. Carry the leaf
         // support set as jointWith so extension highlighting can tell if it is active.
+        // ONE EDGE PER MINIMAL SUPPORT SET, as direct mode already does.
+        //
+        // This drew a single edge keyed on leafSets[0] -- an arbitrary one of several
+        // alternative derivations. The others were invisible, the label was the first
+        // support's leaf weight, and highlighting marked the edge live only if THAT support
+        // was IN. On a disjunctive contrary (nc <- a; nc <- b) the attack that actually
+        // decides the extension could therefore be drawn dormant carrying the wrong number.
+        // GraphUtils.assignEdgeGeometry fans the resulting parallel edges apart.
         const isDirect = assumptionSet.has(contrary);
         const leafSets = computeSupportSets(contrary, rules, assumptionSet, new Set(), SUPPORT_SET_CAP);
-        const jointWith = leafSets[0] || (isDirect ? [contrary] : []);
-        // A single-leaf support (a direct attack, or a chain of single-premise rules)
-        // carries that leaf's own weight under EVERY semiring (⊗ of one element is that
-        // element), so it is safe to label. A multi-leaf support is a semiring-dependent
-        // aggregate, so we show no number (the Results panel has the real value).
-        const leafW = (jointWith.length === 1) ? explicitWeight(weights, jointWith[0]) : null;
-        const shownWeight = leafW === null ? '?' : leafW;
-        visEdges.push(createAttackEdge({
-            id: `attack-${contrary}-${assumption}`,
-            from: src, to: assumption,
-            label: leafW === null ? '' : String(leafW),
-            weight: shownWeight,
-            ...edgeKind('attack'),
-            title: buildAttackEdgeTooltip({
-                typeLabel: isDirect ? 'Direct attack' : 'Derived attack',
-                attacker: contrary, target: assumption, contrary,
+        const supports = leafSets.length > 0 ? leafSets : [isDirect ? [contrary] : []];
+        const derivedByIds = rules.filter((rule) => rule.head === contrary).map((rule) => rule.id);
+        supports.forEach((jointWith, si) => {
+                    const leafW = (jointWith.length === 1)
+                ? chainWeight(weights, jointWith[0], contrary, polarity) : null;
+            const shownWeight = leafW === null ? '?' : leafW;
+            visEdges.push(createAttackEdge({
+                id: `attack-${contrary}-${assumption}-${si}`,
+                from: src, to: assumption,
+                label: leafW === null ? '' : String(leafW),
                 weight: shownWeight,
-                derivationBody: jointWith,
-                derivedBy: rules.filter((rule) => rule.head === contrary).map((rule) => rule.id),
-                note: isDirect
-                    ? 'The attacker is itself the contrary of the target assumption.'
-                    : 'This derived claim is the contrary of the target — it defeats it once its derivation is supported. The aggregate weight is semiring-dependent (see the Results panel).'
-            }),
-            attackType: isDirect ? 'direct' : 'derived',
-            attackingElement: isDirect ? contrary : undefined,
-            targetAssumption: assumption,
-            contrary,
-            jointWith,
-            derivationBody: jointWith
-        }));
+                ...edgeKind(jointWith.length > 1 ? 'joint' : 'attack'),
+                title: buildAttackEdgeTooltip({
+                    typeLabel: isDirect ? 'Direct attack' : 'Derived attack',
+                    attacker: contrary, target: assumption, contrary,
+                    weight: shownWeight,
+                    derivationBody: jointWith,
+                    derivedBy: derivedByIds,
+                    note: isDirect
+                        ? 'The attacker is itself the contrary of the target assumption.'
+                        : (supports.length > 1
+                            ? 'One of several independent derivations of this contrary; each is drawn separately. The aggregate weight is semiring-dependent (see the Results panel).'
+                            : 'This derived claim is the contrary of the target — it defeats it once its derivation is supported. The aggregate weight is semiring-dependent (see the Results panel).')
+                }),
+                attackType: isDirect ? 'direct' : 'derived',
+                attackingElement: isDirect ? contrary : undefined,
+                targetAssumption: assumption,
+                contrary,
+                jointWith,
+                derivationBody: jointWith
+            }));
+        });
     });
 
     visNodes.push(...createAssumptionNodes(assumptions, contraries, visEdges, weights));

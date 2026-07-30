@@ -1,7 +1,7 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260730-36';
+import { wabaModules } from '../waba-modules.js?v=20260730-38';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
@@ -9,10 +9,11 @@ import {
     isBudgetedDefence,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260730-36';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-36';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-36';
-import { ParserUtils } from './parser-utils.js?v=20260730-36';
+} from '../runtime/config-service.js?v=20260730-38';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260730-38';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260730-38';
+import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-38';
+import { ParserUtils } from './parser-utils.js?v=20260730-38';
 
 // Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.
@@ -150,13 +151,40 @@ export class ClingoManager {
         const isCost = config.polarity === 'lower';
         const costs = new Map();
 
-        // Search ceiling: no threshold can exceed the total declared weight.
-        const declared = [...framework.matchAll(/\bweight\s*\(\s*[^,]+,\s*(-?\d+)\s*\)/g)]
-            .map((m) => Number(m[1]))
-            .filter((n) => Number.isFinite(n));
-        const ceiling = declared.length > 0
-            ? declared.reduce((a, b) => a + Math.abs(b), 0) + 1
-            : 1000;
+        // Search ceiling, measured rather than guessed.
+        //
+        // It used to be the sum of the DECLARED weight/2 literals, on the reasoning that no
+        // threshold can exceed the total declared weight. That is false in two ways: with
+        // otimes = + a leaf feeding two branches contributes to arg_weight twice, so a single
+        // arg_weight can exceed the declared total; and a delta-weighted assumption contributes
+        // nothing to the sum but a real arg_weight to the bound. When the ceiling fell short,
+        // the strength probe was UNSAT and the code below turned that into beta* = 0 -- the
+        // value meaning "needs no budget at all" -- and the cost probe concluded "survives at
+        // every beta". Both are the most flattering possible answer, and both sorted those
+        // extensions to the top.
+        //
+        // So ask the module for the actual arg_weights. The bound is over `pay`, so the largest
+        // total is (max arg_weight) x (number of payable attacks) and the largest floor is
+        // (max arg_weight); take the former, which covers both.
+        let ceiling = 1000;
+        try {
+            const weightProbe = await this.runSolver(
+                `${buildProgram(framework, { ...config, beta: 0 })}\n#show arg_weight/2.\n`,
+                1, buildSolverArgs({ ...config, beta: 0, optMode: 'ignore' }), config.timeout
+            );
+            const shown = weightProbe?.Call?.[0]?.Witnesses?.[0]?.Value || [];
+            const argWeights = shown
+                .map((atom) => matchPredicate(atom, 'arg_weight'))
+                .filter((args) => args !== null)
+                .map((args) => Number(splitTopLevelArgs(args)[1]))
+                .filter((n) => Number.isFinite(n));
+            if (argWeights.length > 0) {
+                const maxArg = Math.max(...argWeights.map(Math.abs));
+                ceiling = maxArg * argWeights.length + 1;
+            }
+        } catch {
+            // Fall through to the default; the guards below still refuse to invent a number.
+        }
 
         // One solve per extension for strength, ~log2(ceiling) for cost. Uncapped this was 2^n
         // probes on a wide framework, which froze the page behind a modal overlay.
@@ -177,9 +205,8 @@ ${pins}
 
         for (const witness of witnesses) {
             const inSet = new Set((witness.Value || [])
-                .map((predicate) => predicate.match(/^in\((.+)\)$/))
-                .filter(Boolean)
-                .map((match) => match[1]));
+                .map((predicate) => matchPredicate(predicate, 'in'))
+                .filter((arg) => arg !== null));
             const key = [...inSet].sort().join(',');
             if (costs.has(key)) {
                 continue;
@@ -214,7 +241,12 @@ ${pins}
                     const witnessesOut = probe?.Call?.[0]?.Witnesses || [];
                     const last = witnessesOut[witnessesOut.length - 1];
                     const raw = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : null;
-                    costs.set(key, typeof raw === 'number' ? raw : 0);
+                    // An UNSAT probe means the ceiling was still too low, NOT that the set is
+                    // free. Leaving it unpriced shows no badge; claiming 0 asserted the set is
+                    // classically admissible and ranked it first.
+                    if (typeof raw === 'number') {
+                        costs.set(key, raw);
+                    }
                     continue;
                 }
 
@@ -224,7 +256,13 @@ ${pins}
                     continue;                       // holds nowhere; nothing meaningful to show
                 }
                 if (await holdsAt(pins, ceiling)) {
-                    costs.set(key, Infinity);       // survives however tight the floor gets
+                    // Only sound if the ceiling really is above every reachable arg_weight.
+                    // Confirm at twice the ceiling before claiming the set survives any floor;
+                    // if that fails the ceiling was short, so leave it unpriced rather than
+                    // advertising "any β".
+                    if (await holdsAt(pins, ceiling * 2)) {
+                        costs.set(key, Infinity);
+                    }
                     continue;
                 }
                 let lo = 0;                          // known to hold
@@ -281,10 +319,15 @@ ${pins}
 
         const candidateFacts = candidateWitnesses.map((witness, index) => {
             const modelId = index + 1;
+            // `[^)]+` stopped at the first `)`, so a function-term assumption such as
+            // `in(flies(tweety))` matched nothing and NO member/2 facts were emitted. The
+            // subset-maximal filter then saw candidates with empty membership, derived no
+            // has_extra, dominated nothing, and kept every candidate -- so `preferred`
+            // silently returned exactly the admissible sets.
             const members = (witness.Value || [])
-                .map((predicate) => predicate.match(/^in\(([^)]+)\)$/))
-                .filter(Boolean)
-                .map((match) => `member(${modelId},${match[1]}).`);
+                .map((predicate) => matchPredicate(predicate, 'in'))
+                .filter((arg) => arg !== null)
+                .map((atom) => `member(${modelId},${atom}).`);
             return [`candidate(${modelId}).`, ...members].join('\n');
         }).join('\n');
 

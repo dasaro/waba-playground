@@ -4,6 +4,37 @@
  * @param {string} str the inner contents of a term (without the outer parens)
  * @returns {string[]} trimmed top-level segments
  */
+/**
+ * Match `name(args)` and return the argument list, respecting nesting.
+ *
+ * The regexes this replaces were anchored with `[^)]+`, which stops at the FIRST `)`. A
+ * function term such as `in(flies(tweety))` therefore matched nothing at all -- and function
+ * terms are legal ASP that core/base.lp handles and bin/waba gets right. The consequences were
+ * not cosmetic: `parsed.in` came back empty for every extension, so every result card rendered
+ * with no assumption chips, clicking one highlighted nothing, and in clingo-manager the
+ * subset-maximal filter for `preferred` emitted no member/2 facts, so nothing was ever
+ * dominated and `preferred` silently returned the admissible sets.
+ *
+ * @param {string} predicate e.g. 'in(flies(tweety))'
+ * @param {string} name the functor to match
+ * @returns {string|null} the raw argument string, or null if it is not that predicate
+ */
+export function matchPredicate(predicate, name) {
+    const head = `${name}(`;
+    const text = predicate.trim();
+    if (!text.startsWith(head) || !text.endsWith(')')) {
+        return null;
+    }
+    const inner = text.slice(head.length, -1);
+    // Reject `in(a), foo(b)` and similar: the parens we stripped must be the matching pair.
+    let depth = 0;
+    for (const ch of inner) {
+        if (ch === '(') depth += 1;
+        else if (ch === ')') { depth -= 1; if (depth < 0) return null; }
+    }
+    return depth === 0 ? inner : null;
+}
+
 export function splitTopLevelArgs(str) {
     const segments = [];
     let depth = 0;
@@ -49,20 +80,23 @@ export function parseAnswerSet(predicates) {
     };
 
     predicates.forEach((predicate) => {
-        let match = predicate.match(/^assumption\(([^)]+)\)$/);
-        if (match) {
+        const assumptionArg = matchPredicate(predicate, 'assumption');
+        if (assumptionArg !== null) {
+            const match = [null, assumptionArg];
             parsed.assumptions.add(match[1]);
             return;
         }
 
-        match = predicate.match(/^contrary\(([^,]+),\s*([^)]+)\)$/);
-        if (match) {
+        const contraryArgs = matchPredicate(predicate, 'contrary');
+        if (contraryArgs !== null) {
+            const match = [null, ...splitTopLevelArgs(contraryArgs)];
             parsed.contraries.set(match[1], match[2]);
             return;
         }
 
-        match = predicate.match(/^head\(([^,]+),\s*([^)]+)\)$/);
-        if (match) {
+        const headArgs = matchPredicate(predicate, 'head');
+        if (headArgs !== null) {
+            const match = [null, ...splitTopLevelArgs(headArgs)];
             const ruleId = match[1];
             const head = match[2];
             if (!parsed.rules.has(ruleId)) {
@@ -73,8 +107,9 @@ export function parseAnswerSet(predicates) {
             return;
         }
 
-        match = predicate.match(/^body\(([^,]+),\s*([^)]+)\)$/);
-        if (match) {
+        const bodyArgs = matchPredicate(predicate, 'body');
+        if (bodyArgs !== null) {
+            const match = [null, ...splitTopLevelArgs(bodyArgs)];
             const ruleId = match[1];
             const bodyAtom = match[2];
             if (!parsed.rules.has(ruleId)) {
@@ -85,20 +120,21 @@ export function parseAnswerSet(predicates) {
             return;
         }
 
-        match = predicate.match(/^in\(([^)]+)\)$/);
-        if (match) {
-            parsed.in.push(match[1]);
+        const inArg = matchPredicate(predicate, 'in');
+        if (inArg !== null) {
+            parsed.in.push(inArg);
             return;
         }
 
-        match = predicate.match(/^out\(([^)]+)\)$/);
-        if (match) {
-            parsed.out.push(match[1]);
+        const outArg = matchPredicate(predicate, 'out');
+        if (outArg !== null) {
+            parsed.out.push(outArg);
             return;
         }
 
-        match = predicate.match(/^supported_with_weight\(([^,]+),\s*(.+)\)$/);
-        if (match) {
+        const supported_with_weightArgs = matchPredicate(predicate, 'supported_with_weight');
+        if (supported_with_weightArgs !== null) {
+            const match = [null, ...splitTopLevelArgs(supported_with_weightArgs)];
             const atom = match[1];
             const weight = match[2];
             parsed.supported.push(atom);
@@ -116,10 +152,10 @@ export function parseAnswerSet(predicates) {
             return;
         }
 
-        match = predicate.match(/^budget_value\((.+)\)$/);
-        if (match) {
-            parsed.budgetValue = match[1];
-            parsed.budgetValueRaw = match[1];
+        const budgetArg = matchPredicate(predicate, 'budget_value');
+        if (budgetArg !== null) {
+            parsed.budgetValue = budgetArg;
+            parsed.budgetValueRaw = budgetArg;
         }
     });
 

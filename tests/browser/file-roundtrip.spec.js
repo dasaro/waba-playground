@@ -121,6 +121,15 @@ for (const example of EXAMPLES) {
             name: `${example}.waba`, mimeType: 'text/plain', buffer: Buffer.from(waba.content)
         });
         await settled(page);
+        // The .lp twin has this guard and the .waba version did not. Without it an import that
+        // THROWS leaves the original framework in the editor, solve() re-measures that same
+        // framework, and `after` equals `before` by construction -- so all six .waba specs stay
+        // green with export/import completely broken. parseWabaFile does throw on an
+        // unrecognised file, and handleUploadedFile catches it, so this is reachable.
+        await expect(page.locator('#example-select'),
+            `${example}: the .waba import did not load — the comparison below would be vacuous`)
+            .toHaveValue('__uploaded__');
+        await expect(page.locator('#output')).not.toContainText('Error loading file');
         const after = await solve(page);
 
         expect(after, `${example}: .waba round-trip changed the result`).toEqual(before);

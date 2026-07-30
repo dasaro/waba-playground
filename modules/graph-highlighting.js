@@ -1,5 +1,5 @@
-import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-36';
-import { GraphUtils } from './graph-utils.js?v=20260730-36';
+import { appendStateChip } from './graph-tooltip-builder.js?v=20260730-38';
+import { GraphUtils } from './graph-utils.js?v=20260730-38';
 
 /**
  * The three attack states, each separable from the others on TWO non-hue channels, so the
@@ -110,7 +110,11 @@ export function buildResetUpdates(networkData) {
 }
 
 export function buildHighlightUpdates(networkData, inAssumptions, discardedAttacks, successfulAttacks) {
-    if (!inAssumptions || inAssumptions.length === 0) {
+    // The EMPTY extension is a real extension -- under cf/admissible/complete it is always one,
+    // and usually Answer 1. Bailing out here reset the canvas while output-manager had already
+    // marked the row selected, so the UI said "selected" and the graph showed the unselected
+    // state. Only a null/absent set means "nothing is selected".
+    if (!inAssumptions) {
         return { resetOnly: true, nodeUpdates: [], edgeUpdates: [] };
     }
 
