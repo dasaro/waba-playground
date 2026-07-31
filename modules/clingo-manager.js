@@ -243,8 +243,16 @@ ${pins}
                     // buildSolverArgs, NOT a hand-rolled list: it is the only place `-c k` is
                     // added, so hand-rolling left every Lukasiewicz probe at the module's default
                     // k = 1000 regardless of the k control.
+                    // 0, NOT 1. `--opt-mode=opt` with --models=1 stops at the FIRST model and
+                    // reports its cost, not the minimum -- clingo prints `Optimization:` either
+                    // way and only says OPTIMUM FOUND when it actually proved it. Swept every
+                    // shipped example x every subset x all five algebras: 360/360 agreed, because
+                    // minimising an unconstrained subset choice happens to start empty. That is a
+                    // solver heuristic, not a guarantee -- the same composition with an
+                    // exactly-one choice (setsupport.lp) reported 52 where the optimum was 20.
+                    // 0 enumerates only IMPROVING models, so it costs nothing extra here.
                     const probe = await this.runSolver(
-                        program, 1,
+                        program, 0,
                         [...buildSolverArgs({ ...config, beta: ceiling, optMode: 'ignore' })
                             .filter((a) => !a.startsWith('--opt-mode')), '--opt-mode=opt', '--quiet=1'],
                         config.timeout
