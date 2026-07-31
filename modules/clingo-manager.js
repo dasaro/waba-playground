@@ -96,7 +96,7 @@ export class ClingoManager {
         // split across lines, rule-derived weights and block comments, and it REJECTED legal
         // frameworks whose atoms are function terms. Letting clingo parse it is exact, and it is
         // the same file bin/waba uses, so the two boundaries cannot drift.
-        const precondition = await this.checkPreconditions(framework, normalized);
+        const precondition = await this.checkPreconditions(framework, normalized, onLog);
         if (precondition) {
             throw new Error(precondition);
         }
@@ -412,7 +412,7 @@ ${wabaModules.semantics[filterKind]}
      * Run the pre-flight validator. Returns an explanation, or null when the framework is a
      * well-formed wABA framework.
      */
-    async checkPreconditions(framework, config) {
+    async checkPreconditions(framework, config, onLog = () => {}) {
         const EXPLAIN = {
             not_flat: 'wABA is defined for FLAT ABA: an assumption may not be a rule head',
             cyclic: 'wABA is defined for WELL-FOUNDED frameworks: rule dependencies must be '
@@ -434,6 +434,14 @@ ${wabaModules.semantics[filterKind]}
         }
         const result = await this.runRaw(
             `${wabaModules.validate.framework}\n${framework}\n`, 1, args, 20000);
+        // UNSATISFIABLE means the framework's OWN integrity constraints fired against
+        // validate.lp, which defines none of the solver predicates they mention. No violation
+        // atom is emitted, so treating it as a pass would skip validation entirely.
+        if (result?.Result === 'UNSATISFIABLE') {
+            return 'Could not validate this framework: it contains integrity constraints that '
+                + 'refer to predicates the pre-flight check does not define (in/1, supported/1, '
+                + '…). Move them out of the framework to run it here.';
+        }
         const atoms = result?.Call?.[0]?.Witnesses?.[0]?.Value || [];
         const byKind = new Map();
         for (const atom of atoms) {
@@ -442,6 +450,21 @@ ${wabaModules.semantics[filterKind]}
             const [kind, offender] = splitTopLevelArgs(args2);
             if (!byKind.has(kind)) byKind.set(kind, new Set());
             byKind.get(kind).add(offender);
+        }
+        // Advisories are not rejections. leaf_reuse says a derivation reuses a leaf, which is
+        // well formed but is exactly where the tree fold and the support-set reading part
+        // company -- and where the probabilistic reading stops being exact.
+        for (const atom of atoms) {
+            const adv = matchPredicate(atom, 'advisory');
+            if (adv === null) continue;
+            const [kind, offender] = splitTopLevelArgs(adv);
+            if (kind === 'leaf_reuse') {
+                onLog(`\u2139\ufe0f ${offender}: a derivation reuses a leaf. Under an additive `
+                    + 'algebra (Tropical, Arctic, Łukasiewicz) ⊗ folds each occurrence, so its '
+                    + 'weight depends on the derivation tree rather than the support set — and '
+                    + 'a probabilistic reading multiplies the reused fact twice. Gödel and '
+                    + 'Bottleneck-cost are unaffected (⊗ is idempotent).', 'info');
+            }
         }
         if (byKind.size === 0) return null;
         const parts = [...byKind.entries()].map(([kind, set]) => {
