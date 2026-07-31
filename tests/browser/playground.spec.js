@@ -917,8 +917,13 @@ test('an off-grid Łukasiewicz weight is refused and explained', async ({ page }
     await page.click('#run-btn');
     await runFinished(page);
 
-    await expect(page.locator('#output')).toContainText(/a lies outside \[0, k\] with k = 10/);
+    // Refused BEFORE the solve now: the carrier is a precondition of the definition, checked
+    // at the boundary, so the message names the atom instead of arriving as "no extensions".
+    // Checked by running WABA/validate.lp through clingo-wasm -- the same file bin/waba uses,
+    // so the two boundaries cannot drift and both handle pooled/multi-line/function-term forms.
+    await expect(page.locator('#output')).toContainText(/carrier \[0, k\]/);
     await expect(page.locator('#output')).toContainText(/not associative/);
+    await expect(page.locator('#output')).toContainText(/\ba\b/);
 });
 
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {

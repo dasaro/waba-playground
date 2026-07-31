@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
     <!-- after vis-network: its `div.vis-network div.vis-tooltip` rule must be overridable -->
-    <link rel="stylesheet" href="style.css?v=20260731-4">
+    <link rel="stylesheet" href="style.css?v=20260731-8">
 
     <!-- jsPDF for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,11 +19,11 @@
     <!-- Prism.js for syntax highlighting (minimal theme + core) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="modules/prism-waba.js?v=20260731-4"></script>
+    <script src="modules/prism-waba.js?v=20260731-8"></script>
 
     <!-- Configure Emscripten Module BEFORE loading clingo.web.js -->
-    <script src="modules/wasm-config.js?v=20260731-4"></script>
-    <script src="clingo.web.js?v=20260731-4"></script>
+    <script src="modules/wasm-config.js?v=20260731-8"></script>
+    <script src="clingo.web.js?v=20260731-8"></script>
 </head>
 <body>
     <div class="container">
@@ -623,6 +623,6 @@ contrary(b, c).</code></pre>
 
     <!-- Main Application (ES6 Module) -->
     <!-- Cache-busting: increment version to force reload after changes -->
-    <script type="module" src="app.js?v=20260731-4"></script>
+    <script type="module" src="app.js?v=20260731-8"></script>
 </body>
 </html>

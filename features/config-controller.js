@@ -1,7 +1,7 @@
 import {
     normalizeConfig, isBudgetedDefence, selectableSemirings, semiringConstants, SEMIRING_INFO
-} from '../runtime/config-service.js?v=20260731-4';
-import { wabaModules } from '../waba-modules.js?v=20260731-4';
+} from '../runtime/config-service.js?v=20260731-8';
+import { wabaModules } from '../waba-modules.js?v=20260731-8';
 
 export class ConfigController {
     constructor(dom) {

@@ -1,7 +1,7 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260731-4';
+import { wabaModules } from '../waba-modules.js?v=20260731-8';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
@@ -9,11 +9,11 @@ import {
     isBudgetedDefence,
     shouldApplyNumericPostFilter,
     validateConfig
-} from '../runtime/config-service.js?v=20260731-4';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260731-4';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260731-4';
-import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260731-4';
-import { ParserUtils } from './parser-utils.js?v=20260731-4';
+} from '../runtime/config-service.js?v=20260731-8';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260731-8';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260731-8';
+import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260731-8';
+import { ParserUtils } from './parser-utils.js?v=20260731-8';
 
 // Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.
@@ -88,6 +88,17 @@ export class ClingoManager {
         const validationError = validateConfig(normalized);
         if (validationError) {
             throw new Error(validationError);
+        }
+
+        // The framework's own preconditions, checked by RUNNING WABA/validate.lp through
+        // clingo-wasm. The first version scanned the text with regexes and was wrong both ways:
+        // it missed pooled facts (the compact form CLAUDE.md tells authors to prefer), facts
+        // split across lines, rule-derived weights and block comments, and it REJECTED legal
+        // frameworks whose atoms are function terms. Letting clingo parse it is exact, and it is
+        // the same file bin/waba uses, so the two boundaries cannot drift.
+        const precondition = await this.checkPreconditions(framework, normalized);
+        if (precondition) {
+            throw new Error(precondition);
         }
 
         try {
@@ -395,6 +406,50 @@ ${wabaModules.semantics[filterKind]}
 
     async runSolver(program, numModels, args, timeout) {
         return this.enqueueSolver(() => this.executeSolver(program, numModels, args, timeout));
+    }
+
+    /**
+     * Run the pre-flight validator. Returns an explanation, or null when the framework is a
+     * well-formed wABA framework.
+     */
+    async checkPreconditions(framework, config) {
+        const EXPLAIN = {
+            not_flat: 'wABA is defined for FLAT ABA: an assumption may not be a rule head',
+            cyclic: 'wABA is defined for WELL-FOUNDED frameworks: rule dependencies must be '
+                + "acyclic, or a derived atom's weight has no unique least fixpoint",
+            multi_weight: 'weight/2 must be a partial FUNCTION: two weights for one atom split '
+                + 'a single conflict into several independently discardable attacks',
+            not_a_number: 'a non-integral weight is dropped by the monoid aggregates, so its '
+                + 'attack would cost nothing and be discardable at any β',
+            negative: 'weights must be nonnegative',
+            off_grid: "outside Łukasiewicz's carrier [0, k], where the bounded sum is not "
+                + 'associative'
+        };
+        // k applies whenever the algebra is Łukasiewicz, whether or not the user chose one --
+        // the module carries `#const k = 1000`. Gating on the CONTROL rather than the algebra is
+        // exactly the bug the CLI had.
+        const args = ['--warn=none'];
+        if (config.semiringKey === 'lukasiewicz') {
+            args.push('-c', `k=${Number.isFinite(config.lukK) ? config.lukK : 1000}`);
+        }
+        const result = await this.runRaw(
+            `${wabaModules.validate.framework}\n${framework}\n`, 1, args, 20000);
+        const atoms = result?.Call?.[0]?.Witnesses?.[0]?.Value || [];
+        const byKind = new Map();
+        for (const atom of atoms) {
+            const args2 = matchPredicate(atom, 'violation');
+            if (args2 === null) continue;
+            const [kind, offender] = splitTopLevelArgs(args2);
+            if (!byKind.has(kind)) byKind.set(kind, new Set());
+            byKind.get(kind).add(offender);
+        }
+        if (byKind.size === 0) return null;
+        const parts = [...byKind.entries()].map(([kind, set]) => {
+            const shown = [...set].sort().slice(0, 6).join(', ');
+            const more = set.size > 6 ? ` (+${set.size - 6} more)` : '';
+            return `${EXPLAIN[kind] || kind} — ${shown}${more}`;
+        });
+        return `This is not a well-formed wABA framework. ${parts.join('; ')}.`;
     }
 
     async runRaw(program, numModels = 0, args = [], timeout = 60000) {

@@ -31,58 +31,25 @@ has_body(R) :- body(R,_).
 derived_atom(X) :- is_head(X), not assumption(X).
 
 %% ====================
-%% FUNCTIONALITY GUARD (weight/2 is a partial FUNCTION on atoms)
+%% PRECONDITIONS ON THE FRAMEWORK — enforced at the BOUNDARY, not here
 %% ====================
-%% Two weight facts for the same atom make supported_with_weight/2 non-functional, which
-%% splits ONE conflict into SEVERAL independently discardable attacks_with_weight/3 atoms.
-%% The budget then double-charges, and there are answer sets in which the same
-%% (attacker, target) conflict is simultaneously discarded AND successful. Rejected here
-%% alongside the other two well-formedness conditions rather than silently mis-costed.
-multi_weight(X) :- weight(X,V1), weight(X,V2), V1 != V2.
-:- multi_weight(_).
-
-%% ====================
-%% INTEGRALITY GUARD (a weight must be a number the budget can add up)
-%% ====================
-%% A weight/2 whose value is not an integer is SILENTLY DROPPED by the monoid aggregates:
-%% #sum/#max/#min ignore a tuple whose weight term is not integral. The attack it belongs to then
-%% costs nothing, so it can be discarded at ANY budget -- verified: a framework weighted
-%% \`weight(wa,"heavy")\` admits 2 models at beta=0 under (sum,ub) where the same framework
-%% weighted \`weight(wa,7)\` admits 1. That is a soundness hole, not a modelling choice, so it is
-%% rejected here alongside the other well-formedness conditions rather than mis-priced.
+%% wABA is defined for a WELL-FORMED weighted flat ABA framework:
 %%
-%% The two infinity SENTINELS stay legal: semiring identities are #sup/#inf, arg_weight can
-%% legitimately be infinite, and the budget guards handle both ends explicitly.
-integral_weight(X) :- weight(X,W), W = W + 0.
-sentinel_weight(X) :- weight(X,#sup).
-sentinel_weight(X) :- weight(X,#inf).
-:- weight(X,_), not integral_weight(X), not sentinel_weight(X).
-
-%% ====================
-%% FLATNESS GUARD
-%% ====================
-%% WABA's weighted/budgeted semantics is defined for FLAT ABA frameworks: no
-%% assumption may be the head of a rule. (The weight of an assumption is then
-%% intrinsic, not extension-dependent; this matches the established ABA theory the
-%% semantics rest on, and weighted non-flat ABA has no settled semantics.)
-%% A non-flat assumption is flagged here and the framework is rejected outright,
-%% rather than silently producing ill-defined weights.
-:- assumption(X), is_head(X).
-
-%% ====================
-%% WELL-FOUNDEDNESS GUARD (acyclic derivations)
-%% ====================
-%% The semiring weight of a derived atom is ⊕ over its derivations, each ⊗ over a rule
-%% body — well-defined only when the rule-dependency graph is ACYCLIC. A derivation cycle
-%% (p <- q, q <- p) admits an unfounded second fixpoint in which the cyclic atom floats in
-%% at the ⊗-identity, yielding spurious weights (and, under the cost semirings, spurious
-%% free-discard extensions). Such frameworks are rejected outright, like non-flat ones,
-%% rather than silently producing ill-defined weights. (WABA is defined for well-founded
-%% flat frameworks; the curated/reference examples are all acyclic.)
-derivation_reaches(X,Y) :- head(R,X), body(R,Y).
-derivation_reaches(X,Z) :- head(R,X), body(R,Y), derivation_reaches(Y,Z).
-derivation_cycle(X) :- derivation_reaches(X,X).
-:- derivation_cycle(_).
+%%   flat            no assumption is the head of a rule, so an assumption's weight is
+%%                   intrinsic rather than extension-dependent
+%%   well-founded    the rule-dependency graph is acyclic, so the ⊕-over-derivations /
+%%                   ⊗-over-body recursion has a unique least fixpoint
+%%   functional w    weight/2 is a partial FUNCTION on atoms
+%%   w into S        every declared weight is an element of the algebra's carrier
+%%
+%% These are hypotheses of the definition, not part of the semantics, and a paper states them
+%% once rather than encoding each as a constraint. They used to be five guards plus their
+%% helper predicates here; they now live where input is actually accepted -- bin/waba for the
+%% CLI, runtime/config-service.js for the web playground -- which is also the only place that
+%% can report WHICH atom is at fault instead of an unexplained UNSATISFIABLE.
+%%
+%% Nothing below assumes anything else about the framework: fed a malformed one, this file
+%% computes the least fixpoint of the rules it was given, which is the honest answer.
 
 %% ====================
 %% CORE LOGIC
@@ -114,22 +81,6 @@ attacks_with_weight(X,Y,W) :- supported_with_weight(X,W), assumption(Y), contrar
 attacks_successfully_with_weight(X,Y,W) :- attacks_with_weight(X,Y,W), not discarded_attack(X,Y,W).
 
 %% ====================
-%% DIAGNOSTIC (advisory — NOT a constraint; never rejects an answer set)
-%% ====================
-%% Flags an explicit weight/2 placed on a DERIVED atom (a rule head) whose propagated
-%% support weight ends up DIFFERENT from the declared one — i.e. the declared weight did
-%% not take effect. In WABA weights belong on the LEAVES (assumptions / facts) and derived
-%% atoms get their weight by PROPAGATION; an explicit weight on a derived atom is combined
-%% with its derivation via the semiring's ⊕, and is SILENTLY dominated in several algebras
-%% (Gödel/Bottleneck/Łukasiewicz drive it to the ⊗-identity #sup/#inf/k). This predicate is
-%% empty for a framework that keeps its weights on the leaves; the filter modules #show
-%% it so a modeller sees it. It is ADVISORY: a framework that trips it still solves.
-%% See README.md, "Where weights live (leaves vs derived atoms)".
-weight_on_derived_dominated(X, Declared, Effective) :-
-    weight(X, Declared), derived_atom(X),
-    supported_with_weight(X, Effective), Effective != Declared.
-
-%% ====================
 %% BUDGET
 %% ====================
 %% The budget is supplied ONLY by -c beta=N, through effective_budget/1. A framework may
@@ -138,11 +89,7 @@ weight_on_derived_dominated(X, Declared, Effective) :-
 %% cannot clamp, raise or nullify the budget the caller asked for. Previously both facts
 %% survived and the bound became min(N,beta) under ub, with budget(0) silently disabling
 %% --beta altogether.
-budget(beta).                  %% kept so existing frameworks and tooling still ground
 effective_budget(beta).
-
-%% Advisory: a framework asked for a budget of its own and it was ignored. Not a constraint.
-framework_budget_ignored(N) :- budget(N), N != beta.
 
 %% An unbound \`beta\` is not "budget disabled": clingo orders every integer strictly BELOW
 %% an uninterpreted constant, so \`C > beta\` never holds (ub silently unbounded) and
@@ -155,6 +102,92 @@ framework_budget_ignored(N) :- budget(N), N != beta.
 %% - constraint/ub.lp         upper bound: reject when the aggregate EXCEEDS beta
 %% - constraint/lb.lp         lower bound: reject when the aggregate is BELOW beta
 %% - constraint/no_discard.lp forbid every discard (exact classical ABA recovery)
+`
+    },
+    validate: {
+        "framework": `%% ============================================================================
+%% validate.lp — the framework preconditions, as a SEPARATE pre-flight program
+%% ============================================================================
+%% wABA is defined for a well-formed weighted flat ABA framework. Those conditions are
+%% hypotheses of the definition, not part of the semantics, so they are not in core/base.lp:
+%% a paper states them once, and the core computes the mathematics.
+%%
+%% They are checked HERE, by clingo, on the framework alone. The first attempt scanned the
+%% framework text with regexes in bin/waba and in the playground, which was wrong in both
+%% directions and was caught by adversarial review:
+%%
+%%   MISSED   pooled/compact facts -- \`head(r1,c; r1,a).\` -- which CLAUDE.md tells authors to
+%%            PREFER, so the most-recommended syntax bypassed every check
+%%   MISSED   a fact split across two lines (clingo does not care about newlines)
+%%   MISSED   a weight/2 derived by a RULE rather than stated as a fact
+%%   MISSED   %* ... *% block comments (the CLI stripped only %-to-end-of-line)
+%%   REJECTED legal frameworks whose atoms are function terms, f(a), because the identifier
+%%            regexes did not match them
+%%
+%% Running clingo instead means the framework is parsed by the same front end that will solve
+%% it, so every one of those forms is handled exactly and for free. Grounding a framework
+%% against this file alone is cheap: there is no choice rule and no search.
+%%
+%% USAGE   clingo --outf=0 validate.lp <framework.lp>            [-c k=N for lukasiewicz]
+%%         Any violation/2 atom in the answer set is a rejection; the empty answer set means
+%%         the framework is well formed. Callers report the atom, which is what an in-core
+%%         constraint could never do -- it could only return UNSATISFIABLE.
+%% ============================================================================
+
+#const k = 0.                  %% overridden with -c k=N when the Lukasiewicz carrier applies
+
+%% ---- flat: no assumption is the head of a rule -------------------------------
+%% An assumption's weight is then intrinsic rather than extension-dependent, which is what the
+%% propagation assumes. Weighted non-flat ABA has no settled semantics.
+violation(not_flat, X) :- assumption(X), head(_, X).
+
+%% ---- well-founded: the rule-dependency graph is acyclic ----------------------
+%% A derived atom's weight is ⊕ over its derivations, each ⊗ over a rule body; that recursion
+%% has a unique least fixpoint only on a DAG. A cycle admits an unfounded second fixpoint in
+%% which the cyclic atom floats in at the ⊗-identity.
+reaches(X, Y) :- head(R, X), body(R, Y).
+reaches(X, Z) :- head(R, X), body(R, Y), reaches(Y, Z).
+violation(cyclic, X) :- reaches(X, X).
+
+%% ---- w is a partial FUNCTION on atoms ----------------------------------------
+%% Two weights for one atom split ONE conflict into several independently discardable attacks:
+%% the budget double-charges, and the same (attacker, target) pair can be discarded AND
+%% successful in one answer set. Stated over weight/2 however it is DERIVED, so a rule-defined
+%% weight colliding with a fact is caught too.
+violation(multi_weight, X) :- weight(X, V), weight(X, W), V != W.
+
+%% ---- w maps into the algebra's carrier ---------------------------------------
+%% A non-integral weight is silently dropped by the monoid aggregates (#sum/#max/#min ignore a
+%% non-integral tuple), so its attack costs nothing and is discardable at any budget. The two
+%% infinity sentinels stay legal: they are semiring identities, and the budget guards handle
+%% both ends explicitly.
+integral(X) :- weight(X, W), W = W + 0.
+sentinel(X)  :- weight(X, #sup).
+sentinel(X)  :- weight(X, #inf).
+violation(not_a_number, X) :- weight(X, _), not integral(X), not sentinel(X).
+violation(negative, X)     :- weight(X, W), W = W + 0, W < 0.
+
+%% ---- Lukasiewicz only: the carrier is [0, k] ---------------------------------
+%% Z3 refutes the annihilator law, associativity and both identities off the grid
+%% (test/semiring_axioms.py). Checked only when the caller passes -c k=N, since k is meaningless
+%% for the other four algebras; callers MUST pass the same k they will give the solver, which is
+%% the module's own default when the user did not choose one.
+violation(off_grid, X) :- k > 0, weight(X, W), W = W + 0, W > k.
+violation(off_grid, X) :- k > 0, weight(X, #sup).
+violation(off_grid, X) :- k > 0, weight(X, #inf).
+
+%% ---- wrapper-surface policy (OFF by default) ---------------------------------
+%% Distinct from everything above: #sup and #inf ARE elements of four of the five carriers, so
+%% they are mathematically fine and core/base.lp accepts them. But bin/waba and the playground
+%% normalise their authored surface to FINITE nonnegative integers, because an infinite leaf
+%% weight is almost always a modelling slip rather than an intent. That is a surface decision,
+%% not a precondition of the definition, so it is a switch the caller turns on rather than
+%% something baked in -- raw clingo composition stays unrestricted.
+#const finite_only = 0.
+violation(not_finite, X) :- finite_only = 1, weight(X, #sup).
+violation(not_finite, X) :- finite_only = 1, weight(X, #inf).
+
+#show violation/2.
 `
     },
     semiring: {
@@ -475,18 +508,15 @@ semiring_default_weight(neutral,0).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
@@ -631,18 +661,15 @@ semiring_default_weight(neutral,#inf).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
@@ -770,18 +797,15 @@ semiring_default_weight(neutral,#sup).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
@@ -914,18 +938,15 @@ semiring_default_weight(neutral,#inf).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _idempotent.lp — rule-body (⊗) skeleton for the min/max family
@@ -1061,18 +1082,15 @@ semiring_default_weight(neutral,k).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _phase.lp — shared weight-propagation skeleton (algebra-agnostic part)
@@ -1154,42 +1172,17 @@ arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
 %% ---------------------------------------------------------------------------
-%% CARRIER GUARD — Łukasiewicz is a semiring only on [0, k]
+%% CARRIER: [0, k]
 %% ---------------------------------------------------------------------------
-%% Machine-checked with Z3 over the domain core/base.lp actually admits (ℤ ∪ {#inf,#sup}):
-%% godel, bottleneck_cost, tropical and arctic satisfy all eight commutative-semiring axioms
-%% there, but Łukasiewicz satisfies only three. Restricted to [0,k] it satisfies all eight.
-%% The three that fail outside it, with the counterexamples Z3 returned:
+%% Unlike the other four algebras, Łukasiewicz is a semiring only on the GRID [0, k].
+%% Machine-checked with Z3 (test/semiring_axioms.py): off the grid the ⊕-identity 0 stops
+%% annihilating ⊗ (0 ⊗ 7 = 4 at k = 3), ⊗ stops being associative, and both identities fail on
+%% the sentinels. No lifted top can repair it, because 0̄ = 0 is a FINITE value that must
+%% annihilate -- making #sup absorbing, as arctic does (whose annihilator is #inf), would give
+%% 0 ⊗ #sup = #sup.
 %%
-%%   0̄ annihilates ⊗   a = 7, k = 3     0 ⊗ 7 = max(0, 0+7-3) = 4, not 0
-%%   ⊗ associative      a = -7, b = c = 6, k = 5
-%%   ⊗ identity / ⊕ identity for a = #sup or #inf
-%%
-%% Verified in clingo, not just in the model: with k=3 and weights 0 and 7 the implementation
-%% reports supported_with_weight(x,4) for the rule body {0,7}, where the algebra requires 0.
-%%
-%% Unlike the other four, Łukasiewicz's ⊕-identity 0̄ = 0 is a FINITE value that must annihilate
-%% ⊗. That is why no lifted top can be added to the carrier: making #sup absorbing (as arctic
-%% does, whose annihilator is #inf) would give 0 ⊗ #sup = #sup and break the annihilator law.
-%%
-%% So every DECLARED weight must lie on the grid. This is the same class of guard as
-%% core/base.lp's integrality and functionality checks, and it REJECTS rather than warns:
-%% off-grid weights do not merely look odd, they make ⊗ non-associative, so the value a
-%% derivation gets would depend on how its rules happened to be written.
-weight_off_grid(X) :- weight(X, W), W = W + 0, W < 0.
-weight_off_grid(X) :- weight(X, W), W = W + 0, W > k.
-weight_off_grid(X) :- weight(X, #sup).
-weight_off_grid(X) :- weight(X, #inf).
-:- weight_off_grid(_).
-
-%% δ is deliberately NOT covered by that guard. \`--default-policy aba\` sets δ = #sup, which is
-%% an EXTERNAL marker meaning "this objection may never be paid for" (semantics/admissible.lp
-%% keys on arg_weight(X,#sup)), not an element of [0,k]. Inside a rule body ⊗ substitutes it by
-%% the grid top k = 1̄, so it is transparent in a conjunction rather than inflating it. The
-%% consequence, which is a genuine property of a BOUNDED algebra rather than a defect, is that
-%% δ = #sup is un-droppable only at the leaf: it cannot make a derived objection un-droppable,
-%% because [0,k] has no absorbing top. Use ABA recovery (constraint/no_discard.lp) when
-%% un-droppability must hold throughout.
+%% So \`w : A → [0,k]\` is a hypothesis of this algebra, checked at the boundary with the other
+%% framework preconditions, not encoded here.
 
 %% Bounded-sum ⊗ (both phases). #sum drops #sup/#inf, so saturate them first:
 %% #inf -> 0 (the bounded-sum annihilator, precedence), #sup -> k (grid top).
@@ -1239,18 +1232,15 @@ semiring_default_weight(neutral,0).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
@@ -1399,18 +1389,15 @@ semiring_default_weight(neutral,0).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 
 %% ============================================================================
 %% _additive.lp — rule-body (⊗ = +) skeleton for the additive family
@@ -1548,18 +1535,15 @@ explicit_default_policy(aba).
 %% behaviour already reachable. Its one distinctive effect was on TROPICAL, where delta was
 %% #sup (the ⊗-annihilator) rather than 0; \`--default-policy aba\` still provides exactly that.
 
-configured_default_policy :- explicit_default_policy(_).
-
-:- explicit_default_policy(P1), explicit_default_policy(P2), P1 != P2.
-
-active_default_policy(P) :- explicit_default_policy(P).
-active_default_policy(neutral) :- not configured_default_policy.
-
+%% delta resolves to ONE value, so say it in two rules rather than routing it through a
+%% \`configured_default_policy\` flag and an \`active_default_policy\` relation. The "exactly one
+%% policy module is loaded" and "that policy is defined for this semiring" checks moved to the
+%% boundary with the framework preconditions: bin/waba and the web program-builder each load
+%% exactly one defaults/*.lp by construction, so neither is reachable from a supported run.
 default_assumption_weight(W) :-
-    active_default_policy(P),
-    semiring_default_weight(P, W).
-
-:- active_default_policy(P), not semiring_default_weight(P, _).
+    explicit_default_policy(P), semiring_default_weight(P, W).
+default_assumption_weight(W) :-
+    not explicit_default_policy(_), semiring_default_weight(neutral, W).
 `,
         "neutral": `%% Use the semiring-specific conjunction-neutral default for unweighted assumptions.
 explicit_default_policy(neutral).
@@ -1603,8 +1587,6 @@ budget_value(C) :- C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
 active_optimization(maximize).
 
 :- active_optimization(minimize).
-:- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
-:- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
 %% Sum: maximize the discarded multiset directly (fast path).
 #maximize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
@@ -1623,8 +1605,6 @@ active_optimization(maximize).
 active_optimization(minimize).
 
 :- active_optimization(maximize).
-:- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
-:- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
 
 %% Sum: minimize the discarded multiset directly (fast path; no single aggregate term).
 #minimize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
@@ -1644,9 +1624,6 @@ active_optimization(minimize).
         "lb": `%% Generic lower-bound budget constraint.
 
 
-:- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
-:- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
-
 %% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
 
 %% An empty discard set spends nothing; it does not "meet" a positive lower bound,
@@ -1662,13 +1639,6 @@ some_discard :- discarded_attack(_,_,_).
 
 %% For plain ABA (no discards at all) use constraint/no_discard.lp, not a budget here.
 
-%% An unbound \`beta\` is not "budget disabled". clingo orders every integer strictly BELOW an
-%% uninterpreted constant, so with a symbolic beta the comparison above can never fire (ub)
-%% or always fires (lb) -- silent, and in opposite directions. Reject instead. The \`B+0\` test
-%% is arithmetic, undefined on a symbolic constant, so the rule simply does not fire; the
-%% accompanying "operation undefined" info is emitted only in that misconfigured case.
-integer_budget(B) :- effective_budget(B), B = B + 0.
-:- effective_budget(B), not integer_budget(B).
 `,
         "no_discard": `%% No Discarding Constraint
 %% =========================
@@ -1690,9 +1660,6 @@ integer_budget(B) :- effective_budget(B), B = B + 0.
         "ub": `%% Generic upper-bound budget constraint.
 
 
-:- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
-:- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
-
 %% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
 
 %% An empty discard set spends nothing, so it trivially respects any upper bound.
@@ -1713,13 +1680,6 @@ some_discard :- discarded_attack(_,_,_).
 %% zero-cost attack costs nothing to drop. For plain ABA use no_discard, or the \`aba\`
 %% default policy (unweighted attacks are then #sup, hence un-discardable above).
 
-%% An unbound \`beta\` is not "budget disabled". clingo orders every integer strictly BELOW an
-%% uninterpreted constant, so with a symbolic beta the comparison above can never fire (ub)
-%% or always fires (lb) -- silent, and in opposite directions. Reject instead. The \`B+0\` test
-%% is arithmetic, undefined on a symbolic constant, so the rule simply does not fire; the
-%% accompanying "operation undefined" info is emitted only in that misconfigured case.
-integer_budget(B) :- effective_budget(B), B = B + 0.
-:- effective_budget(B), not integer_budget(B).
 `
     },
     filter: {
@@ -1728,12 +1688,8 @@ integer_budget(B) :- effective_budget(B), B = B + 0.
 #show out/1.
 #show discarded_attack/3.
 
-%% Advisory diagnostic: an explicit weight on a derived atom that did not take effect
 %% (usually empty — see core/base.lp and README.md "Where weights live").
-#show weight_on_derived_dominated/3.
 
-%% Advisory: a framework-declared budget/1 that the wrapper ignored.
-#show framework_budget_ignored/1.
 `,
         "standard": `#show in/1.
 #show out/1.
@@ -1750,10 +1706,7 @@ integer_budget(B) :- effective_budget(B), B = B + 0.
 
 % Advisory diagnostic: an explicit weight on a derived atom that did not take effect
 % (usually empty — see core/base.lp and README.md "Where weights live").
-#show weight_on_derived_dominated/3.
 
-%% Advisory: a framework-declared budget/1 that the wrapper ignored.
-#show framework_budget_ignored/1.
 `
     },
     semantics: {
