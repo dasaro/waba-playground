@@ -56,8 +56,7 @@ multi_weight(X) :- weight(X,V1), weight(X,V2), V1 != V2.
 integral_weight(X) :- weight(X,W), W = W + 0.
 sentinel_weight(X) :- weight(X,#sup).
 sentinel_weight(X) :- weight(X,#inf).
-non_numeric_weight(X) :- weight(X,_), not integral_weight(X), not sentinel_weight(X).
-:- non_numeric_weight(_).
+:- weight(X,_), not integral_weight(X), not sentinel_weight(X).
 
 %% ====================
 %% FLATNESS GUARD
@@ -68,8 +67,7 @@ non_numeric_weight(X) :- weight(X,_), not integral_weight(X), not sentinel_weigh
 %% semantics rest on, and weighted non-flat ABA has no settled semantics.)
 %% A non-flat assumption is flagged here and the framework is rejected outright,
 %% rather than silently producing ill-defined weights.
-non_flat_assumption(X) :- assumption(X), is_head(X).
-:- non_flat_assumption(_).
+:- assumption(X), is_head(X).
 
 %% ====================
 %% WELL-FOUNDEDNESS GUARD (acyclic derivations)
@@ -81,9 +79,8 @@ non_flat_assumption(X) :- assumption(X), is_head(X).
 %% free-discard extensions). Such frameworks are rejected outright, like non-flat ones,
 %% rather than silently producing ill-defined weights. (WABA is defined for well-founded
 %% flat frameworks; the curated/reference examples are all acyclic.)
-derivation_edge(H,B) :- head(R,H), body(R,B).
-derivation_reaches(X,Y) :- derivation_edge(X,Y).
-derivation_reaches(X,Z) :- derivation_edge(X,Y), derivation_reaches(Y,Z).
+derivation_reaches(X,Y) :- head(R,X), body(R,Y).
+derivation_reaches(X,Z) :- head(R,X), body(R,Y), derivation_reaches(Y,Z).
 derivation_cycle(X) :- derivation_reaches(X,X).
 :- derivation_cycle(_).
 
@@ -197,29 +194,32 @@ framework_budget_ignored(N) :- budget(N), N != beta.
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -249,25 +249,28 @@ supported_with_weight(X, W) :- pweight(support, X, W).
 arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
-otimes_annihilator(A) :- oplus_identity(A).
 opposite_infinity(#inf) :- oplus_identity(#sup).
 opposite_infinity(#sup) :- oplus_identity(#inf).
 
-add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
-add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
+%% One auxiliary -- "this rule body carries the value V" -- instead of two pre-baked booleans
+%% (add_body_has_annih / add_body_has_opp). Each case below now names the algebra constant it
+%% tests, so the precedence reads off the rules themselves rather than out of two helper names.
+add_body_has(P, R, V) :- body(R, B), pweight(P, B, V).
 
 %% Annihilator wins (a ⊗ 0̄ = 0̄).
 rule_deriv(P, R, X, A) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    add_body_has_annih(P, R), otimes_annihilator(A).
+    oplus_identity(A), add_body_has(P, R, A).
 %% No annihilator, but the opposite infinity saturates.
 rule_deriv(P, R, X, O) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), add_body_has(P, R, O).
 %% Finite case: plain integer sum (no infinities present).
 rule_deriv(P, R, X, W) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), not add_body_has(P, R, O),
     W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 `,
         "_idempotent": `%% ============================================================================
@@ -305,29 +308,32 @@ rule_deriv(P, R, X, W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -389,29 +395,32 @@ rule_deriv(P, R, X, W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -445,7 +454,6 @@ arg_weight(X, W)            :- pweight(maximal, X, W).
 %% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
 %% Weights are rewards/benefits, higher is better (longest path).
 
-active_semiring(arctic).
 
 oplus(max).
 oplus_identity(#inf).
@@ -516,29 +524,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -568,25 +579,28 @@ supported_with_weight(X, W) :- pweight(support, X, W).
 arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
-otimes_annihilator(A) :- oplus_identity(A).
 opposite_infinity(#inf) :- oplus_identity(#sup).
 opposite_infinity(#sup) :- oplus_identity(#inf).
 
-add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
-add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
+%% One auxiliary -- "this rule body carries the value V" -- instead of two pre-baked booleans
+%% (add_body_has_annih / add_body_has_opp). Each case below now names the algebra constant it
+%% tests, so the precedence reads off the rules themselves rather than out of two helper names.
+add_body_has(P, R, V) :- body(R, B), pweight(P, B, V).
 
 %% Annihilator wins (a ⊗ 0̄ = 0̄).
 rule_deriv(P, R, X, A) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    add_body_has_annih(P, R), otimes_annihilator(A).
+    oplus_identity(A), add_body_has(P, R, A).
 %% No annihilator, but the opposite infinity saturates.
 rule_deriv(P, R, X, O) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), add_body_has(P, R, O).
 %% Finite case: plain integer sum (no infinities present).
 rule_deriv(P, R, X, W) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), not add_body_has(P, R, O),
     W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 
 `,
@@ -595,7 +609,6 @@ rule_deriv(P, R, X, W) :-
 %% Conjunction = worst step (max); disjunction = cheapest alternative (min).
 %% An argument costs as much as its single worst step (worst-case path).
 
-active_semiring(bottleneck_cost).
 
 oplus(min).
 otimes(max).
@@ -666,29 +679,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -732,7 +748,6 @@ rule_deriv(P, R, X, W) :-
 %% Conjunction = weakest link (min); disjunction = strongest alternative (max).
 %% Weights are truth degrees / confidences, higher is better (original WABA).
 
-active_semiring(godel).
 
 oplus(max).
 otimes(min).
@@ -803,29 +818,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -874,7 +892,6 @@ rule_deriv(P, R, X, W) :-
 %% Conjunction = worst step (max); disjunction = cheapest alternative (min).
 %% An argument costs as much as its single worst step (worst-case path).
 
-active_semiring(bottleneck_cost).
 
 oplus(min).
 otimes(max).
@@ -945,29 +962,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -1016,7 +1036,6 @@ rule_deriv(P, R, X, W) :-
 
 #const k = 1000.
 
-active_semiring(lukasiewicz).
 
 oplus(max).
 oplus_identity(0).
@@ -1079,29 +1098,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -1196,7 +1218,6 @@ rule_deriv(P, R, X, M) :-
 %% Conjunction = accumulate cost (sum); disjunction = cheapest proof (min).
 %% Weights are costs, lower is better (shortest path).
 
-active_semiring(tropical).
 
 oplus(min).
 oplus_identity(#sup).
@@ -1267,29 +1288,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -1319,25 +1343,28 @@ supported_with_weight(X, W) :- pweight(support, X, W).
 arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
-otimes_annihilator(A) :- oplus_identity(A).
 opposite_infinity(#inf) :- oplus_identity(#sup).
 opposite_infinity(#sup) :- oplus_identity(#inf).
 
-add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
-add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
+%% One auxiliary -- "this rule body carries the value V" -- instead of two pre-baked booleans
+%% (add_body_has_annih / add_body_has_opp). Each case below now names the algebra constant it
+%% tests, so the precedence reads off the rules themselves rather than out of two helper names.
+add_body_has(P, R, V) :- body(R, B), pweight(P, B, V).
 
 %% Annihilator wins (a ⊗ 0̄ = 0̄).
 rule_deriv(P, R, X, A) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    add_body_has_annih(P, R), otimes_annihilator(A).
+    oplus_identity(A), add_body_has(P, R, A).
 %% No annihilator, but the opposite infinity saturates.
 rule_deriv(P, R, X, O) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), add_body_has(P, R, O).
 %% Finite case: plain integer sum (no infinities present).
 rule_deriv(P, R, X, W) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), not add_body_has(P, R, O),
     W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 
 `,
@@ -1351,7 +1378,6 @@ rule_deriv(P, R, X, W) :-
 %% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
 %% Weights are rewards/benefits, higher is better (longest path).
 
-active_semiring(arctic).
 
 oplus(max).
 oplus_identity(#inf).
@@ -1422,29 +1448,32 @@ default_assumption_weight(W) :-
 %% and includes a ⊗ skeleton (_idempotent.lp or _additive.lp) defining rule_deriv/4.
 
 %% ---- phase bridges -----------------------------------------------------------
+%% Two bridges, not three. \`phase_selected\` used to gate the policy-default case while
+%% \`phase_active\` gated the explicit-weight one, but they coincide exactly where the former was
+%% used -- that rule is already restricted to \`assumption(X)\`, and for an ASSUMPTION:
+%%   support : the flatness guard means an assumption is never a rule head, so \`supported(X)\`
+%%             can only come from \`in(X)\`  ->  phase_active == phase_selected
+%%   maximal : semantics/admissible.lp declares \`arg(X) :- assumption(X).\`, so arg(X) holds for
+%%             every assumption  ->  phase_active == phase_selected
+%% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
+%% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
 %% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
 %%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
-phase(support).
-phase(maximal) :- budgeted_full.
-
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
-%% "selected" = the assumption is committed in this phase (in).
-phase_selected(support, X)  :- in(X).
 
 %% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
 %% the strength of an argument in the largest possible context (its intrinsic strongest form).
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
-phase_selected(maximal, X)  :- budgeted_full, assumption(X).
 
 %% ---- direct (own) weight: explicit weight, else policy default ---------------
 %% Explicit weight is gated on phase_active (= in for flat assumptions, = supported
 %% for non-flat / derived atoms — matches the previous per-semiring gating). The
 %% policy default applies to unweighted assumptions that are selected.
-direct_weight(P, X, V) :- phase(P), weight(X, V), phase_active(P, X).
-direct_weight(P, X, V) :- phase(P), assumption(X), not weight(X, _), phase_selected(P, X), default_assumption_weight(V).
+direct_weight(P, X, V) :- weight(X, V), phase_active(P, X).
+direct_weight(P, X, V) :- assumption(X), not weight(X, _), phase_active(P, X), default_assumption_weight(V).
 
 %% ---- assumptions: weight is just the direct weight --------------------------
 %% WABA is restricted to flat ABA (see core/base.lp's flatness guard), so an
@@ -1474,25 +1503,28 @@ supported_with_weight(X, W) :- pweight(support, X, W).
 arg_weight(X, W)            :- pweight(maximal, X, W).
 
 
-otimes_annihilator(A) :- oplus_identity(A).
 opposite_infinity(#inf) :- oplus_identity(#sup).
 opposite_infinity(#sup) :- oplus_identity(#inf).
 
-add_body_has_annih(P, R) :- body(R, B), pweight(P, B, A), otimes_annihilator(A).
-add_body_has_opp(P, R)   :- body(R, B), pweight(P, B, O), opposite_infinity(O).
+%% One auxiliary -- "this rule body carries the value V" -- instead of two pre-baked booleans
+%% (add_body_has_annih / add_body_has_opp). Each case below now names the algebra constant it
+%% tests, so the precedence reads off the rules themselves rather than out of two helper names.
+add_body_has(P, R, V) :- body(R, B), pweight(P, B, V).
 
 %% Annihilator wins (a ⊗ 0̄ = 0̄).
 rule_deriv(P, R, X, A) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    add_body_has_annih(P, R), otimes_annihilator(A).
+    oplus_identity(A), add_body_has(P, R, A).
 %% No annihilator, but the opposite infinity saturates.
 rule_deriv(P, R, X, O) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), add_body_has_opp(P, R), opposite_infinity(O).
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), add_body_has(P, R, O).
 %% Finite case: plain integer sum (no infinities present).
 rule_deriv(P, R, X, W) :-
     rule(R), head(R, X), has_body(R), phase_triggered(P, R),
-    not add_body_has_annih(P, R), not add_body_has_opp(P, R),
+    oplus_identity(A), not add_body_has(P, R, A),
+    opposite_infinity(O), not add_body_has(P, R, O),
     W = #sum{ V,B : body(R,B), pweight(P,B,V) }.
 
 
@@ -1611,8 +1643,6 @@ active_optimization(minimize).
     constraint: {
         "lb": `%% Generic lower-bound budget constraint.
 
-active_budget_mode(lb).
-active_constraint(lb).
 
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.
@@ -1655,14 +1685,10 @@ integer_budget(B) :- effective_budget(B), B = B + 0.
 %%          WABA/semantics/<semantic>.lp framework.lp
 
 %% Reject any extension that discards any attack
-active_budget_mode(no_discard).
-active_constraint(no_discard).
 :- discarded_attack(_,_,_).
 `,
         "ub": `%% Generic upper-bound budget constraint.
 
-active_budget_mode(ub).
-active_constraint(ub).
 
 :- not active_monoid(sum), not active_monoid(max), not active_monoid(min).
 :- 2 { active_monoid(sum); active_monoid(max); active_monoid(min) }.

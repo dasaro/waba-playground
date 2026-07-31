@@ -1,5 +1,5 @@
-import { appendStateChip } from './graph-tooltip-builder.js?v=20260731-3';
-import { GraphUtils } from './graph-utils.js?v=20260731-3';
+import { appendStateChip } from './graph-tooltip-builder.js?v=20260731-4';
+import { GraphUtils } from './graph-utils.js?v=20260731-4';
 
 /**
  * The three attack states, each separable from the others on TWO non-hue channels, so the
