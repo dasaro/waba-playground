@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260730-42';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260730-42';
-import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260730-42';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260730-42';
+import { PopupManager } from './popup-manager.js?v=20260731-3';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260731-3';
+import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260731-3';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260731-3';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -160,6 +160,19 @@ export class OutputManager {
                 const cycles = this.frameworkCycles();
                 this.log(`⚠️ No extensions: the rules are not well-founded — ${cycles.join(', ')} depend${cycles.length > 1 ? '' : 's'} on themselves.`, 'warning');
                 this.log('A derivation cycle (p ← q, q ← p) has no well-defined propagated weight, so the framework is rejected rather than mis-priced. Break the cycle.', 'info');
+            } else if (config.semiringKey === 'lukasiewicz'
+                && this.frameworkOffGridWeights(config).length > 0) {
+                // Lukasiewicz is a semiring only on [0, k]: off the grid, 0 stops annihilating
+                // and the conjunction stops being associative, so semiring/lukasiewicz.lp
+                // rejects the framework outright. Name the offending weights rather than
+                // leaving the user with a bare "no extensions".
+                const off = this.frameworkOffGridWeights(config);
+                this.log(`\u26a0\ufe0f No extensions: ${off.join(', ')} `
+                    + `${off.length > 1 ? 'lie' : 'lies'} outside [0, k] with k = ${config.lukK}.`,
+                'warning');
+                this.log('Lukasiewicz is only a semiring on that grid — outside it the bounded '
+                    + 'sum is not associative, so a derivation\u2019s weight would depend on how '
+                    + 'its rules happened to be written. Raise k, or lower the weights.', 'info');
             } else if (this.frameworkDuplicateWeights().length > 0) {
                 const dup = this.frameworkDuplicateWeights();
                 this.log(`⚠️ No extensions: ${dup.join(', ')} carr${dup.length > 1 ? 'y' : 'ies'} more than one weight.`, 'warning');
@@ -732,6 +745,22 @@ export class OutputManager {
     }
 
     /** Atoms carrying more than one distinct weight, which core/base.lp rejects. */
+    /** Declared weights outside Lukasiewicz's carrier [0, k]. */
+    frameworkOffGridWeights(config) {
+        const k = Number.isFinite(config?.lukK) ? config.lukK : 1000;
+        const off = [];
+        for (const [atom, values] of this.frameworkWeights.entries()) {
+            for (const raw of values) {
+                const n = Number(raw);
+                if (!Number.isFinite(n) || n < 0 || n > k) {
+                    off.push(atom);
+                    break;
+                }
+            }
+        }
+        return off.sort();
+    }
+
     frameworkDuplicateWeights() {
         return [...(this.frameworkWeights || new Map()).entries()]
             .filter(([, values]) => values instanceof Set && values.size > 1)

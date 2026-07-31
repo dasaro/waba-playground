@@ -1,7 +1,7 @@
 /**
  * ThemeManager - Handles dark/light theme switching
  */
-import { GraphUtils } from './graph-utils.js?v=20260730-42';
+import { GraphUtils } from './graph-utils.js?v=20260731-3';
 
 export class ThemeManager {
     constructor(themeToggleBtn, themeIcon, network, networkData, onGraphRestyled = null) {

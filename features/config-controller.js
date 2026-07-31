@@ -1,7 +1,7 @@
 import {
     normalizeConfig, isBudgetedDefence, selectableSemirings, semiringConstants, SEMIRING_INFO
-} from '../runtime/config-service.js?v=20260730-42';
-import { wabaModules } from '../waba-modules.js?v=20260730-42';
+} from '../runtime/config-service.js?v=20260731-3';
+import { wabaModules } from '../waba-modules.js?v=20260731-3';
 
 export class ConfigController {
     constructor(dom) {
@@ -278,6 +278,15 @@ export class ConfigController {
             this.dom.lukKContainer.style.display = constants.length > 0 ? 'block' : 'none';
             if (constants.length > 0 && this.dom.lukKLabel) {
                 this.dom.lukKLabel.textContent = `Bound ${constants[0].name}`;
+                // Seed from the MODULE's own default the first time this algebra is chosen, so
+                // the playground and bin/waba agree. The field used to default to a hardcoded
+                // 10 while the module says 1000 -- a divergence that was survivable when an
+                // off-grid weight merely computed something odd, and is not now that the
+                // carrier guard rejects it outright.
+                if (this._seededConstant !== algebra) {
+                    this._seededConstant = algebra;
+                    if (this.dom.lukKInput) this.dom.lukKInput.value = String(constants[0].default);
+                }
             }
         }
 

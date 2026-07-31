@@ -894,6 +894,33 @@ test('the reference sheet is actually styled, and matches the control surface',
         expect(readings.length).toBe(await page.locator('#budget-select option').count());
     });
 
+test('an off-grid Łukasiewicz weight is refused and explained', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#semiring-select', 'lukasiewicz');
+
+    // The k field is seeded from the MODULE's own #const, so the playground and bin/waba agree.
+    // It used to default to a hardcoded 10 against the module's 1000.
+    await expect(page.locator('#luk-k-input')).toHaveValue('1000');
+
+    // Z3 refutes the annihilator, associativity and both identities off the grid [0,k], and
+    // semiring/lukasiewicz.lp therefore rejects the framework. Without a diagnosis that surfaces
+    // as a bare "no extensions", which reads as a modelling mistake rather than a carrier one.
+    await page.fill('#luk-k-input', '10');
+    await page.setInputFiles('#file-upload-input', {
+        name: 'offgrid.lp',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('assumption(a). assumption(b).\nweight(a,900). weight(b,3).\n'
+            + 'contrary(a,ca). contrary(b,cb).\nhead(r1,ca). body(r1,b).\n')
+    });
+    await settled(page);
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    await expect(page.locator('#output')).toContainText(/a lies outside \[0, k\] with k = 10/);
+    await expect(page.locator('#output')).toContainText(/not associative/);
+});
+
 test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
