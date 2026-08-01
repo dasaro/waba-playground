@@ -1598,4 +1598,46 @@ test('the exponential discount reads costs as odds, the harmonic one saturates',
     // and both agree on the never-attacked observations
     expect(harmonic.obs_atlas).toBe(1);
     expect(exponential.obs_atlas).toBe(1);
+
+    // AUTO must not be flat for exponential either. Its scale is the cheapest paid
+    // standpoint (8 here), not the median: using the median gave K = 109/ln2 = 157, above
+    // every cost, and the pair came back .744/.513 -- the flat failure the auto rule exists
+    // to prevent.
+    await page.selectOption('#credibility-discount', 'exponential');
+    await page.fill('#credibility-kappa', '');
+    await page.click('#credibility-btn');
+    await page.waitForFunction(
+        () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
+    const expAuto = await read();
+    expect(expAuto.higgs_exists).toBeGreaterThan(0.99);
+    expect(expAuto.null_fluctuation).toBeLessThan(0.01);
+});
+
+test('the credibility discount preselects from the algebra, and a manual choice survives', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+
+    // Derived from the semiring metadata, not a list: exponential exactly where the weights
+    // are surprisals (cost polarity AND additive otimes), harmonic everywhere else.
+    for (const [algebra, expected] of [
+        ['tropical', 'exponential'],
+        ['godel', 'harmonic'],
+        ['arctic', 'harmonic'],
+        ['bottleneck_cost', 'harmonic'],
+        ['lukasiewicz', 'harmonic']
+    ]) {
+        await page.selectOption('#semiring-select', algebra);
+        await settled(page);
+        await expect(page.locator('#credibility-discount'),
+            `${algebra} should preselect ${expected}`).toHaveValue(expected);
+    }
+
+    // A deliberate choice must not be clobbered by an unrelated control change --
+    // the same contract the budget reading has.
+    await page.selectOption('#semiring-select', 'godel');
+    await settled(page);
+    await page.selectOption('#credibility-discount', 'exponential');
+    await page.selectOption('#semantics-select', 'cf');
+    await settled(page);
+    await expect(page.locator('#credibility-discount')).toHaveValue('exponential');
 });

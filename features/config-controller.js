@@ -3,6 +3,18 @@ import {
 } from '../runtime/config-service.js?v=20260731-8';
 import { wabaModules } from '../waba-modules.js?v=20260731-8';
 
+// The credibility discount follows the ALGEBRA, derived from the same metadata as the
+// budget pairing rather than a per-algebra list. The exponential discount reads a
+// standpoint's price as a LOG-PROBABILITY (it is invariant under translating costs -- an
+// interval scale), so it is the calibrated family exactly when the weights are surprisals:
+// cost polarity AND an additive otimes, together the w = -K ln p encoding. Every other
+// algebra reads its weights ordinally, where the harmonic discount's bounded discrimination
+// is the honest choice -- a three-point rating must not yield four-nines confidence.
+function recommendedDiscount(key, info) {
+    const entry = info[key] || {};
+    return entry.polarity === 'lower' && entry.otimes === '+' ? 'exponential' : 'harmonic';
+}
+
 export class ConfigController {
     constructor(dom) {
         this.dom = dom;
@@ -87,6 +99,14 @@ export class ConfigController {
         // Seed the algebra-change detector so applying a preset does not look like a user
         // switching algebra, which would overwrite the preset's own budget reading.
         this._lastAlgebra = this.dom.semiringSelect.value;
+        // That suppression also skipped the credibility discount, which presets do NOT carry
+        // -- so loading the tropical Higgs example left the ordinal (harmonic) reading in
+        // place and its 8-vs-109 costs came back .741/.518. Set it here from the preset's own
+        // algebra, honouring an explicit preset value if one is ever added.
+        if (this.dom.credibilityDiscount) {
+            this.dom.credibilityDiscount.value = config.credibilityDiscount
+                || recommendedDiscount(this._lastAlgebra, SEMIRING_INFO);
+        }
         this.dom.defaultPolicySelect.value = config.defaultPolicy;
         this.dom.abaRecoveryToggle.checked = Boolean(config.abaRecovery);
         this.dom.semanticsSelect.value = config.semantics;
@@ -238,6 +258,11 @@ export class ConfigController {
 
         if (this._lastAlgebra !== undefined && this._lastAlgebra !== algebra) {
             const previousReading = readingPinned ? this._savedReading : this.dom.budgetSelect.value;
+            // Preselected on an ACTUAL algebra change only, exactly like the budget reading,
+            // so a deliberate choice is never overwritten by an unrelated syncUi.
+            if (this.dom.credibilityDiscount) {
+                this.dom.credibilityDiscount.value = recommendedDiscount(algebra, SEMIRING_INFO);
+            }
             const reading = recommendedFor(algebra);
             if (readingPinned) {
                 this._savedReading = reading;

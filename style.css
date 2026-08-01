@@ -2735,8 +2735,39 @@ div.vis-network div.vis-tooltip {
 
 
 /* ---- Credibility (price-weighted, per assumption) ---- */
-.credibility-controls { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; }
-.credibility-kappa { width: 72px; padding: 2px 6px; }
+.credibility-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-right: var(--space-sm);
+}
+.credibility-controls label {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+/* The three controls share the pill height of #clear-btn beside them. The kappa field and
+   the family select reuse `.select`, the same class #budget-input uses, so they inherit the
+   site's input theming instead of the browser default (which rendered the number field on a
+   white background in dark mode). */
+.credibility-kappa,
+.credibility-discount {
+    height: 39px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
+    border-radius: 999px;
+}
+.credibility-kappa { width: 90px; }
+/* Both pills in this header keep their label on one line. Without this the credibility
+   controls narrow the row enough that "Clear Output" wraps to two lines and the two pills
+   end up different heights (44 vs 71). */
+#credibility-btn,
+.output-header .clear-btn {
+    height: 39px;
+    white-space: nowrap;
+}
+/* the family select is the widest control here; size it to its content rather than the
+   select default so the row stays on one line in the narrow output panel */
+.credibility-discount { width: auto; min-width: 0; }
 .credibility-block { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--border-color, #444); border-radius: 6px; }
 .credibility-caption { font-size: 0.85em; opacity: 0.8; margin-bottom: 6px; }
 .credibility-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
@@ -2746,4 +2777,3 @@ div.vis-network div.vis-tooltip {
 .cred-bar-fill { height: 100%; background: var(--accent-color, #7c6fdd); border-radius: 4px; }
 .cred-value { font-variant-numeric: tabular-nums; }
 .cred-cost, .cred-count { font-variant-numeric: tabular-nums; opacity: 0.85; }
-.credibility-discount { padding: 2px 6px; }

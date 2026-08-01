@@ -415,10 +415,22 @@ ${pins}
         //                (omega(c1+c2) = omega(c1)omega(c2)) -- see the paper's separability
         //                proposition. The two motivations coincide, which is not an accident:
         //                independence and log-probability are the same factorisation.
+        // The auto SCALE differs per family, because "flat" means different things to them.
+        //   harmonic     kappa = median paid cost, so omega(median) = 1/2. Its 1/c decay is
+        //                gentle, so a mid-range scale still discriminates across the whole
+        //                range.
+        //   exponential  K = the CHEAPEST paid standpoint, so one unit of e-folding is one
+        //                unit of real price. Using the median here (K = median/ln2 > every
+        //                cost) made the discount FLAT over the observed range -- reported
+        //                from the Higgs example, where costs 8 and 109 came back .744/.513
+        //                instead of separating. That was the very failure the auto rule was
+        //                introduced to fix for harmonic, reintroduced for exponential by
+        //                extending its "omega = 1/2 at the median" rule by false analogy.
         const isExp = discount === 'exponential';
+        const cheapest = paid.length ? paid[0] : 1;
         const autoScale = isExp
-            ? Math.max(1, median / Math.LN2)     // exp(-median/K) = 1/2
-            : Math.max(1, Math.round(median));   // median/(median+median) = 1/2
+            ? Math.max(1, cheapest)
+            : Math.max(1, Math.round(median));
         const effectiveKappa = Number.isFinite(kappa) && kappa > 0 ? kappa : autoScale;
         const omega = isExp
             ? (c) => Math.exp(-c / effectiveKappa)
