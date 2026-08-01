@@ -1522,3 +1522,40 @@ test('the curated list is deduplicated and every example still loads', async ({ 
     expect(algebras).toEqual(
         ['arctic', 'bottleneck_cost', 'godel', 'lukasiewicz', 'tropical']);
 });
+
+test('credibility auto-scales kappa so a large cost gap is visible', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    // Higgs: standpoint costs 8, 109, 109. With the old fixed kappa = 1000 the discount was
+    // nearly flat across that range (omega .992 vs .902), so both contested assumptions
+    // collapsed to their bare membership fraction (2/3) and the 13x cost gap was invisible.
+    await page.selectOption('#example-select', 'higgs_boson_discovery');
+    await settled(page);
+
+    await page.fill('#credibility-kappa', '');           // auto
+    await page.click('#credibility-btn');
+    await page.waitForFunction(
+        () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
+    await expect(page.locator('.credibility-caption')).toContainText('auto-scaled');
+    const read = async () => Object.fromEntries(
+        await page.locator('.credibility-table tbody tr').evaluateAll(
+            (trs) => trs.map((tr) => {
+                const td = tr.querySelectorAll('td');
+                return [td[0].textContent, parseFloat(td[1].textContent)];
+            })));
+    const auto = await read();
+    // the accepted discovery must now be clearly ahead of the fluctuation holdout
+    expect(auto.higgs_exists - auto.null_fluctuation).toBeGreaterThan(0.15);
+    // observations are in every standpoint either way
+    expect(auto.obs_atlas).toBe(1);
+
+    // pinning the old kappa reproduces the flat behaviour -- the scale is a semantic choice,
+    // not a bug, and the UI must still honour an explicit value.
+    await page.fill('#credibility-kappa', '1000');
+    await page.click('#credibility-btn');
+    await page.waitForFunction(
+        () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
+    await expect(page.locator('.credibility-caption')).not.toContainText('auto-scaled');
+    const pinned = await read();
+    expect(pinned.higgs_exists - pinned.null_fluctuation).toBeLessThan(0.05);
+});

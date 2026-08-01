@@ -386,7 +386,22 @@ ${pins}
             standpoints.push({ ins, cost });
         }
 
-        const omega = (c) => kappa / (kappa + c);
+        // kappa AUTO-SCALES to the framework unless the caller pins it. A fixed kappa is
+        // wrong in a way that is easy to miss: the discount only discriminates over costs
+        // COMPARABLE to it, so kappa = 1000 against costs of 8..109 is nearly flat
+        // (omega(8) = .992 vs omega(109) = .902) and cred silently collapses to the bare
+        // membership fraction -- two standpoints out of three, whatever they cost. The
+        // auto rule sets kappa to the MEDIAN non-zero standpoint cost, i.e. omega = 1/2 at
+        // the typical price: a typical paid reading counts half as much as a free one, in
+        // whatever units the author chose. This is exactly the scale-covariance the
+        // operator already has (rescaling all weights and kappa together is a no-op), now
+        // applied by default instead of left to the user.
+        const paid = standpoints.map((sp) => sp.cost).filter((c) => c > 0).sort((a, b) => a - b);
+        const autoKappa = paid.length
+            ? Math.max(1, Math.round(paid[Math.floor((paid.length - 1) / 2)]))
+            : 1;
+        const effectiveKappa = Number.isFinite(kappa) && kappa > 0 ? kappa : autoKappa;
+        const omega = (c) => effectiveKappa / (effectiveKappa + c);
         const Z = standpoints.reduce((acc, sp) => acc + omega(sp.cost), 0);
         const atoms = new Set();
         standpoints.forEach((sp) => sp.ins.forEach((a) => atoms.add(a)));
@@ -407,7 +422,12 @@ ${pins}
                 count: mine.length
             };
         }).sort((x, y) => y.cred - x.cred || x.atom.localeCompare(y.atom));
-        return { rows, standpoints: standpoints.map((sp) => ({ ins: [...sp.ins].sort(), cost: sp.cost })), kappa };
+        return {
+            rows,
+            standpoints: standpoints.map((sp) => ({ ins: [...sp.ins].sort(), cost: sp.cost })),
+            kappa: effectiveKappa,
+            kappaAuto: !(Number.isFinite(kappa) && kappa > 0)
+        };
     }
 
     async runDirect(framework, config) {

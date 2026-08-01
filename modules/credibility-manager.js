@@ -19,7 +19,8 @@ export class CredibilityManager {
         caption.className = 'credibility-caption';
         caption.textContent = `Price-weighted credibility over ${data.standpoints.length} `
             + `budget-feasible standpoint${data.standpoints.length === 1 ? '' : 's'} `
-            + `(kappa = ${data.kappa}; costs ${data.standpoints.map((sp) => sp.cost).sort((a, b) => a - b).join(', ')})`;
+            + `(\u03ba = ${data.kappa}${data.kappaAuto ? ', auto-scaled to the median paid standpoint' : ''}; `
+            + `costs ${data.standpoints.map((sp) => sp.cost).sort((a, b) => a - b).join(', ')})`;
         block.appendChild(caption);
 
         const table = document.createElement('table');

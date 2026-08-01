@@ -317,12 +317,17 @@ export class PlaygroundController {
             this.outputManager.log('⚠️ No framework code to grade', 'warning');
             return;
         }
-        const kappa = Math.max(1, parseInt(this.dom.credibilityKappa.value, 10) || 1000);
+        // empty input = auto: kappa is chosen from the framework's own standpoint costs.
+        // A fixed default silently flattens cred on any framework whose costs are far from
+        // it, which is a semantic change disguised as a UI default.
+        const raw = this.dom.credibilityKappa.value.trim();
+        const kappa = raw === '' ? null : Math.max(1, parseInt(raw, 10) || 1);
         const config = this.configController.getCurrentConfig();
         this.dom.credibilityBtn.disabled = true;
         document.body.dataset.wabaCredibility = '0';
         try {
-            this.outputManager.log(`⚖️ Computing credibility (kappa = ${kappa})…`, 'info');
+            this.outputManager.log(
+                `⚖️ Computing credibility (\u03ba = ${kappa === null ? 'auto' : kappa})…`, 'info');
             const data = await this.clingoManager.computeCredibility(
                 framework, config, kappa,
                 (message, type) => this.outputManager.log(message, type)
