@@ -253,8 +253,9 @@ test('budgeted admissible matches the CLI count and beta* at every budget',
 test('the Standard set-graph refuses frameworks with too many candidate sets', async ({ page }) => {
     await waitForClingoReady(page);
 
-    // n = 6 -> 64 sets, over the limit of 32.
-    await page.selectOption('#example-select', 'out_of_africa');
+    // n = 6 -> 64 sets, over the limit of 32. (Was out_of_africa until that near-duplicate
+    // was retired; kpg_impact_vs_deccan has the same assumption count.)
+    await page.selectOption('#example-select', 'kpg_impact_vs_deccan');
     await page.locator('.mode-option', { hasText: 'Standard' }).click();
     await expect(page.locator('#graph-empty-message')).toContainText(/candidate sets/i, { timeout: 30000 });
     await expect(page.locator('#graph-empty-message')).toContainText(/Assumption-Direct|Assumption-Branching/);
@@ -1460,4 +1461,64 @@ test('credibility grades the P-A-R template with exact hand-computed values', as
     expect(byAtom.p[4]).toBe('2/3');
     // the caption names the ensemble and its costs -- the score stays decomposable
     await expect(page.locator('.credibility-caption')).toContainText('costs 0, 600, 800');
+});
+
+test('the PERSUADE essay example reproduces the corpus study end to end', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    await page.selectOption('#example-select', 'persuade_essay');
+    await settled(page);
+
+    // Its preset is arctic + max + ub at beta = 667, the price of the forgotten objection.
+    const config = await page.evaluate(
+        () => window.playground.configController.getCurrentConfig());
+    expect(config.semiringKey ?? config.semiring).toBe('arctic');
+    expect(config.beta).toBe(667);
+
+    // beta = 666 buys nothing: the unanswered counterclaim still fells the position.
+    await page.fill('#budget-input', '666');
+    await page.click('#run-btn');
+    await runFinished(page);
+    await expect(page.locator('.answer-header')).toHaveCount(1);
+
+    // beta = 667 buys it back -- exactly the Adequate rating of cc_scared.
+    await page.fill('#budget-input', '667');
+    await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
+    await page.click('#run-btn');
+    await runFinished(page);
+    await expect(page.locator('.answer-header')).toHaveCount(4);
+
+    // and credibility grades the forgotten objection ABOVE the answered one
+    await page.fill('#credibility-kappa', '1000');
+    await page.click('#credibility-btn');
+    await page.waitForFunction(
+        () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
+    const cred = Object.fromEntries(
+        await page.locator('.credibility-table tbody tr').evaluateAll(
+            (trs) => trs.map((tr) => {
+                const td = tr.querySelectorAll('td');
+                return [td[0].textContent, parseFloat(td[1].textContent)];
+            })));
+    expect(cred.cc_scared).toBeGreaterThan(cred.cc_risk);
+    expect(cred.reb_worth).toBe(1);
+});
+
+test('the curated list is deduplicated and every example still loads', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    const keys = await page.evaluate(
+        () => [...document.querySelectorAll('#example-select option')]
+            .map((o) => o.value).filter(Boolean));
+    // three near-duplicate "theory A vs B" frameworks were retired; the list must not
+    // silently regrow them, and must still cover all five algebras.
+    for (const gone of ['out_of_africa', 'lipid_hypothesis', 'deorbit_plan_risk']) {
+        expect(keys).not.toContain(gone);
+    }
+    expect(keys).toContain('persuade_essay');
+    const algebras = await page.evaluate(async () => {
+        const m = await import('/examples.js');
+        return [...new Set(Object.values(m.examples).map((e) => e.preset.semiring))].sort();
+    });
+    expect(algebras).toEqual(
+        ['arctic', 'bottleneck_cost', 'godel', 'lukasiewicz', 'tropical']);
 });

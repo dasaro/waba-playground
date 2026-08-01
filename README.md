@@ -120,14 +120,6 @@ chains into the rival's refutation. Competing theories map 1:1 to assumptions; e
   ATLAS 5.9σ (59) and CMS 5.0σ (50) add to 109 units of surprisal against the background-fluctuation
   null (arXiv:1207.7214/7235); the discovery is accepted at **cost 8** — discarding the
   look-elsewhere / trials-factor caveat every local 5σ carries (tropical + sum + ub, β=109).
-- `out_of_africa` — **Human origins: Out-of-Africa vs multiregional** (**Arctic**): coalescence (12)
-  + serial-founder decay (15) + African basal diversity (10) sum to 37; recent African origin is
-  accepted at **cost 8** — discarding the archaic-admixture objection (Neanderthal/Denisovan DNA;
-  Green 2010, Reich 2010) that partly vindicates gene flow (arctic + sum + ub, β=37).
-- `lipid_hypothesis` — **Lipid hypothesis: LDL causal vs marker-only** (**Arctic**, meta-analytic
-  effect sizes): CTT statin meta-analysis (8) + Mendelian randomization (11) + PCSK9 RCTs (6) sum to
-  25; causal-LDL is accepted at **cost 5** — discarding the residual-risk objection (~70-80% of
-  events remain despite LDL-lowering; CANTOS) (arctic + sum + ub, β=25).
 
 **Cost/weakness reasoning** — the same non-zero-cost, weighted-argument contract, but the weights read
 as a **cost or weakness** (not a strength), the natural home of the cost-polarity semirings:
@@ -139,14 +131,23 @@ as a **cost or weakness** (not a strength), the natural home of the cost-polarit
 - `weakest_link_security` — **Weakest link: defence-in-depth vs single barrier** (**Bottleneck-cost**):
   a system is only as strong as its weakest link, so a design's exposure is its *worst* component (⊗=max),
   never a sum — the single barrier's max(9,6)=9 vs the layered design's max(1,3)=**3**, accepted (β=9).
-- `deorbit_plan_risk` — **Deorbit plan: redundant vs single-string** (**Tropical** / risk): a plan's
-  failure risk *accumulates* across steps (⊗=+) — valve leak (12) + attitude drift (9) + comms blackout
-  (7) = 28; the redundant plan is accepted at **cost 5** (a residual sensor-crosscheck risk) (β=28).
 - `testimony_erosion` — **Testimony erosion: eyewitness vs long-chain legend** (**Łukasiewicz** /
   bounded sum): reliability *erodes* along a transmission chain — ⊗ = max(0, Σw − (n−1)·k), k=1000. Same
   90%-faithful links (weight 900); only length differs: 2 copies retain 900⊗900 = 800, but 7 retellings
   collapse to max(0, 6300−6000) = **300** (the "telephone game"). The eyewitness account is accepted at
   **cost 300** (dismissing the eroded legend); the legend holdout costs 800 (β=800).
+
+**Real corpus data** — nothing invented: the framework, the attack structure and every weight come
+from a published annotated corpus.
+
+- `persuade_essay` — **Student essay: the objection the writer forgot** (**Arctic**): one essay from
+  the PERSUADE 2.0 corpus (Crossley et al. 2024, CC BY 4.0), with Position/Claim/Evidence support,
+  Counterclaims attacking the position and a Rebuttal reinstating against one of them — reinstatement
+  is native to the annotation. Weights are the corpus's own double-blind expert effectiveness ratings
+  (Ineffective 333 / Adequate 667 / Effective 1000). The writer answered one objection and forgot the
+  other, so the position **falls classically**; **β=667** buys it back for exactly the price of the
+  forgotten objection. The algebras disagree visibly about case strength here (arctic 3334, Gödel 333,
+  Łukasiewicz 0), and **Credibility** grades the forgotten objection above the answered one.
 
 The debate and cost/weakness examples open in the **Assumption-Branching** graph view (the Standard
 set-graph is the 2ⁿ power set of assumptions, guarded off above ~8 assumptions).
