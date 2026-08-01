@@ -16,6 +16,8 @@ export function createDomRegistry(doc = document) {
         stats: byId('stats'),
         runBtn: byId('run-btn'),
         clearBtn: byId('clear-btn'),
+        credibilityBtn: byId('credibility-btn'),
+        credibilityKappa: byId('credibility-kappa'),
         semiringSelect: byId('semiring-select'),
         defaultPolicySelect: byId('default-policy-select'),
         abaRecoveryToggle: byId('aba-recovery-toggle'),

@@ -302,6 +302,114 @@ ${pins}
         return costs;
     }
 
+    /**
+     * Price-weighted credibility: for every assumption, the omega-discounted share of
+     * budget-feasible stable standpoints containing it.
+     *
+     *   cred(a) = sum over standpoints X with a in X of omega(c(X)) / sum over all X
+     *
+     * Standpoints are enumerated ONCE under the user's semiring/semantics with max+ub at
+     * an unreachable beta and `#project in/1.` (distinct in-sets, whatever the discard
+     * realisation); each standpoint's minimal cost c(X) is then a solve that pins the
+     * in-set and minimises budget_value/1, accepted only with clingo's OPTIMUM FOUND
+     * certificate. omega(c) = kappa / (kappa + c) -- kappa is part of the semantics
+     * (the ranking is provably not invariant under it), hence exposed as a control.
+     */
+    async computeCredibility(framework, config, kappa, onLog) {
+        const normalized = normalizeConfig(config);
+        if (isBudgetedDefence(normalized.semantics)) {
+            onLog('Credibility is defined over the discard lattice, which the defence '
+                + 'semantics replace with their own pay mechanism. Switch to stable or cf.',
+            'warning');
+            return null;
+        }
+        const weightSum = [...framework.matchAll(/weight\s*\([^,]+,\s*(\d+)\s*\)/g)]
+            .reduce((acc, m) => acc + parseInt(m[1], 10), 0);
+        const big = Math.min(100000000, (weightSum + 1) * 64);
+        const credConfig = {
+            ...normalized,
+            budgetMode: 'ub',
+            monoid: 'max',
+            beta: big,
+            optMode: 'ignore',
+            filterType: 'projection',
+            abaRecovery: false
+        };
+        const constants = ['-c', `beta=${big}`];
+        if (credConfig.semiringKey === 'lukasiewicz' && Number.isFinite(credConfig.lukK)) {
+            constants.push('-c', `k=${credConfig.lukK}`);
+        }
+
+        const enumProgram = buildProgram(framework, credConfig, { includeObjective: false })
+            + '\n#project in/1.\n';
+        const enumResult = await this.runSolver(
+            enumProgram, 0, [...constants, '--opt-mode=ignore', '--project'], config.timeout);
+        this.assertSolverResult(enumResult);
+        const witnesses = enumResult?.Call?.[0]?.Witnesses || [];
+        if (witnesses.length === 0) {
+            onLog('No budget-feasible standpoints: nothing to grade.', 'warning');
+            return null;
+        }
+        if (witnesses.length > 64) {
+            onLog(`This framework has ${witnesses.length} budget-feasible standpoints; `
+                + 'credibility is capped at 64 to keep the browser responsive. '
+                + 'A truncated ensemble would silently bias the scores, so none are shown.',
+            'warning');
+            return null;
+        }
+
+        const standpoints = [];
+        for (const witness of witnesses) {
+            const ins = new Set();
+            const outs = new Set();
+            for (const atom of witness?.Value || []) {
+                const inArg = matchPredicate(atom, 'in');
+                if (inArg !== null) ins.add(inArg);
+                const outArg = matchPredicate(atom, 'out');
+                if (outArg !== null) outs.add(outArg);
+            }
+            const pins = [...ins].map((a) => `:- not in(${a}).`)
+                .concat([...outs].map((a) => `:- in(${a}).`)).join('\n');
+            const costProgram = buildProgram(framework, credConfig, { includeObjective: false })
+                + pins + '\n#minimize { C : budget_value(C) }.\n';
+            const costResult = await this.runSolver(
+                costProgram, 0, [...constants, '--opt-mode=opt', '--quiet=1'], config.timeout);
+            if (costResult?.Result !== 'OPTIMUM FOUND') {
+                onLog(`Could not certify the cost of standpoint {${[...ins].join(', ')}}; `
+                    + 'credibility aborted rather than reported from an unproved optimum.',
+                'warning');
+                return null;
+            }
+            const costWitnesses = costResult?.Call?.[0]?.Witnesses || [];
+            const last = costWitnesses[costWitnesses.length - 1];
+            const cost = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : 0;
+            standpoints.push({ ins, cost });
+        }
+
+        const omega = (c) => kappa / (kappa + c);
+        const Z = standpoints.reduce((acc, sp) => acc + omega(sp.cost), 0);
+        const atoms = new Set();
+        standpoints.forEach((sp) => sp.ins.forEach((a) => atoms.add(a)));
+        // out-only assumptions still deserve a row (cred 0)
+        witnesses.forEach((w) => (w?.Value || []).forEach((atom) => {
+            const outArg = matchPredicate(atom, 'out');
+            if (outArg !== null) atoms.add(outArg);
+        }));
+        const rows = [...atoms].sort().map((a) => {
+            const mine = standpoints.filter((sp) => sp.ins.has(a));
+            const share = mine.reduce((acc, sp) => acc + omega(sp.cost), 0);
+            return {
+                atom: a,
+                cred: Z > 0 ? share / Z : 0,
+                avgCost: mine.length
+                    ? mine.reduce((acc, sp) => acc + sp.cost, 0) / mine.length
+                    : null,
+                count: mine.length
+            };
+        }).sort((x, y) => y.cred - x.cred || x.atom.localeCompare(y.atom));
+        return { rows, standpoints: standpoints.map((sp) => ({ ins: [...sp.ins].sort(), cost: sp.cost })), kappa };
+    }
+
     async runDirect(framework, config) {
         const program = buildProgram(framework, config);
         const args = buildSolverArgs(config);

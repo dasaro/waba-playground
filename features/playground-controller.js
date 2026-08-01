@@ -7,6 +7,7 @@ import { GraphManager } from '../modules/graph-manager.js?v=20260731-8';
 import { PopupManager } from '../modules/popup-manager.js?v=20260731-8';
 import { ClingoManager } from '../modules/clingo-manager.js?v=20260731-8';
 import { OutputManager } from '../modules/output-manager.js?v=20260731-8';
+import { CredibilityManager } from '../modules/credibility-manager.js?v=20260731-8';
 import { ExportManager } from '../modules/export-manager.js?v=20260731-8';
 import { ConfigController } from './config-controller.js?v=20260731-8';
 import { DocsController } from './docs-controller.js?v=20260731-8';
@@ -68,6 +69,7 @@ export class PlaygroundController {
         );
         this.clingoManager = new ClingoManager(this.dom.runBtn, this.dom.introStatus);
         this.outputManager = new OutputManager(this.dom, () => this.configController.getCurrentConfig());
+        this.credibilityManager = new CredibilityManager(this.dom.output);
         this.exportManager = new ExportManager(this.graphManager, this.dom.exportPngBtn, this.dom.exportPdfBtn, this);
     }
 
@@ -166,6 +168,7 @@ export class PlaygroundController {
     attachEventListeners() {
         this.dom.runBtn.addEventListener('click', () => this.runWABA());
         this.dom.clearBtn.addEventListener('click', () => this.clearOutput());
+        this.dom.credibilityBtn.addEventListener('click', () => this.track(this.computeCredibility()));
         this.dom.exampleSelect.addEventListener('change', (event) => {
             // Loading a different framework invalidates the displayed extensions, exactly as
             // in the upload path; without this the previous run's answer sets stay on screen
@@ -305,6 +308,34 @@ export class PlaygroundController {
         } catch (error) {
             console.error('File upload error:', error);
             this.outputManager.log(`❌ Error loading file: ${error.message}`, 'error');
+        }
+    }
+
+    async computeCredibility() {
+        const framework = this.editorController.getFrameworkCode();
+        if (!framework.trim()) {
+            this.outputManager.log('⚠️ No framework code to grade', 'warning');
+            return;
+        }
+        const kappa = Math.max(1, parseInt(this.dom.credibilityKappa.value, 10) || 1000);
+        const config = this.configController.getCurrentConfig();
+        this.dom.credibilityBtn.disabled = true;
+        document.body.dataset.wabaCredibility = '0';
+        try {
+            this.outputManager.log(`⚖️ Computing credibility (kappa = ${kappa})…`, 'info');
+            const data = await this.clingoManager.computeCredibility(
+                framework, config, kappa,
+                (message, type) => this.outputManager.log(message, type)
+            );
+            if (data) {
+                this.credibilityManager.render(data);
+                this.outputManager.log(`Credibility over ${data.standpoints.length} standpoints rendered.`, 'success');
+            }
+        } catch (error) {
+            this.outputManager.log(`❌ Credibility failed: ${error.message}`, 'error');
+        } finally {
+            this.dom.credibilityBtn.disabled = false;
+            document.body.dataset.wabaCredibility = '1';
         }
     }
 

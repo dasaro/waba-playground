@@ -2733,3 +2733,16 @@ div.vis-network div.vis-tooltip {
     color: var(--text-muted);
 }
 
+
+/* ---- Credibility (price-weighted, per assumption) ---- */
+.credibility-controls { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; }
+.credibility-kappa { width: 72px; padding: 2px 6px; }
+.credibility-block { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--border-color, #444); border-radius: 6px; }
+.credibility-caption { font-size: 0.85em; opacity: 0.8; margin-bottom: 6px; }
+.credibility-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.credibility-table th, .credibility-table td { text-align: left; padding: 3px 8px; }
+.credibility-table thead th { border-bottom: 1px solid var(--border-color, #444); opacity: 0.7; }
+.cred-bar { width: 120px; height: 8px; background: var(--panel-bg, #2a2a2a); border-radius: 4px; overflow: hidden; }
+.cred-bar-fill { height: 100%; background: var(--accent-color, #7c6fdd); border-radius: 4px; }
+.cred-value { font-variant-numeric: tabular-nums; }
+.cred-cost, .cred-count { font-variant-numeric: tabular-nums; opacity: 0.85; }

@@ -1420,3 +1420,44 @@ test('STRESS: Lukasiewicz k is applied, so weights do not silently erode to zero
     // The eroded chain must retain SOME strength: an all-zero result is the failure mode.
     expect(text).toMatch(/[1-9]\d{2}/);
 });
+
+test('credibility grades the P-A-R template with exact hand-computed values', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    // The template: rb rebuts a, a attacks p. Standpoint lattice has exactly three
+    // members with minimal costs {0, 600, 800}; with kappa = 1000 the shares are
+    //   omega = 1, 0.625, 5/9  ->  Z = 2.18056
+    //   cred(p)  = (1 + 5/9)   / Z = 0.713
+    //   cred(a)  = (0.625+5/9) / Z = 0.541
+    //   cred(rb) = 1.000 (in every standpoint)
+    await page.evaluate(() => {
+        window.playground.editorController.loadClingoCode([
+            'assumption(p). contrary(p,not_p). weight(p,500).',
+            'assumption(a). contrary(a,na). weight(a,800).',
+            'assumption(rb). contrary(rb,nrb). weight(rb,600).',
+            'head(r1,not_p). body(r1,a).',
+            'head(r2,na). body(r2,rb).'
+        ].join('\n'));
+    });
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'stable');
+    await page.fill('#credibility-kappa', '1000');
+    await page.click('#credibility-btn');
+    await page.waitForFunction(
+        () => document.body.dataset.wabaCredibility === '1', null, { timeout: 60000 });
+
+    const rows = await page.locator('.credibility-table tbody tr').evaluateAll(
+        (trs) => trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
+    );
+    const byAtom = Object.fromEntries(rows.map((r) => [r[0], r]));
+    expect(byAtom.rb[1]).toBe('1.000');
+    expect(byAtom.p[1]).toBe('0.713');
+    expect(byAtom.a[1]).toBe('0.541');
+    // avg costs: p over {0, 800}; a over {600, 800}; rb over all three
+    expect(byAtom.p[3]).toBe('400');
+    expect(byAtom.a[3]).toBe('700');
+    expect(byAtom.rb[3]).toBe('467');
+    expect(byAtom.p[4]).toBe('2/3');
+    // the caption names the ensemble and its costs -- the score stays decomposable
+    await expect(page.locator('.credibility-caption')).toContainText('costs 0, 600, 800');
+});
