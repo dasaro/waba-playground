@@ -469,6 +469,10 @@ c_a: 70"></textarea>
                         <div class="credibility-controls">
                             <label for="credibility-kappa" title="Discount scale: omega(c) = kappa/(kappa + c). Empty = auto, which sets kappa to the median paid standpoint cost so the discount discriminates in whatever units this framework uses. The ranking is not invariant under kappa, so it is a declared parameter, not a constant.">&kappa;</label>
                             <input id="credibility-kappa" class="input credibility-kappa" type="number" value="" min="1" step="1" placeholder="auto" aria-label="Credibility discount scale kappa; leave empty to scale automatically to this framework">
+                            <select id="credibility-discount" class="select credibility-discount" aria-label="Credibility discount family" title="How a standpoint's price is turned into weight. Harmonic decays like 1/c and saturates -- right for ordinal ratings. Exponential decays geometrically, turning a cost ratio into an odds ratio -- right when the weights are surprisals (tropical, w = -K ln p), and the family that satisfies independence.">
+                                <option value="harmonic" selected>harmonic</option>
+                                <option value="exponential">exponential</option>
+                            </select>
                             <button id="credibility-btn" class="secondary-btn" aria-label="Compute price-weighted credibility of every assumption" title="Credibility: the omega-discounted share of budget-feasible stable standpoints containing each assumption">&#9878;&#65039; Credibility</button>
                         </div>
                         <button id="clear-btn" class="clear-btn danger-btn" aria-label="Clear output results">🗑️ Clear Output</button>

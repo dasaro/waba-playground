@@ -59,6 +59,7 @@
  * @property {HTMLButtonElement} clearBtn
  * @property {HTMLButtonElement} credibilityBtn
  * @property {HTMLInputElement} credibilityKappa
+ * @property {HTMLSelectElement} credibilityDiscount
  * @property {HTMLSelectElement} semiringSelect
  * @property {HTMLSelectElement} defaultPolicySelect
  * @property {HTMLInputElement} abaRecoveryToggle

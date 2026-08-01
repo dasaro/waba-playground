@@ -330,7 +330,8 @@ export class PlaygroundController {
                 `⚖️ Computing credibility (\u03ba = ${kappa === null ? 'auto' : kappa})…`, 'info');
             const data = await this.clingoManager.computeCredibility(
                 framework, config, kappa,
-                (message, type) => this.outputManager.log(message, type)
+                (message, type) => this.outputManager.log(message, type),
+                this.dom.credibilityDiscount.value
             );
             if (data) {
                 this.credibilityManager.render(data);

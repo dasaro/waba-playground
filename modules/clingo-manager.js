@@ -315,7 +315,7 @@ ${pins}
      * certificate. omega(c) = kappa / (kappa + c) -- kappa is part of the semantics
      * (the ranking is provably not invariant under it), hence exposed as a control.
      */
-    async computeCredibility(framework, config, kappa, onLog) {
+    async computeCredibility(framework, config, kappa, onLog, discount = 'harmonic') {
         const normalized = normalizeConfig(config);
         if (isBudgetedDefence(normalized.semantics)) {
             onLog('Credibility is defined over the discard lattice, which the defence '
@@ -397,11 +397,32 @@ ${pins}
         // operator already has (rescaling all weights and kappa together is a no-op), now
         // applied by default instead of left to the user.
         const paid = standpoints.map((sp) => sp.cost).filter((c) => c > 0).sort((a, b) => a - b);
-        const autoKappa = paid.length
-            ? Math.max(1, Math.round(paid[Math.floor((paid.length - 1) / 2)]))
-            : 1;
-        const effectiveKappa = Number.isFinite(kappa) && kappa > 0 ? kappa : autoKappa;
-        const omega = (c) => effectiveKappa / (effectiveKappa + c);
+        const median = paid.length ? paid[Math.floor((paid.length - 1) / 2)] : 1;
+        // Both families are auto-scaled by the SAME rule -- omega = 1/2 at the median paid
+        // standpoint -- so switching family does not silently move the midpoint. What it
+        // changes is the TAIL, which is the whole point:
+        //
+        //   harmonic     omega = k/(k+c)     decays like 1/c. The ratio omega(c1)/omega(c2)
+        //                is bounded by c2/c1, so credibility saturates: on costs 8 vs 109
+        //                no kappa can push the pair past 0.936 / 0.128. Right when the
+        //                weights are ORDINAL (a 3-point expert rating should not yield
+        //                four-nines confidence).
+        //   exponential  omega = exp(-c/K)   decays geometrically, so a cost ratio becomes
+        //                an odds ratio. Right when the weights ARE surprisals / log-
+        //                probabilities (the tropical reading, w = -K ln p): cost 109 at the
+        //                encoding scale is then genuinely ~1e-5 credible, not 0.13.
+        //                It is also the family that satisfies INDEPENDENCE under sum
+        //                (omega(c1+c2) = omega(c1)omega(c2)) -- see the paper's separability
+        //                proposition. The two motivations coincide, which is not an accident:
+        //                independence and log-probability are the same factorisation.
+        const isExp = discount === 'exponential';
+        const autoScale = isExp
+            ? Math.max(1, median / Math.LN2)     // exp(-median/K) = 1/2
+            : Math.max(1, Math.round(median));   // median/(median+median) = 1/2
+        const effectiveKappa = Number.isFinite(kappa) && kappa > 0 ? kappa : autoScale;
+        const omega = isExp
+            ? (c) => Math.exp(-c / effectiveKappa)
+            : (c) => effectiveKappa / (effectiveKappa + c);
         const Z = standpoints.reduce((acc, sp) => acc + omega(sp.cost), 0);
         const atoms = new Set();
         standpoints.forEach((sp) => sp.ins.forEach((a) => atoms.add(a)));
@@ -425,8 +446,9 @@ ${pins}
         return {
             rows,
             standpoints: standpoints.map((sp) => ({ ins: [...sp.ins].sort(), cost: sp.cost })),
-            kappa: effectiveKappa,
-            kappaAuto: !(Number.isFinite(kappa) && kappa > 0)
+            kappa: Math.round(effectiveKappa * 100) / 100,
+            kappaAuto: !(Number.isFinite(kappa) && kappa > 0),
+            discount
         };
     }
 

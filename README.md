@@ -137,6 +137,25 @@ as a **cost or weakness** (not a strength), the natural home of the cost-polarit
   collapse to max(0, 6300−6000) = **300** (the "telephone game"). The eyewitness account is accepted at
   **cost 300** (dismissing the eroded legend); the legend holdout costs 800 (β=800).
 
+### Credibility
+
+The **⚖️ Credibility** button grades every assumption by the ω-discounted share of
+budget-feasible standpoints it stands in. Two readings, because a cost means different things
+in different frameworks:
+
+| discount | ω(c) | decay | read it as | use when |
+|---|---|---|---|---|
+| harmonic *(default)* | κ/(κ+c) | ~1/c, **saturating** | affordability share | weights are ordinal ratings |
+| exponential | e^(−c/K) | geometric | odds / probability | weights are surprisals (tropical, w = −K ln p) |
+
+The scale auto-fits the framework (ω = ½ at the median paid standpoint) unless you type one.
+The families differ in the **tail**: harmonic's ratio is bounded by the cost ratio, so on the
+Higgs example (costs 8 vs 109) no κ pushes the pair past 0.94/0.13 — right for a 3-point rating
+scale, wrong for a 5σ result. At the encoding scale (K=10, one σ per 10 units) the exponential
+gives 0.99996 / 0.00008. Exponential is also the family that satisfies **independence** across
+disconnected frameworks; that coincidence is not accidental — independence and the
+log-probability reading are the same factorisation.
+
 **Real corpus data** — nothing invented: the framework, the attack structure and every weight come
 from a published annotated corpus.
 

@@ -17,9 +17,12 @@ export class CredibilityManager {
         block.className = 'credibility-block';
         const caption = document.createElement('div');
         caption.className = 'credibility-caption';
+        const fam = data.discount === 'exponential'
+            ? 'exponential \u03c9 = e^(-c/K), odds reading'
+            : 'harmonic \u03c9 = \u03ba/(\u03ba+c), affordability reading';
         caption.textContent = `Price-weighted credibility over ${data.standpoints.length} `
             + `budget-feasible standpoint${data.standpoints.length === 1 ? '' : 's'} `
-            + `(\u03ba = ${data.kappa}${data.kappaAuto ? ', auto-scaled to the median paid standpoint' : ''}; `
+            + `(${fam}; scale = ${data.kappa}${data.kappaAuto ? ', auto' : ''}; `
             + `costs ${data.standpoints.map((sp) => sp.cost).sort((a, b) => a - b).join(', ')})`;
         block.appendChild(caption);
 

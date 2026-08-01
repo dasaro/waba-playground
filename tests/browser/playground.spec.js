@@ -1532,11 +1532,12 @@ test('credibility auto-scales kappa so a large cost gap is visible', async ({ pa
     await page.selectOption('#example-select', 'higgs_boson_discovery');
     await settled(page);
 
+    await page.selectOption('#credibility-discount', 'harmonic');
     await page.fill('#credibility-kappa', '');           // auto
     await page.click('#credibility-btn');
     await page.waitForFunction(
         () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
-    await expect(page.locator('.credibility-caption')).toContainText('auto-scaled');
+    await expect(page.locator('.credibility-caption')).toContainText('auto');
     const read = async () => Object.fromEntries(
         await page.locator('.credibility-table tbody tr').evaluateAll(
             (trs) => trs.map((tr) => {
@@ -1555,7 +1556,46 @@ test('credibility auto-scales kappa so a large cost gap is visible', async ({ pa
     await page.click('#credibility-btn');
     await page.waitForFunction(
         () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
-    await expect(page.locator('.credibility-caption')).not.toContainText('auto-scaled');
+    await expect(page.locator('.credibility-caption')).not.toContainText(', auto');
     const pinned = await read();
     expect(pinned.higgs_exists - pinned.null_fluctuation).toBeLessThan(0.05);
+});
+
+test('the exponential discount reads costs as odds, the harmonic one saturates', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+    // Higgs standpoint costs are 8 (discovery) and 109 (fluctuation holdout). The weights are
+    // sigma x 10, so at the ENCODING scale (10 units = 1 sigma) the holdout is asking us to
+    // wave away 10.9 sigma. Harmonic decays like 1/c and cannot express that; exponential can.
+    await page.selectOption('#example-select', 'higgs_boson_discovery');
+    await settled(page);
+    const read = async () => Object.fromEntries(
+        await page.locator('.credibility-table tbody tr').evaluateAll(
+            (trs) => trs.map((tr) => {
+                const td = tr.querySelectorAll('td');
+                return [td[0].textContent, parseFloat(td[1].textContent)];
+            })));
+    const run = async (family, scale) => {
+        await page.selectOption('#credibility-discount', family);
+        await page.fill('#credibility-kappa', scale);
+        await page.click('#credibility-btn');
+        await page.waitForFunction(
+            () => document.body.dataset.wabaCredibility === '1', null, { timeout: 90000 });
+        return read();
+    };
+
+    // harmonic at the sharpest useful scale still leaves the holdout visibly credible
+    const harmonic = await run('harmonic', '10');
+    expect(harmonic.null_fluctuation).toBeGreaterThan(0.15);
+    await expect(page.locator('.credibility-caption')).toContainText('affordability');
+
+    // exponential at the same scale collapses it, as a 10.9-sigma denial should
+    const exponential = await run('exponential', '10');
+    expect(exponential.higgs_exists).toBeGreaterThan(0.99);
+    expect(exponential.null_fluctuation).toBeLessThan(0.01);
+    await expect(page.locator('.credibility-caption')).toContainText('odds reading');
+
+    // and both agree on the never-attacked observations
+    expect(harmonic.obs_atlas).toBe(1);
+    expect(exponential.obs_atlas).toBe(1);
 });

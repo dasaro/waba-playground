@@ -2746,3 +2746,4 @@ div.vis-network div.vis-tooltip {
 .cred-bar-fill { height: 100%; background: var(--accent-color, #7c6fdd); border-radius: 4px; }
 .cred-value { font-variant-numeric: tabular-nums; }
 .cred-cost, .cred-count { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.credibility-discount { padding: 2px 6px; }
