@@ -70,13 +70,22 @@ test('the shipped bundle carries the metadata the UI reads', async () => {
     assert.equal(info.godel_low.aliasOf, 'bottleneck_cost');
     assert.equal(info.tropical_high.aliasOf, 'arctic');
     assert.equal(info.godel.aliasOf, null);
-    // Defence semantics are detected structurally (they price a `pay` set), not listed by name.
+    // Every semantics declares the same beta-sigma contract; no semantics owns a private
+    // defence budget or polarity-dependent bound.
     const sem = wabaModules.metadata.semanticsInfo;
-    assert.equal(sem.admissible.defence, true);
-    assert.equal(sem.complete.defence, true);
-    assert.equal(sem.preferred.defence, true);
-    assert.equal(sem.stable.defence, false);
-    assert.equal(sem.cf.defence, false);
+    for (const semantics of wabaModules.metadata.supportedSemantics) {
+        assert.deepEqual(sem[semantics], { betaSigma: true }, semantics);
+    }
+    assert.deepEqual(wabaModules.metadata.semanticFilters, {
+        preferred: 'subset_maximal_filter',
+        grounded: 'subset_minimal_filter',
+        naive: 'subset_maximal_filter',
+        'semi-stable': 'range_maximal_filter',
+        stage: 'range_maximal_filter',
+        ideal: 'ideal_filter',
+        eager: 'eager_filter'
+    });
+    assert.ok(!wabaModules.metadata.supportedSemantics.includes('_range'));
     // Only Lukasiewicz declares a tunable constant, and its default comes from the module.
     assert.deepEqual(info.lukasiewicz.constants, [{ name: 'k', default: 1000 }]);
     assert.deepEqual(info.godel.constants, []);

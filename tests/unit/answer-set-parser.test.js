@@ -21,6 +21,14 @@ test('splitTopLevelArgs ignores commas inside a term', () => {
     assert.deepEqual(splitTopLevelArgs('a, f(b, c), d'), ['a', 'f(b, c)', 'd']);
 });
 
+test('term parsing ignores punctuation inside quoted ASP strings', () => {
+    assert.equal(matchPredicate('in("a,) with \\"quote\\"")', 'in'), '"a,) with \\"quote\\""');
+    assert.deepEqual(
+        splitTopLevelArgs('f("x,y)"), "target,(one)", 7'),
+        ['f("x,y)")', '"target,(one)"', '7']
+    );
+});
+
 test('parseAnswerSet reads function-term atoms', () => {
     const parsed = parseAnswerSet([
         'in(flies(tweety))', 'in(plain)', 'out(normal(tweety))',

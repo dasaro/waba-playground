@@ -1,7 +1,7 @@
 import {
-    normalizeConfig, isBudgetedDefence, selectableSemirings, semiringConstants, SEMIRING_INFO
-} from '../runtime/config-service.js?v=20260731-8';
-import { wabaModules } from '../waba-modules.js?v=20260731-8';
+    normalizeConfig, selectableSemirings, semiringConstants, SEMIRING_INFO
+} from '../runtime/config-service.js?v=20260831-1';
+import { wabaModules } from '../waba-modules.js?v=20260831-1';
 
 // The credibility discount follows the ALGEBRA, derived from the same metadata as the
 // budget pairing rather than a per-algebra list. The exponential discount reads a
@@ -80,14 +80,9 @@ export class ConfigController {
             optMode,
             // normalizeConfig zeroes this under ABA recovery, so the raw field is read here.
             beta: ConfigController.readNumber(this.dom.budgetInput, 0),
-            // The empty-field fallback is 10; bin/waba's own default is 1000. Neither is a
-            // universal right answer -- k has to sit at the framework's weight scale, and a
-            // preset that needs a particular k carries it (testimony_erosion ships k = 1000
-            // over weights of 900, where the erosion it demonstrates only exists). Do NOT
-            // describe 10 as "the playground default for small-integer examples": the one
-            // Lukasiewicz example shipped is not small-integer, and at k = 10 it does not
-            // even terminate.
-            lukK: ConfigController.readNumber(this.dom.lukKInput, 10),
+            // Match the module and CLI default. Presets may still override k to fit their
+            // weight scale, but clearing the field must not silently change the algebra.
+            lukK: ConfigController.readNumber(this.dom.lukKInput, 1000),
             numModels: ConfigController.readNumber(this.dom.numModelsInput, 0),
             timeout: ConfigController.readNumber(this.dom.timeoutInput, 60) * 1000,
             filterType: 'projection'
@@ -129,7 +124,6 @@ export class ConfigController {
         // A freshly applied config supersedes any held ABA-recovery snapshot.
         this._savedPolicy = undefined;
         this._savedReading = undefined;
-        this._savedResults = undefined;
         // The preset owns beta, so per-direction memory from before it is stale.
         this._betaFor = undefined;
     }
@@ -176,7 +170,9 @@ export class ConfigController {
 
         const SEMANTICS_LABEL = {
             cf: 'Conflict-free', stable: 'Stable', admissible: 'Admissible',
-            complete: 'Complete', preferred: 'Preferred'
+            complete: 'Complete', preferred: 'Preferred', grounded: 'Grounded',
+            naive: 'Naive', 'semi-stable': 'Semi-stable', stage: 'Stage', ideal: 'Ideal',
+            eager: 'Eager'
         };
         const semanticsSelect = this.dom.semanticsSelect;
         if (semanticsSelect) {
@@ -223,12 +219,7 @@ export class ConfigController {
 
     syncUi() {
         const algebra = this.dom.semiringSelect.value;
-        const semantics = this.dom.semanticsSelect.value;
         const abaRecovery = this.dom.abaRecoveryToggle.checked;
-
-        // Defence semantics carry their own SUM inconsistency budget and take beta directly,
-        // exactly as bin/waba does; they reject a monoid/bound pairing.
-        const isDefence = isBudgetedDefence(semantics);
         // Which algebras carry a tunable constant is declared by the modules (`#const k = ...`),
         // not by a name check here.
         const constants = semiringConstants(algebra);
@@ -245,13 +236,9 @@ export class ConfigController {
         // CANONICAL_PRESETS, and a new algebra gets the right pairing with no edit here.
         const recommendedFor = (key) =>
             (SEMIRING_INFO[key]?.polarity === 'lower' ? 'min-lb' : 'sum-ub');
-        // The reading selector is pinned to 'none' while a defence semantics or ABA recovery
-        // is active, and the user's own choice lives in `_savedReading`. Snapshot BEFORE the
-        // preselect so the preselect can write through to whichever slot currently holds it:
-        // it used to write the pinned select, which the pin below immediately overwrote, so
-        // changing algebra while on `admissible` and then returning to `stable` restored the
-        // reading from before the defence detour and the preselect was silently lost.
-        const readingPinned = isDefence || abaRecovery;
+        // ABA recovery temporarily pins the reading to no-discard. Every actual semantics uses
+        // the same external monoid/bound selector, so changing sigma never pins this control.
+        const readingPinned = abaRecovery;
         if (readingPinned && this._savedReading === undefined) {
             this._savedReading = this.dom.budgetSelect.value;
         }
@@ -280,8 +267,7 @@ export class ConfigController {
             if (previousBound && previousBound !== bound) {
                 // Remember beta PER DIRECTION and restore it, rather than only forcing the new
                 // direction's permissive end. Forcing alone was one-way: leaving a strength
-                // algebra reset beta to 0 and coming back left it at 0, which under `ub` (and
-                // under a defence semantics, whose own bound follows the same polarity) means
+                // algebra reset beta to 0 and coming back left it at 0, which under `ub` means
                 // nothing is affordable -- so a there-and-back trip through Tropical silently
                 // turned a working beta=8 into an empty result.
                 this._betaFor = this._betaFor || {};
@@ -328,10 +314,8 @@ export class ConfigController {
             this._savedPolicy = undefined;
         }
 
-        // A defence semantics owns its budget, so the reading selector is not applicable.
-        // Snapshot the user's choice while it is pinned, or switching to admissible and back
-        // silently leaves the reading on "No discarding" -- and then cf/stable report no cost,
-        // which looks like the cost regression all over again.
+        // Recovery owns the no-discard override. Snapshot and restore the user's beta reading
+        // around it rather than erasing a deliberate configuration.
         if (readingPinned) {
             this.dom.budgetSelect.value = 'none';
         } else if (this._savedReading !== undefined) {
@@ -339,31 +323,11 @@ export class ConfigController {
             this._savedReading = undefined;
         }
 
-        const budgetActive = !abaRecovery && (isDefence || this.dom.budgetSelect.value !== 'none');
-
-        // `preferred` is computed by subset-maximal filtering over enumerated candidates, so
-        // it needs every candidate rather than the optimal ones. The other two defence
-        // semantics compose with no_discard, so program-builder emits no monoid and no
-        // objective: optN would hand clingo `--quiet=1` with nothing to optimise, printing
-        // only the last model. The control was inert at best and lossy at worst.
-        const forceEnumerate = isDefence;
-        if (forceEnumerate) {
-            // Snapshot and restore, exactly as the budget reading does. Overwriting outright
-            // meant a look at a defence semantics permanently discarded the user's choice:
-            // Stable -> Admissible -> Stable came back on "All extensions" with no way to know
-            // it had been changed.
-            if (this._savedResults === undefined) {
-                this._savedResults = this.dom.resultsSelect.value;
-            }
-            this.dom.resultsSelect.value = 'all';
-        } else if (this._savedResults !== undefined) {
-            this.dom.resultsSelect.value = this._savedResults;
-            this._savedResults = undefined;
-        }
+        const budgetActive = !abaRecovery && this.dom.budgetSelect.value !== 'none';
 
         this.dom.defaultPolicySelect.disabled = abaRecovery;
-        this.dom.budgetSelect.disabled = abaRecovery || isDefence;
-        this.dom.resultsSelect.disabled = !budgetActive || forceEnumerate;
+        this.dom.budgetSelect.disabled = abaRecovery;
+        this.dom.resultsSelect.disabled = !budgetActive;
         this.dom.budgetInput.disabled = !budgetActive;
         this.dom.budgetInput.style.opacity = budgetActive ? '1' : '0.5';
 
@@ -372,9 +336,8 @@ export class ConfigController {
             this.dom.budgetInputLabel.style.opacity = budgetActive ? '1' : '0.5';
         }
         if (this.dom.semanticsNote) {
-            this.dom.semanticsNote.textContent = isDefence
-                ? 'Defence semantics: β pays for the objections this set declines to answer.'
-                : 'Conflict-based: β pays for the attacks this set supports.';
+            this.dom.semanticsNote.textContent =
+                'First choose an affordable discard set D; then apply this ordinary semantics to the surviving attacks.';
         }
         if (this.dom.semiringAliasNote) {
             // The gloss is per-algebra prose, but the POLARITY word comes from the module, so
@@ -399,7 +362,6 @@ export class ConfigController {
 
     updateSurfaceCopy() {
         const config = this.getCurrentConfig();
-        const isDefence = isBudgetedDefence(config.semantics);
         const READING = {
             'sum-ub': 'The concessions must sum to no more than β.',
             'max-ub': 'No single concession may exceed β.',
@@ -408,18 +370,8 @@ export class ConfigController {
         if (this.dom.budgetIntentNote) {
             this.dom.budgetIntentNote.textContent = config.abaRecovery
                 ? 'Every discard is forbidden, so this is plain ABA.'
-                : (isDefence
-                    // The DIRECTION follows the polarity, exactly as semantics/admissible.lp
-                    // derives it: oplus=max bounds the sum ABOVE, oplus=min bounds the minimum
-                    // BELOW. Saying "must sum to no more than β" for every algebra told a
-                    // Tropical user to lower β for a stricter result, when β=0 is that
-                    // semantics' most PERMISSIVE setting -- and the stats line after the run
-                    // said the opposite on the same screen.
-                    ? (config.polarity === 'lower'
-                        ? 'This semantics carries its own budget: every objection it declines to answer must be worth at least β, so a BIGGER β is more restrictive. This control does not apply.'
-                        : 'This semantics carries its own budget (the objections it declines to answer must sum to no more than β), so this control does not apply.')
-                    : (READING[this.dom.budgetSelect.value]
-                        || 'Nothing may be conceded, so this is plain ABA.'));
+                : (READING[this.dom.budgetSelect.value]
+                    || 'Nothing may be conceded, so this is plain ABA.');
         }
     }
 

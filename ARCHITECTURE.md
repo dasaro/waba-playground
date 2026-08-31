@@ -89,7 +89,7 @@ Responsibilities:
 
 These remain “manager” style modules, but their responsibilities are narrower than before the refactor:
 
-- `clingo-manager.js` owns solver initialization, solver queueing, and exact preferred orchestration
+- `clingo-manager.js` owns solver initialization, solver queueing, and exact relational-semantics orchestration
 - `graph-manager.js` owns vis.js graph construction and graph highlighting
 - `output-manager.js` owns result rendering and delegates parsing/objective math to runtime helpers
 
@@ -97,15 +97,18 @@ These remain “manager” style modules, but their responsibilities are narrowe
 
 The browser preserves exactly this public surface:
 
-- semiring family: `godel`, `tropical` (with polarity), plus standalone `lukasiewicz`
-- polarity: `higher`, `lower` (n/a for `lukasiewicz`)
+- algebra: direct selection of `godel`, `arctic`, `tropical`, `bottleneck_cost`, or
+  `lukasiewicz` (polarity is derived from the selected algebra)
 - default policy: `aba`, `neutral` (`legacy` retired: provably redundant)
 - monoid: `sum`, `max`, `min`
 - optimization: `minimize`, `maximize`
 - budget mode: `none`, `ub`, `lb`
-- semantics: `cf`, `stable`, `admissible`, `complete`, `preferred`
-  (the three defence semantics carry their own budget and run on the no-discard surface)
-- exact `preferred` via browser-side multi-pass plain `clingo`
+- semantics: `cf`, `stable`, `admissible`, `complete`, `preferred`, `grounded`,
+  `naive`, `semi-stable`, `stage`, `ideal`, `eager`
+- exact subset- and range-induced semantics via browser-side multi-pass plain `clingo`
+
+Every semantics shares one beta-sigma pipeline: choose an affordable `D` with the external
+monoid/bound modules, then apply ordinary sigma semantics to `Att \ D`.
 
 Supported bounded presets:
 
@@ -120,14 +123,17 @@ Normal semantics:
 1. UI config is normalized by `runtime/config-service.js`
 2. `runtime/program-builder.js` composes the ASP program from synced modules
 3. `modules/clingo-manager.js` runs plain `clingo-wasm`
-4. `runtime/answer-set-parser.js` and `modules/output-manager.js` render extensions
+4. discard-witness duplicates are collapsed by accepted `in/1` set while retaining one receipt
+5. `runtime/answer-set-parser.js` and `modules/output-manager.js` render extensions
 
-Exact preferred:
+Exact post-filtered semantics:
 
-1. enumerate `complete` candidates without numeric post-filtering
-2. generate `candidate/1` and `member/2` facts
-3. run `subset_maximal_filter.lp`
-4. if needed, apply numeric post-filtering only after subset-maximal filtering
+1. enumerate the declared `(S,D)` candidate family without numeric post-filtering
+2. generate `candidate/1`, `member/2`, `discarded_member/4`, and, when needed,
+   `range_member/2` facts
+3. run the declared exact filter, comparing candidates only when their `D` sets are equal
+4. existentially forget `D` and deduplicate equal `S` values
+5. if needed, apply numeric post-filtering only after per-reduct semantic selection
 
 ## Concurrency Rule
 

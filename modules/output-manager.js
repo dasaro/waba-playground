@@ -1,10 +1,10 @@
 /**
  * OutputManager - Handles result display, parsing, and logging
  */
-import { PopupManager } from './popup-manager.js?v=20260731-8';
-import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260731-8';
-import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260731-8';
-import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260731-8';
+import { PopupManager } from './popup-manager.js?v=20260831-1';
+import { parseAnswerSet, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260831-1';
+import { ParserUtils, escapeHtml, stripAspComments } from './parser-utils.js?v=20260831-1';
+import { compareTuples, computeAggregateFromDiscarded, displayValue, getObjectiveTuple, normalizeAggregateValue } from '../runtime/objective-utils.js?v=20260831-1';
 
 /**
  * Split a `discarded_attack(from, target, weight)` predicate string into its
@@ -59,28 +59,8 @@ export class OutputManager {
         return select?.options?.[select.selectedIndex]?.text || select?.value || 'godel';
     }
 
-    static isDefenceSemantics(semantics) {
-        return ['admissible', 'complete', 'preferred'].includes(semantics);
-    }
-
     static describeReading(config) {
         if (config.abaRecovery) return 'no discarding (ABA recovery)';
-        // A defence semantics carries its OWN budget over the objections it declines to
-        // answer, and composes with no_discard -- so budgetMode is 'none' by construction.
-        // Reporting "no discarding" for it was a flat contradiction of the beta it spent.
-        //
-        // The DIRECTION follows the polarity, exactly as semantics/admissible.lp derives it.
-        // Under strength (oplus = max) a bigger weight is a harder objection, so the total
-        // conceded is bounded ABOVE: `#sum{paid} <= beta`. Under cost (oplus = min) a smaller
-        // weight is a BETTER-supported objection, so bounding above would licence dismissing
-        // precisely the best-supported ones; the bound reverses to `#min{paid} >= beta` and a
-        // bigger beta is more RESTRICTIVE. Hard-coding <= told a tropical user to raise beta
-        // for more results when raising it removes them.
-        if (OutputManager.isDefenceSemantics(config.semantics)) {
-            return config.polarity === 'lower'
-                ? `every unanswered objection \u2265 \u03b2 (${config.semantics})`
-                : `unanswered objections \u2264 \u03b2 (${config.semantics})`;
-        }
         if (config.budgetMode === 'none') return 'no discarding';
         const bound = config.budgetMode === 'lb' ? '\u2265' : '\u2264';
         return `${config.monoid} of concessions ${bound} \u03b2`;
@@ -92,17 +72,12 @@ export class OutputManager {
      * algebra in the stats line credited a control that did not act on the run.
      */
     static weightsWereConsulted(config) {
-        // abaRecovery FIRST, in the same order describeReading tests it. Recovery zeroes beta
-        // and loads no_discard, so not even a defence semantics' own budget prices anything --
-        // checking the defence case first credited the algebra while the line beside it said
-        // "no discarding (ABA recovery)".
         if (config.abaRecovery) return false;
-        if (OutputManager.isDefenceSemantics(config.semantics)) return true;
         return config.budgetMode !== 'none';
     }
 
     // ===================================
-    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '', defenceCosts = null) {
+    displayResults(result, elapsed, onHighlightExtension, onResetGraph, effectiveConfig = null, frameworkCode = '') {
         // Handle clingo-wasm object format
         const witnesses = result.Call?.[0]?.Witnesses || [];
         const isSuccessful = result.Result === 'SATISFIABLE' ||
@@ -194,24 +169,15 @@ export class OutputManager {
                 const aggregateValue = parsed.budgetValueRaw !== null
                     ? normalizeAggregateValue(parsed.budgetValueRaw)
                     : computeAggregateFromDiscarded(parsed.discarded, config.monoid);
-                // The defence semantics carry no discarded_attack/3 at all, so the monoid
-                // aggregate is meaningless for them; their cost is the separately probed
-                // minimum concession (see ClingoManager.computeDefenceCosts).
-                const defenceCost = defenceCosts
-                    ? defenceCosts.get(parsed.in.slice().sort().join(','))
-                    : undefined;
-                const cost = defenceCost !== undefined
-                    ? (defenceCost === Infinity ? 'any β' : displayValue(defenceCost))
-                    : ((config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
-                        ? null
-                        : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization));
+                const cost = (config.budgetMode === 'none' && config.budgetIntent === 'no_discard')
+                    ? null
+                    : this.extractDisplayCost(witness, aggregateValue, config.monoid, config.optimization);
 
                 return {
                     witness,
                     parsed,
                     cost,
                     aggregateValue,
-                    defenceCost,
                     // BEST FIRST, and "best" is set by the BOUND, not by the user's
                     // optimisation direction. Under an upper bound (`sum`/`max` + ub) the
                     // aggregate is a price, so smaller is better. Under a lower bound
@@ -220,26 +186,10 @@ export class OutputManager {
                     // has to invert. It previously always sorted ascending, which listed the
                     // weakest extension first for every cost algebra.
                     //
-                    // For the defence semantics the monoid aggregate does not exist (no
-                    // discarded_attack/3), so their key is the probed β*, ascending: the
-                    // extension needing the smallest budget comes first. Before this they were
-                    // emitted in solver order, e.g. 0, 8, 8, 16, 3, 5, 5, 3.
-                    // An extension past the pricing cap has NO beta*, which is not the same
-                    // as beta* = 0. Falling through to the monoid tuple gave it [0,0,0] -- the
-                    // same key as a genuinely free extension -- so the unpriced rows sorted
-                    // ahead of ones with a measured beta* of 1, implying they were cheapest.
-                    // Sort them last instead.
-                    objectiveTuple: (defenceCost === undefined
-                        && ['admissible', 'complete', 'preferred'].includes(config.semantics))
-                        ? [1, 0, 0]
-                        : defenceCost !== undefined
-                        // Best first: the cheapest beta* under a strength bound, the largest
-                        // surviving beta* under a cost bound.
-                        ? [0, 0, config.polarity === 'lower' ? -defenceCost : defenceCost]
-                        : getObjectiveTuple(
-                            { ...config, optimization: config.budgetMode === 'lb' ? 'maximize' : 'minimize' },
-                            aggregateValue
-                        )
+                    objectiveTuple: getObjectiveTuple(
+                        { ...config, optimization: config.budgetMode === 'lb' ? 'maximize' : 'minimize' },
+                        aggregateValue
+                    )
                 };
             });
 
@@ -764,12 +714,6 @@ export class OutputManager {
      */
     costLabel() {
         const config = this.lastRunConfig || this.readConfig();
-        if (['admissible', 'complete', 'preferred'].includes(config.semantics)) {
-            // Strength bounds the SUM above, so beta* is the least budget that admits the
-            // extension. Cost bounds the MIN below, so a bigger beta is more restrictive and
-            // beta* is the largest budget it survives. Different quantities, different words.
-            return config.polarity === 'lower' ? 'β* up to' : 'β* needed';
-        }
         return {
             sum: 'Σ conceded',
             max: 'worst conceded',

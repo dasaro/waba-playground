@@ -7,14 +7,14 @@
 //          genuine, tolerated residual objection (there is no cost-0 extension);
 //        - evidence enters as WEIGHTED ARGUMENT atoms (non-assumption, non-contrary) whose
 //          weights encode real quantities (effect sizes, meta-analyses, σ / p-values, evidence
-//          strength) and accumulate along derivation CHAINS into the rival's refutation;
+//          strength) and accumulate across weighted leaves in the rival's refutation;
 //        - competing theories map 1:1 to assumptions; every framework has >= 2 stable models.
 //        kpg_impact_vs_deccan  : Chicxulub impact vs Deccan volcanism      (Arctic,   accepted @8 / holdout @22)
 //        higgs_boson_discovery : 5-sigma discovery vs background-fluctuation (Tropical, @8 / @109)
 //  (3) COST/WEAKNESS reasoning: weights read as a COST or WEAKNESS (not a strength) -- the natural home
 //      of the cost-polarity semirings: Tropical (otimes=+ ; cost/improbability/risk ACCUMULATES),
 //      Bottleneck (otimes=max ; cost = the single WORST component / weakest link), and Lukasiewicz
-//      (bounded-sum otimes ; RELIABILITY that erodes along a long chain). Same nonzero-cost,
+//      (Lukasiewicz t-norm otimes; RELIABILITY folded over every link in a transmission path). Same nonzero-cost,
 //      weighted-argument, multi-model contract as (2), from non-scientific domains:
 //        detective_locked_house : butler vs intruder -- improbability of coincidences (Tropical,   @5 / @27)
 //        weakest_link_security  : layered vs single barrier -- worst vulnerability   (Bottleneck, @3 / @9)
@@ -151,7 +151,6 @@ weight(arg_selectivity, 8).      head(dobj, arg_selectivity). body(dobj, obs_ext
 head(robj, c_impact). body(robj, impact_theory). body(robj, arg_selectivity).  % active only when impact is IN
 head(rmx, c_impact).  body(rmx, deccan_volcanism).                             % rival also attacks impact
 
-budget(beta).
 `;
 
 const HIGGS_DISCOVERY = `%% HIGGS-BOSON DISCOVERY (July 2012): a new ~125 GeV boson exists (accepted) vs the
@@ -185,7 +184,6 @@ weight(look_elsewhere, 8).     head(dobj, look_elsewhere). body(dobj, higgs_exis
 head(robj, c_higgs). body(robj, look_elsewhere).            % active only when the discovery is asserted
 head(rmx, c_higgs). body(rmx, null_fluctuation).            % the null, if held, attacks the discovery
 
-budget(beta).
 `;
 
 
@@ -214,7 +212,6 @@ head(rref, c_intruder). body(rref, surprisal_noforce). body(rref, surprisal_code
 weight(doubt_footprint, 5). head(dobj, doubt_footprint). body(dobj, insider). body(dobj, obs_footprint).
 head(robj, c_insider). body(robj, doubt_footprint).
 head(rmx, c_insider). body(rmx, intruder).   % adopting the rival also indicts the insider theory
-budget(beta).
 `;
 
 const WEAKEST_LINK_SECURITY = `%% WEAKEST-LINK SECURITY: layered defence-in-depth (accepted) vs a single-barrier perimeter (rival).
@@ -223,7 +220,7 @@ const WEAKEST_LINK_SECURITY = `%% WEAKEST-LINK SECURITY: layered defence-in-dept
 %% The layered design wins at NON-ZERO cost 3 (a residual insider risk) vs the single barrier's 9.
 
 assumption(layered_defense). weight(layered_defense, 1). contrary(layered_defense, c_layered).
-assumption(single_barrier).  weight(single_barrier, 1).  contrary(single_barrier, c_single).
+assumption(single_barrier).  weight(single_barrier, 9).  contrary(single_barrier, c_single).  % intrinsic exposure = its worst vulnerability
 %% single_barrier component vulnerabilities (WEIGHTED FACTS; higher severity = weaker point):
 weight(vuln_service_entrance, 9). head(vs1, vuln_service_entrance).  % an unguarded service entrance
 weight(vuln_default_password, 6). head(vs2, vuln_default_password).  % a default admin password
@@ -232,23 +229,23 @@ head(rs, c_single). body(rs, vuln_service_entrance). body(rs, vuln_default_passw
 %% layered_defense residual worst link (weighted fact):
 weight(vuln_insider_risk, 3). head(vl1, vuln_insider_risk).          % a residual insider risk
 head(rl, c_layered). body(rl, layered_defense). body(rl, vuln_insider_risk).  % self-activated : max(1,3)=3
-head(rmx, c_layered). body(rmx, single_barrier).                     % the rival design also attacks the accepted
-budget(beta).
+head(rmx, c_layered). body(rmx, single_barrier).                     % rival mirror attack : max(9)=9; oplus=min keeps min(3,9)=3
 `;
 
 
-const EROSION_TRANSMISSION = `%% LUKASIEWICZ EROSION: an eyewitness account (short chain) vs a legend (long chain of retellings).
-%% Lukasiewicz (bounded-sum) semiring: otimes = max(0, sum(w) - (n-1)*k), k=1000 -- the one algebra whose
-%% conjunction is neither min, max nor plain +. A claim relayed through MANY links ERODES toward 0, even
-%% when each link is individually reliable. Same per-link fidelity (900 = 90%); only the chain LENGTH differs.
+const EROSION_TRANSMISSION = `%% LUKASIEWICZ EROSION: an eyewitness path with two links vs a legend with seven retellings.
+%% Lukasiewicz t-norm semiring: otimes = max(0, sum(w) - (n-1)*k), k=1000 -- the one algebra whose
+%% conjunction is neither min, max nor plain +. Each path is encoded by conjoining all of its link facts;
+%% associativity makes this the flattened form of combining one new link at every relay. A unary chain
+%% without those link premises would preserve the value. Same per-link fidelity (900 = 90%).
 
 assumption(t_eyewitness). contrary(t_eyewitness, c_eyewitness).   % the near-contemporary eyewitness record
-assumption(t_legend).     contrary(t_legend, c_legend).           % the popular legend
+assumption(t_legend).     weight(t_legend, 300). contrary(t_legend, c_legend).  % the legend carries its chain's reliability
 
 %% Eyewitness account: 2 faithful transmission links (WEIGHTED FACTS, fidelity 900 = 90%):
 weight(copy_1, 900). head(e1, copy_1).    % the witness's own written record
 weight(copy_2, 900). head(e2, copy_2).    % one careful copy down to us
-%% eyewitness_support = bounded-sum(900,900) = max(0, 1800-1000) = 800  (mild erosion, still strong)
+%% eyewitness_support = lukasiewicz(900,900) = max(0, 1800-1000) = 800  (mild erosion, still strong)
 head(re, eyewitness_support). body(re, copy_1). body(re, copy_2).
 %% the strong eyewitness record refutes the legend: c_legend = 800 (standing)
 head(rref, c_legend). body(rref, eyewitness_support).
@@ -261,15 +258,14 @@ weight(retell_4, 900). head(l4, retell_4).
 weight(retell_5, 900). head(l5, retell_5).
 weight(retell_6, 900). head(l6, retell_6).
 weight(retell_7, 900). head(l7, retell_7).
-%% legend_support = bounded-sum(900 x7) = max(0, 6300-6000) = 300
+%% legend_support = lukasiewicz(900 x7) = max(0, 6300-6000) = 300
 %% EROSION: seven individually-strong (90%) retellings collapse to 300 -- the "telephone game".
 head(rl, legend_support).
 body(rl, retell_1). body(rl, retell_2). body(rl, retell_3). body(rl, retell_4).
 body(rl, retell_5). body(rl, retell_6). body(rl, retell_7).
-%% the eroded legend attacks the eyewitness account (self-activated): c_eyewitness = bounded-sum(k,300) = 300
+%% the eroded legend attacks the eyewitness account (self-activated): c_eyewitness = lukasiewicz(k,300) = 300
 head(robj, c_eyewitness). body(robj, t_eyewitness). body(robj, legend_support).
-head(rmx, c_eyewitness). body(rmx, t_legend).
-budget(beta).
+head(rmx, c_eyewitness). body(rmx, t_legend).  % mirror attack : w(t_legend)=300; oplus=max keeps max(300,300)=300
 `;
 
 export const examples = {
@@ -383,7 +379,7 @@ export const examples = {
     },
     testimony_erosion: {
         label: 'Testimony erosion: eyewitness vs long-chain legend',
-        description: "A textual / testimonial-transmission dispute showing weights as RELIABILITY that ERODES along a chain, under the Lukasiewicz (bounded-sum) semiring -- the one algebra whose conjunction is neither min, max, nor plain sum. otimes = max(0, sum(w) - (n-1)*k) with k=1000, so each link in a transmission chain loses (k - fidelity), and a LONG chain erodes toward zero even when every link is individually reliable. Two accounts of an event compete: a near-contemporary eyewitness record preserved through 2 faithful copies (accepted) and a popular legend transmitted through 7 successive retellings (rival). Every link has the SAME 90%-faithful reliability (weight 900); only the chain LENGTH differs. The eyewitness account retains 900(x)900 = max(0, 1800-1000) = 800 (mild erosion), but the legend's 7 retellings collapse to max(0, 6300-6000) = 300 -- the classic 'telephone game'. So the eyewitness account is accepted at cost 300 (dismissing the eroded legend) while the legend holdout costs 800 (dismissing the strong eyewitness record). Lukasiewicz is the right algebra because reliability degrades toward a floor along a chain -- not by weakest link (Godel) or unbounded accumulation (Tropical). beta=800 enumerates both extensions.",
+        description: "A testimonial-transmission dispute showing weights as RELIABILITY folded over every link in a path, under the Lukasiewicz t-norm semiring -- the one algebra whose conjunction is neither min, max, nor plain sum. Each path is represented by the conjunction of its link-reliability facts, so otimes = max(0, sum(w) - (n-1)*k), k=1000, loses (k - fidelity) as each link is added. Two accounts compete: a near-contemporary eyewitness record preserved through 2 faithful copies and a legend transmitted through 7 retellings. Every link has the same 90%-faithful reliability (weight 900); the eyewitness path retains 900(x)900 = 800, while the legend path gives max(0, 6300-6000) = 300. Thus the eyewitness account is accepted at cost 300 and the legend holdout costs 800. A unary rule chain with no new weighted premise would preserve its value; the erosion here comes from conjoining the reliability of every relay. beta=800 enumerates both extensions.",
         section: 'curated',
         source: 'inline',
         code: EROSION_TRANSMISSION,

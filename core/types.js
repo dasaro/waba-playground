@@ -7,7 +7,7 @@
  * @property {'minimize'|'maximize'} optimization
  * @property {'none'|'ub'|'lb'} budgetMode
  * @property {'no_discard'|'bounded'} budgetIntent
- * @property {'cf'|'stable'|'admissible'|'complete'|'preferred'} semantics
+ * @property {'cf'|'stable'|'admissible'|'complete'|'preferred'|'grounded'|'naive'|'semi-stable'|'stage'|'ideal'|'eager'} semantics
  * @property {'ignore'|'optN'} optMode
  * @property {number} beta
  * @property {number} numModels

@@ -20,13 +20,13 @@ The app remains GitHub-Pages compatible:
 ## Supported Surface
 
 The UI offers one control per real choice, and nothing that can be set to an
-unsupported combination. Seven controls, down from eleven:
+unsupported combination. Eight controls, down from eleven:
 
 | control | options | notes |
 |---|---|---|
 | Algebra | `godel`, `arctic`, `lukasiewicz` (strength); `tropical`, `bottleneck_cost` (cost) | named directly; the polarity is a property of the algebra, not a separate knob |
 | Łukasiewicz bound `k` | integer | shown only for `lukasiewicz`; passed as `-c k=N` |
-| Semantics | `cf`, `stable`, `admissible`, `complete`, `preferred` | all five are budgeted; `preferred` is post-filtered |
+| Semantics | `cf`, `stable`, `admissible`, `complete`, `preferred`, `grounded`, `naive`, `semi-stable`, `stage`, `ideal`, `eager` | all eleven share beta-sigma; seven use exact per-reduct post-filters |
 | Unweighted assumptions (δ) | `aba`, `neutral` | which default weight an unweighted assumption carries; `legacy` was retired as provably redundant (it equalled `neutral` for four algebras and `aba` for tropical) |
 | ABA recovery | on/off | pins transparent δ and forbids every discard |
 | Budget reading | none, total ≤ β, worst ≤ β, every ≥ β | exactly the three canonical (monoid, bound) pairings |
@@ -43,10 +43,11 @@ than merely discouraged:
 The five algebras are the direct module keys; `godel_low` and `tropical_high` remain as
 aliases for `bottleneck_cost` and `arctic` in saved configurations.
 
-`admissible`, `complete` and `preferred` carry their own SUM inconsistency budget inside
-the module (the Dunne et al. lift), so they take β directly and the budget-reading control
-is disabled for them. Under a cost algebra the bound direction reverses, so classical
-recovery arrives at a β above every attack weight rather than at β = 0.
+All eleven semantics use one beta-sigma mechanism. The core chooses an affordable discard set
+`D` using the selected monoid and bound; the selected ordinary semantics is then evaluated in
+the fixed reduced attack framework `Att \ D`. There is no semantics-specific `pay` relation,
+private SUM budget, or recovery threshold. ABA recovery loads `no_discard`, which forbids the
+same `D` for every semantics.
 
 β is passed to the solver as `-c beta=N`, exactly as `bin/waba` does, so it overrides a
 framework that declares its own `#const beta`. The output filter is always `projection`.
@@ -58,26 +59,43 @@ The startup configuration is wrapper-aligned:
 - enumerate mode
 - `conflict_cycle` (Three-Way Standoff) as the initial loaded example (which applies its own budgeted preset)
 
-Curated comparison examples can still override that global default with a more appropriate preset. The public `Reference Preferred` example, for instance, keeps `budget mode = none` so it remains a faithful classical ABA comparison case.
+Curated comparison examples override that global default when their intended algebra or
+budget requires a specific preset.
 
-`preferred` is exact. The browser does not use `asprin`; it performs the same plain-`clingo`
-multi-pass flow as the CLI surface:
+The seven higher-order semantics are exact. The browser does not use `asprin`; it performs the
+same metadata-driven plain-`clingo` multi-pass flow as the CLI surface:
 
-1. enumerate the `admissible` candidates
-2. filter them with `semantics/subset_maximal_filter.lp`
+1. enumerate `(S,D)` witnesses from the declared kernel (`cf`, `admissible`, or `complete`)
+2. apply the declared subset/range filter separately inside each exact `D`
+3. existentially forget `D`, deduplicate equal extensions, and retain one deterministic
+   representative receipt (least aggregate for an upper bound, greatest floor for a lower
+   bound, with the discard key breaking ties)
+4. apply an optional numeric result filter only after semantic filtering
+
+The filters implement preferred (maximal admissible), grounded (least complete), naive
+(maximal conflict-free), semi-stable (complete with maximal assumption range), stage
+(conflict-free with maximal assumption range), ideal (largest admissible subset of every
+preferred extension), and eager (largest admissible subset of every semi-stable extension;
+computed from complete candidates because it is complete). `CF2`/`stage2` are not offered:
+their ASPARTIX encodings recurse over SCCs in a binary Dung graph, whereas an ABA attack may
+require a set of assumptions jointly. The native flat-ABA SCC schema of
+[Blümel et al. (2025)](https://doi.org/10.24963/ijcai.2025/488) is the appropriate basis for
+a direct implementation, but still requires a CF2 base case and a proof that its recursion
+remains local to each budget reduct.
 
 ## Synced Modules
 
 `npm run sync` regenerates [waba-modules.js](waba-modules.js) from the public WABA manifest only:
 
 - `core/base.lp`
+- `validate.lp`, used as the same pre-flight program as the CLI
 - supported semiring modules: `godel`, `bottleneck_cost`, `arctic`, `tropical`, `lukasiewicz`
 - `defaults/*.lp`
 - `monoid/*.lp`
 - `optimize/*.lp`
 - `constraint/{ub,lb,no_discard}.lp`
 - `filter/{standard,projection}.lp`
-- `semantics/{cf,stable,admissible,complete,subset_maximal_filter}.lp`
+- four semantics kernels plus the generated subset/range filters and private range projection
 - curated public example `.lp` files
 
 Sync fails hard on missing files. There are no placeholder fallbacks.
@@ -91,7 +109,7 @@ the inconsistency budget resolving conflicts that classical ABA cannot, with
 several weighted resolutions at *different, non-zero* costs (not one trivial
 cost-0 extension):
 
-The four span the four algebras and several attack shapes (single-premise vs.
+The suite spans all five algebras and several attack shapes (single-premise vs.
 joint attacks, sum vs. max monoid):
 
 - `conflict_cycle` — **Three-Way Standoff** (default, **Gödel** / weakest link): an
@@ -131,9 +149,10 @@ as a **cost or weakness** (not a strength), the natural home of the cost-polarit
 - `weakest_link_security` — **Weakest link: defence-in-depth vs single barrier** (**Bottleneck-cost**):
   a system is only as strong as its weakest link, so a design's exposure is its *worst* component (⊗=max),
   never a sum — the single barrier's max(9,6)=9 vs the layered design's max(1,3)=**3**, accepted (β=9).
-- `testimony_erosion` — **Testimony erosion: eyewitness vs long-chain legend** (**Łukasiewicz** /
-  bounded sum): reliability *erodes* along a transmission chain — ⊗ = max(0, Σw − (n−1)·k), k=1000. Same
-  90%-faithful links (weight 900); only length differs: 2 copies retain 900⊗900 = 800, but 7 retellings
+- `testimony_erosion` — **Testimony erosion: eyewitness vs long-chain legend** (**Łukasiewicz
+  t-norm**): each transmission path is represented by the conjunction of its link-reliability leaves,
+  so ⊗ = max(0, Σw − (n−1)·k), k=1000, erodes as links are added. With the same
+  90%-faithful links (weight 900), 2 copies retain 900⊗900 = 800, but 7 retellings
   collapse to max(0, 6300−6000) = **300** (the "telephone game"). The eyewitness account is accepted at
   **cost 300** (dismissing the eroded legend); the legend holdout costs 800 (β=800).
 
@@ -208,13 +227,9 @@ The output filter is always `projection`, so a witness carries exactly:
 - `out/1`
 - `discarded_attack/3`
 - `budget_value/1` in bounded runs
-- the two advisories, `weight_on_derived_dominated/3` and `framework_budget_ignored/1`
 
 `supported_with_weight/2` and `attacks_successfully_with_weight/3` are **not** among them:
 `filter/standard.lp` is never loaded. Anything the UI wants to say about derivations or
 attack provenance is reconstructed from the framework SOURCE, not read out of the witness
-(see `OutputManager.frameworkRules` / `findSupportingAssumptions`).
-
-The live browser surface also inherits one documented implementation limit from the mature WABA repo:
-
-- empty-body weighted rules remain a known paper/code mismatch
+(see `OutputManager.frameworkRules` / `findSupportingAssumptions`). Framework well-formedness
+is checked separately by the bundled `validate.lp` before this semantic program is run.

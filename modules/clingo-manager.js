@@ -1,24 +1,27 @@
 /**
  * ClingoManager - Handles Clingo WASM integration and mature WABA program execution.
  */
-import { wabaModules } from '../waba-modules.js?v=20260731-8';
+import { wabaModules } from '../waba-modules.js?v=20260831-1';
 import {
     normalizeConfig,
     resolveSemiringModuleKey,
     getAliasLabel,
-    isBudgetedDefence,
     shouldApplyNumericPostFilter,
-    validateConfig
-} from '../runtime/config-service.js?v=20260731-8';
-import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260731-8';
-import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260731-8';
-import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260731-8';
-import { ParserUtils } from './parser-utils.js?v=20260731-8';
+    validateConfig,
+    validateFrameworkSource
+} from '../runtime/config-service.js?v=20260831-1';
+import { buildProgram, buildSolverArgs, getConstraintModule, getCoreModule, getDefaultPolicyModule, getFilterModule, getMonoidModule, getOptimizeModule, getSemanticsModule, getSemiringModule } from '../runtime/program-builder.js?v=20260831-1';
+import { compareTuples, computeAggregateFromDiscarded, formatSyntheticOptimization, getObjectiveTuple } from '../runtime/objective-utils.js?v=20260831-1';
+import { matchPredicate, splitTopLevelArgs } from '../runtime/answer-set-parser.js?v=20260831-1';
+import {
+    buildSemanticCandidateFacts, dedupeExtensionWitnesses, stripSemanticReceipts
+} from '../runtime/witness-utils.js?v=20260831-1';
 
-// Which semantics need the enumerate-then-subset-filter two-pass, and what they filter over.
+// Which semantics need an enumerate-then-relational-filter pass, and what they filter over.
 // Both come from the bundle so they track the .lp module set automatically.
 const DERIVED_SEMANTICS = wabaModules.metadata.derivedSemantics || {};
 const POST_FILTERED = new Set(wabaModules.metadata.postFilteredSemantics || []);
+const SEMANTIC_FILTERS = wabaModules.metadata.semanticFilters || {};
 
 export class ClingoManager {
     constructor(runBtn, introStatus = null) {
@@ -90,12 +93,11 @@ export class ClingoManager {
             throw new Error(validationError);
         }
 
-        // The framework's own preconditions, checked by RUNNING WABA/validate.lp through
-        // clingo-wasm. The first version scanned the text with regexes and was wrong both ways:
-        // it missed pooled facts (the compact form CLAUDE.md tells authors to prefer), facts
-        // split across lines, rule-derived weights and block comments, and it REJECTED legal
-        // frameworks whose atoms are function terms. Letting clingo parse it is exact, and it is
-        // the same file bin/waba uses, so the two boundaries cannot drift.
+        // Two-stage boundary, matching bin/waba: a conservative source parser first admits only
+        // the five ground data predicates (and constants), then WABA/validate.lp checks the
+        // mathematical preconditions through clingo-wasm. Pooled and multi-line facts, block
+        // comments, function terms and quoted strings remain legal; runtime ASP cannot be
+        // injected into the composed program.
         const precondition = await this.checkPreconditions(framework, normalized, onLog);
         if (precondition) {
             throw new Error(precondition);
@@ -104,202 +106,14 @@ export class ClingoManager {
         try {
             const startTime = performance.now();
             const result = POST_FILTERED.has(normalized.semantics)
-                ? await this.runExactSubsetSemantics(framework, normalized, onLog)
+                ? await this.runPostFilteredSemantics(framework, normalized, onLog)
                 : await this.runDirect(framework, normalized);
-            const defenceCosts = await this.computeDefenceCosts(framework, normalized, result, onLog);
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-            return { result, elapsed, effectiveConfig: normalized, defenceCosts };
+            return { result, elapsed, effectiveConfig: normalized };
         } catch (error) {
             console.error('Error running WABA:', error);
             throw error;
         }
-    }
-
-    /**
-     * Per-extension cost for the DEFENCE semantics (admissible / complete / preferred).
-     *
-     * Those semantics price a shared `pay` set internally and emit no discarded_attack/3, so
-     * the answer set carries in/1 and out/1 and nothing else -- which is why no cost was ever
-     * shown for them. `#show pay/2` is NOT the fix: it multiplies the model count, because
-     * different payment choices realising the SAME extension become distinct projected models
-     * (measured 3 -> 5 -> 7 -> 11 as beta rises), breaking enumerate-each-extension-once.
-     *
-     * Instead: one extra solve per returned extension, with in/out PINNED and the paid
-     * aggregate minimised. The optimum is the least objection-weight this extension has to
-     * wave away -- 0 exactly when it is classically admissible. Under a strength algebra that
-     * is also the smallest beta admitting it.
-     *
-     * Returns a Map from a canonical extension key to the number, or null when not applicable.
-     */
-    async computeDefenceCosts(framework, config, result, onLog = () => {}) {
-        if (!isBudgetedDefence(config.semantics)) {
-            return null;
-        }
-        const witnesses = result?.Call?.[0]?.Witnesses || [];
-        if (witnesses.length === 0) {
-            return null;
-        }
-
-        const assumptions = ParserUtils.parseAssumptions(framework);
-        if (assumptions.length === 0) {
-            return null;
-        }
-
-        // The two polarities ask DIFFERENT questions of the module:
-        //
-        //   strength (oplus = max): it bounds `#sum{paid} <= beta`, so S holds for every
-        //       beta >= the least total it can concede. beta* = that minimum.
-        //   cost (oplus = min): it bounds `#min{paid} >= beta`, so a BIGGER beta is more
-        //       restrictive and S holds for every beta <= the largest floor it can achieve.
-        //       beta* = that maximum.
-        //
-        // The strength side is a plain #minimize and is verified exact. The cost side is not: a
-        // #maximize over the computed #min got the answer wrong three different ways (it ignores
-        // that a pay-free model dominates, and it does not reliably find the best floor). Rather
-        // than keep guessing at an encoding, the cost side BINARY-SEARCHES the real module -- it
-        // asks the actual semantics whether S survives at a given beta, so it cannot disagree
-        // with it by construction.
-        const isCost = config.polarity === 'lower';
-        const costs = new Map();
-
-        // Search ceiling, measured rather than guessed.
-        //
-        // It used to be the sum of the DECLARED weight/2 literals, on the reasoning that no
-        // threshold can exceed the total declared weight. That is false in two ways: with
-        // otimes = + a leaf feeding two branches contributes to arg_weight twice, so a single
-        // arg_weight can exceed the declared total; and a delta-weighted assumption contributes
-        // nothing to the sum but a real arg_weight to the bound. When the ceiling fell short,
-        // the strength probe was UNSAT and the code below turned that into beta* = 0 -- the
-        // value meaning "needs no budget at all" -- and the cost probe concluded "survives at
-        // every beta". Both are the most flattering possible answer, and both sorted those
-        // extensions to the top.
-        //
-        // So ask the module for the actual arg_weights. The bound is over `pay`, so the largest
-        // total is (max arg_weight) x (number of payable attacks) and the largest floor is
-        // (max arg_weight); take the former, which covers both.
-        let ceiling = 1000;
-        try {
-            const weightProbe = await this.runSolver(
-                `${buildProgram(framework, { ...config, beta: 0 })}\n#show arg_weight/2.\n`,
-                1, buildSolverArgs({ ...config, beta: 0, optMode: 'ignore' }), config.timeout
-            );
-            const shown = weightProbe?.Call?.[0]?.Witnesses?.[0]?.Value || [];
-            const argWeights = shown
-                .map((atom) => matchPredicate(atom, 'arg_weight'))
-                .filter((args) => args !== null)
-                .map((args) => Number(splitTopLevelArgs(args)[1]))
-                .filter((n) => Number.isFinite(n));
-            if (argWeights.length > 0) {
-                const maxArg = Math.max(...argWeights.map(Math.abs));
-                ceiling = maxArg * argWeights.length + 1;
-            }
-        } catch {
-            // Fall through to the default; the guards below still refuse to invent a number.
-        }
-
-        // One solve per extension for strength, ~log2(ceiling) for cost. Uncapped this was 2^n
-        // probes on a wide framework, which froze the page behind a modal overlay.
-        const PRICING_CAP = 24;
-        let priced = 0;
-
-        const holdsAt = async (pins, beta) => {
-            const program = `${buildProgram(framework, { ...config, beta })}
-%% Pin this extension and ask the module whether it survives at this beta
-${pins}
-`;
-            const probe = await this.runSolver(
-                program, 1,
-                buildSolverArgs({ ...config, beta, optMode: 'ignore' }), config.timeout
-            );
-            return probe?.Result === 'SATISFIABLE';
-        };
-
-        for (const witness of witnesses) {
-            const inSet = new Set((witness.Value || [])
-                .map((predicate) => matchPredicate(predicate, 'in'))
-                .filter((arg) => arg !== null));
-            const key = [...inSet].sort().join(',');
-            if (costs.has(key)) {
-                continue;
-            }
-            if (priced >= PRICING_CAP) {
-                onLog(`Priced the first ${PRICING_CAP} extensions; the rest are shown without a β*.`, 'info');
-                break;
-            }
-            priced += 1;
-
-            const pins = assumptions
-                .map((a) => (inSet.has(a) ? `:- not in(${a}).` : `:- in(${a}).`))
-                .join('\n');
-
-            try {
-                if (!isCost) {
-                    // Least beta admitting S: minimise what it must concede.
-                    const program = `${buildProgram(framework, { ...config, beta: ceiling })}
-%% Pin this extension and minimise what it must concede
-${pins}
-#minimize { W,X,Y : pay(X,Y), arg_weight(X,W) }.
-`;
-                    // buildSolverArgs, NOT a hand-rolled list: it is the only place `-c k` is
-                    // added, so hand-rolling left every Lukasiewicz probe at the module's default
-                    // k = 1000 regardless of the k control.
-                    // 0, NOT 1. `--opt-mode=opt` with --models=1 stops at the FIRST model and
-                    // reports its cost, not the minimum -- clingo prints `Optimization:` either
-                    // way and only says OPTIMUM FOUND when it actually proved it. Swept every
-                    // shipped example x every subset x all five algebras: 360/360 agreed, because
-                    // minimising an unconstrained subset choice happens to start empty. That is a
-                    // solver heuristic, not a guarantee -- the same composition with an
-                    // exactly-one choice (setsupport.lp) reported 52 where the optimum was 20.
-                    // 0 enumerates only IMPROVING models, so it costs nothing extra here.
-                    const probe = await this.runSolver(
-                        program, 0,
-                        [...buildSolverArgs({ ...config, beta: ceiling, optMode: 'ignore' })
-                            .filter((a) => !a.startsWith('--opt-mode')), '--opt-mode=opt', '--quiet=1'],
-                        config.timeout
-                    );
-                    const witnessesOut = probe?.Call?.[0]?.Witnesses || [];
-                    const last = witnessesOut[witnessesOut.length - 1];
-                    const raw = Array.isArray(last?.Costs) ? last.Costs[last.Costs.length - 1] : null;
-                    // An UNSAT probe means the ceiling was still too low, NOT that the set is
-                    // free. Leaving it unpriced shows no badge; claiming 0 asserted the set is
-                    // classically admissible and ranked it first.
-                    if (typeof raw === 'number') {
-                        costs.set(key, raw);
-                    }
-                    continue;
-                }
-
-                // Cost: greatest beta at which S still holds. Monotone (a bigger beta is strictly
-                // more restrictive), so binary search is exact.
-                if (!(await holdsAt(pins, 0))) {
-                    continue;                       // holds nowhere; nothing meaningful to show
-                }
-                if (await holdsAt(pins, ceiling)) {
-                    // Only sound if the ceiling really is above every reachable arg_weight.
-                    // Confirm at twice the ceiling before claiming the set survives any floor;
-                    // if that fails the ceiling was short, so leave it unpriced rather than
-                    // advertising "any β".
-                    if (await holdsAt(pins, ceiling * 2)) {
-                        costs.set(key, Infinity);
-                    }
-                    continue;
-                }
-                let lo = 0;                          // known to hold
-                let hi = ceiling;                    // known not to hold
-                while (hi - lo > 1) {
-                    const mid = Math.floor((lo + hi) / 2);
-                    if (await holdsAt(pins, mid)) {
-                        lo = mid;
-                    } else {
-                        hi = mid;
-                    }
-                }
-                costs.set(key, lo);
-            } catch (error) {
-                onLog(`Could not price extension {${key}}: ${error.message}`, 'warning');
-            }
-        }
-        return costs;
     }
 
     /**
@@ -308,7 +122,7 @@ ${pins}
      *
      *   cred(a) = sum over standpoints X with a in X of omega(c(X)) / sum over all X
      *
-     * Standpoints are enumerated ONCE under the user's semiring/semantics with max+ub at
+     * Standpoints are enumerated ONCE under stable semantics with max+ub at
      * an unreachable beta and `#project in/1.` (distinct in-sets, whatever the discard
      * realisation); each standpoint's minimal cost c(X) is then a solve that pins the
      * in-set and minimises budget_value/1, accepted only with clingo's OPTIMUM FOUND
@@ -317,17 +131,19 @@ ${pins}
      */
     async computeCredibility(framework, config, kappa, onLog, discount = 'harmonic') {
         const normalized = normalizeConfig(config);
-        if (isBudgetedDefence(normalized.semantics)) {
-            onLog('Credibility is defined over the discard lattice, which the defence '
-                + 'semantics replace with their own pay mechanism. Switch to stable or cf.',
-            'warning');
-            return null;
-        }
+        const validationError = validateConfig(normalized);
+        if (validationError) throw new Error(validationError);
+        const precondition = await this.checkPreconditions(framework, normalized, onLog);
+        if (precondition) throw new Error(precondition);
+
         const weightSum = [...framework.matchAll(/weight\s*\([^,]+,\s*(\d+)\s*\)/g)]
             .reduce((acc, m) => acc + parseInt(m[1], 10), 0);
         const big = Math.min(100000000, (weightSum + 1) * 64);
         const credConfig = {
             ...normalized,
+            // Credibility is defined over stable readings, independently of which semantics
+            // happens to be selected in the ordinary-run control.
+            semantics: 'stable',
             budgetMode: 'ub',
             monoid: 'max',
             beta: big,
@@ -467,19 +283,26 @@ ${pins}
     async runDirect(framework, config) {
         const program = buildProgram(framework, config);
         const args = buildSolverArgs(config);
-        const result = await this.runSolver(program, config.numModels, args, config.timeout);
+        // D is existential in a beta-sigma extension. Ask clingo for every witness, retain the
+        // best deterministic receipt per in-set, and only then apply the UI's extension cap.
+        // Capping raw models can stop on several D witnesses for one extension and omit another
+        // extension entirely.
+        const result = await this.runSolver(program, 0, args, config.timeout);
         this.assertSolverResult(result);
-        return result;
+        return this.dedupeResult(result, config);
     }
 
-    async runExactSubsetSemantics(framework, config, onLog) {
-        // preferred = the subset-MAXIMAL beta-admissible sets, matching bin/waba's
-        // POST_FILTER_SEMANTICS/SUBSET_FILTER pair. The candidate semantics comes from the
-        // bundle's derivedSemantics map rather than a local guess, so the two-pass shape
-        // cannot disagree with the CLI about what is being maximised over.
-        const filterKind = 'subset_maximal_filter';
+    async runPostFilteredSemantics(framework, config, onLog) {
+        // For each fixed affordable D, enumerate the declared candidate family and
+        // apply that semantics' exact subset/range relation.  Only then forget D.
+        // Candidate, filter and optional range projection all come from generated
+        // metadata, so the browser and CLI share one pipeline declaration.
+        const filterKind = SEMANTIC_FILTERS[config.semantics];
         const candidateSemantics = DERIVED_SEMANTICS[config.semantics] || 'admissible';
         const targetLabel = config.semantics;
+        if (!filterKind || !wabaModules.semantics[filterKind]) {
+            throw new Error(`No exact post-filter is bundled for ${targetLabel} semantics.`);
+        }
         onLog(`Enumerating ${candidateSemantics} candidates for exact ${targetLabel} semantics…`, 'info');
 
         const candidateConfig = {
@@ -488,7 +311,8 @@ ${pins}
             optMode: 'ignore'
         };
         const candidateProgram = buildProgram(framework, candidateConfig, {
-            includeObjective: false
+            includeObjective: false,
+            auxiliaryFor: targetLabel
         });
         const candidateResult = await this.runSolver(candidateProgram, 0, buildSolverArgs(candidateConfig), config.timeout);
         this.assertSolverResult(candidateResult);
@@ -498,28 +322,18 @@ ${pins}
             return candidateResult;
         }
 
-        const candidateFacts = candidateWitnesses.map((witness, index) => {
-            const modelId = index + 1;
-            // `[^)]+` stopped at the first `)`, so a function-term assumption such as
-            // `in(flies(tweety))` matched nothing and NO member/2 facts were emitted. The
-            // subset-maximal filter then saw candidates with empty membership, derived no
-            // has_extra, dominated nothing, and kept every candidate -- so `preferred`
-            // silently returned exactly the admissible sets.
-            const members = (witness.Value || [])
-                .map((predicate) => matchPredicate(predicate, 'in'))
-                .filter((arg) => arg !== null)
-                .map((atom) => `member(${modelId},${atom}).`);
-            return [`candidate(${modelId}).`, ...members].join('\n');
-        }).join('\n');
+        // Include each witness' exact D, and range(S) when required. Every shipped
+        // filter compares candidates only inside one reduced framework Att \\ D.
+        const candidateFacts = buildSemanticCandidateFacts(candidateWitnesses);
 
-        onLog(`Filtering subset-maximal ${candidateSemantics} candidates…`, 'info');
-        const subsetProgram = `
+        onLog(`Applying ${filterKind} to ${candidateSemantics} candidates…`, 'info');
+        const filterProgram = `
 ${candidateFacts}
 ${wabaModules.semantics[filterKind]}
 `;
-        const subsetResult = await this.runSolver(subsetProgram, 0, ['--project'], config.timeout);
-        this.assertSolverResult(subsetResult);
-        const keepWitness = subsetResult.Call?.[0]?.Witnesses?.[0]?.Value || [];
+        const filterResult = await this.runSolver(filterProgram, 0, ['--project'], config.timeout);
+        this.assertSolverResult(filterResult);
+        const keepWitness = filterResult.Call?.[0]?.Witnesses?.[0]?.Value || [];
         const keepIds = new Set(
             keepWitness
                 .map((predicate) => predicate.match(/^keep\((\d+)\)$/))
@@ -552,19 +366,32 @@ ${wabaModules.semantics[filterKind]}
                 .map((entry) => entry.witness);
         }
 
-        if (config.numModels > 0) {
-            filteredWitnesses = filteredWitnesses.slice(0, config.numModels);
-        }
+        // beta-sigma is existential over D only after ordinary sigma has been
+        // checked inside each fixed reduct. Collapse duplicate in-sets now,
+        // retain a representative discard receipt, and hide internal range facts.
+        filteredWitnesses = dedupeExtensionWitnesses(filteredWitnesses, config)
+            .map(stripSemanticReceipts);
+        if (config.numModels > 0) filteredWitnesses = filteredWitnesses.slice(0, config.numModels);
 
         return {
             Result: filteredWitnesses.length > 0
-                ? (config.optMode === 'optN' ? 'OPTIMUM FOUND' : 'SATISFIABLE')
+                ? (shouldApplyNumericPostFilter(config) ? 'OPTIMUM FOUND' : 'SATISFIABLE')
                 : 'UNSATISFIABLE',
             Call: [
                 {
                     Witnesses: filteredWitnesses
                 }
             ]
+        };
+    }
+
+    dedupeResult(result, config) {
+        const witnesses = result?.Call?.[0]?.Witnesses || [];
+        let unique = dedupeExtensionWitnesses(witnesses, config);
+        if (config.numModels > 0) unique = unique.slice(0, config.numModels);
+        return {
+            ...result,
+            Call: [{ ...(result.Call?.[0] || {}), Witnesses: unique }]
         };
     }
 
@@ -583,34 +410,55 @@ ${wabaModules.semantics[filterKind]}
      * well-formed wABA framework.
      */
     async checkPreconditions(framework, config, onLog = () => {}) {
+        const sourceError = validateFrameworkSource(framework);
+        if (sourceError) return sourceError;
+
         const EXPLAIN = {
             not_flat: 'wABA is defined for FLAT ABA: an assumption may not be a rule head',
             cyclic: 'wABA is defined for WELL-FOUNDED frameworks: rule dependencies must be '
                 + "acyclic, or a derived atom's weight has no unique least fixpoint",
             multi_weight: 'weight/2 must be a partial FUNCTION: two weights for one atom split '
                 + 'a single conflict into several independently discardable attacks',
+            missing_contrary: 'contrary/2 must be TOTAL on assumptions: every assumption needs '
+                + 'exactly one contrary',
+            multi_contrary: 'contrary/2 must be FUNCTIONAL: an assumption may have only one '
+                + 'contrary',
+            multi_head: 'each rule identifier must have exactly ONE head',
+            orphan_body: 'every body/2 fact must name a rule identifier declared by head/2',
             not_a_number: 'a non-integral weight is dropped by the monoid aggregates, so its '
                 + 'attack would cost nothing and be discardable at any β',
+            not_finite: 'authored weights must be finite integers; algebraic extrema are '
+                + 'reserved for the selected semiring and default policy',
             negative: 'weights must be nonnegative',
-            off_grid: "outside Łukasiewicz's carrier [0, k], where the bounded sum is not "
+            off_grid: "outside Łukasiewicz's carrier [0, k], where its t-norm is not "
                 + 'associative'
         };
         // k applies whenever the algebra is Łukasiewicz, whether or not the user chose one --
         // the module carries `#const k = 1000`. Gating on the CONTROL rather than the algebra is
         // exactly the bug the CLI had.
-        const args = ['--warn=none'];
+        const args = ['--warn=none', '-c', 'finite_only=1'];
         if (config.semiringKey === 'lukasiewicz') {
             args.push('-c', `k=${Number.isFinite(config.lukK) ? config.lukK : 1000}`);
         }
         const result = await this.runRaw(
             `${wabaModules.validate.framework}\n${framework}\n`, 1, args, 20000);
-        // UNSATISFIABLE means the framework's OWN integrity constraints fired against
-        // validate.lp, which defines none of the solver predicates they mention. No violation
-        // atom is emitted, so treating it as a pass would skip validation entirely.
-        if (result?.Result === 'UNSATISFIABLE') {
-            return 'Could not validate this framework: it contains integrity constraints that '
-                + 'refer to predicates the pre-flight check does not define (in/1, supported/1, '
-                + '…). Move them out of the framework to run it here.';
+        // Mirror bin/waba's returncode gate: anything that is not a clean SAT/UNSAT answer
+        // (worker ERROR, clingo UNKNOWN on a parse/ground failure) means the guards NEVER RAN,
+        // so treating it as "no violations" would silently skip flatness, acyclicity, weight
+        // functionality and contrary totality. A framework #const colliding with the
+        // validator's, or invisible characters, land here.
+        const verdict = result?.Result;
+        if (verdict !== 'SATISFIABLE' && verdict !== 'OPTIMUM FOUND' && verdict !== 'UNSATISFIABLE') {
+            const detail = result?.Error ? ` (${String(result.Error).trim().split('\n')[0]})` : '';
+            return 'Could not validate this framework: the pre-flight solver reported '
+                + `${verdict || 'no result'}${detail}. The framework text is probably not plain `
+                + 'clingo facts: check for stray directives such as #const or invisible characters.';
+        }
+        // Authored constraints have already been excluded by the source boundary. UNSAT here is
+        // therefore a validator failure, never evidence that a framework is well formed.
+        if (verdict === 'UNSATISFIABLE') {
+            return 'Could not validate this framework: the pre-flight program was unexpectedly '
+                + 'unsatisfiable.';
         }
         const atoms = result?.Call?.[0]?.Witnesses?.[0]?.Value || [];
         const byKind = new Map();

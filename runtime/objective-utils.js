@@ -1,3 +1,6 @@
+// @ts-ignore -- the query is the playground's browser cache-busting module version
+import { matchPredicate, splitTopLevelArgs } from './answer-set-parser.js?v=20260831-1';
+
 export const POS_INF = '#sup';
 export const NEG_INF = '#inf';
 
@@ -63,16 +66,22 @@ export function displayValue(value) {
 
 export function computeAggregateFromDiscarded(discardedAttacks, monoid) {
     const weights = discardedAttacks
-        .map((attack) => attack.match(/discarded_attack\([^,]+,\s*[^,]+,\s*([^)]+)\)/))
-        .filter(Boolean)
-        .map((match) => normalizeAggregateValue(match[1]));
+        .map((attack) => matchPredicate(attack, 'discarded_attack'))
+        .filter((args) => args !== null)
+        .map((args) => splitTopLevelArgs(args))
+        .filter((args) => args.length === 3)
+        .map((args) => normalizeAggregateValue(args[2]));
 
     if (monoid === 'sum') {
-        // monoid/sum.lp is `budget_value(C) :- C = #sum{ W,X,Y : discarded_attack(X,Y,W) }`,
-        // and clingo's #sum silently DROPS tuples whose weight is #sup/#inf (an empty sum is 0).
-        // Propagating the infinity instead would report a cost the solver never computed.
+        // monoid/sum.lp defines the LIFTED sum: #inf is absorbing (sum_has_infimum ->
+        // budget_value(#inf)); #sup tuples are still dropped by clingo's #sum. Mirroring the
+        // raw #sum here (the pre-lift behaviour) under-reported any receipt holding a
+        // #inf-priced attack and ranked it as if it were finite.
+        if (weights.includes(NEG_INF)) {
+            return NEG_INF;
+        }
         return weights
-            .filter((value) => value !== POS_INF && value !== NEG_INF)
+            .filter((value) => value !== POS_INF)
             .reduce((total, value) => total + value, 0);
     }
 
@@ -97,7 +106,16 @@ export function getObjectiveTuple(config, aggregateValue) {
     const { monoid, optimization } = config;
 
     if (monoid === 'sum') {
-        return [0, 0, optimization === 'minimize' ? aggregateValue : -aggregateValue];
+        // Mirror optimize/{minimize,maximize}.lp's stratified levels for the lifted sum:
+        // minimize ranks #inf best ((0,0,0)) and #sup worst; maximize the reverse.
+        if (optimization === 'minimize') {
+            if (aggregateValue === NEG_INF) return [0, 0, 0];
+            if (aggregateValue === POS_INF) return [1, 0, 0];
+            return [0, 1, aggregateValue];
+        }
+        if (aggregateValue === POS_INF) return [0, 0, 0];
+        if (aggregateValue === NEG_INF) return [1, 0, 0];
+        return [0, 1, -aggregateValue];
     }
 
     if (monoid === 'max' && optimization === 'minimize') {

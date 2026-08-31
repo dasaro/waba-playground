@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 const ALGEBRAS = ['godel', 'arctic', 'lukasiewicz', 'tropical', 'bottleneck_cost'];
-const SEMANTICS = ['cf', 'stable', 'admissible', 'complete', 'preferred'];
+const SEMANTICS = [
+    'cf', 'stable', 'admissible', 'complete', 'preferred',
+    'grounded', 'naive', 'semi-stable', 'stage', 'ideal', 'eager'
+];
 // The controls retired when the surface was cut from 11 selects to 7. Their combinations are
 // now unreachable by construction, so a spec that still drives them is testing nothing.
 const RETIRED_CONTROLS = [
@@ -64,7 +67,7 @@ test('the control surface exposes exactly the supported options', async ({ page 
 
     await expect(page.locator('#semiring-select option')).toHaveCount(5);
     await expect(page.locator('#semiring-select optgroup')).toHaveCount(2);
-    await expect(page.locator('#semantics-select option')).toHaveCount(5);
+    await expect(page.locator('#semantics-select option')).toHaveCount(11);
     // Only the three canonical (monoid, bound) pairings, plus no-discard.
     await expect(page.locator('#budget-select option')).toHaveCount(4);
     await expect(page.locator('#results-select option')).toHaveCount(3);
@@ -152,13 +155,15 @@ test('extensions are ordered best-first, in the direction the bound implies', as
     expect(lb.length).toBeGreaterThan(1);
     expect(lb, 'min >= beta should descend').toEqual([...lb].sort((a, b) => b - a));
 
-    // Defence semantics have no monoid aggregate; they rank by the probed beta*, ascending.
+    // Admissible uses the very same external sum/upper-bound reading and ordering.
     await page.selectOption('#semiring-select', 'godel');
     await page.selectOption('#semantics-select', 'admissible');
+    await page.selectOption('#budget-select', 'sum-ub');
     await page.fill('#budget-input', '30');
-    const def = await costsInOrder();
-    expect(def.length).toBeGreaterThan(1);
-    expect(def, 'beta* should ascend').toEqual([...def].sort((a, b) => a - b));
+    const adm = await costsInOrder();
+    expect(adm.length).toBeGreaterThan(1);
+    expect(adm, 'sum <= beta should ascend for admissible too')
+        .toEqual([...adm].sort((a, b) => a - b));
 });
 
 // Every other spec here asserts SHAPE -- that some cost badge exists, that the order is
@@ -172,7 +177,6 @@ test('extensions are ordered best-first, in the direction the bound implies', as
 //     in(growth)  in(welfare)  discarded_attack(against_growth,growth,5)
 //     in(growth)  in(climate)  discarded_attack(against_climate,climate,8)
 //
-//   --semantics admissible, same algebra:  beta=0 -> 1,  3 -> 3,  5 -> 5,  8 -> 7
 const STANDOFF_STABLE = [
     { in: ['climate', 'welfare'], cost: 3 },
     { in: ['growth', 'welfare'], cost: 5 },
@@ -224,31 +228,109 @@ test('the budget buys exactly the extensions the CLI says it buys', async ({ pag
     }
 });
 
-test('budgeted admissible matches the CLI count and beta* at every budget',
-    async ({ page }) => {
-        test.setTimeout(240000);
-        await waitForClingoReady(page);
-        await page.selectOption('#example-select', 'conflict_cycle');
-        await page.selectOption('#semiring-select', 'godel');
-        await page.selectOption('#semantics-select', 'admissible');
-
-        for (const [beta, expected] of [[0, 1], [3, 3], [5, 5], [8, 7]]) {
-            await page.fill('#budget-input', String(beta));
-            await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
-            await page.click('#run-btn');
-            await runFinished(page);
-            await expect(page.locator('.answer-header'),
-                `beta=${beta} should admit ${expected} admissible extension(s)`)
-                .toHaveCount(expected);
-        }
-
-        // beta* per set, from the enumeration above: the empty set needs nothing, {welfare}
-        // and {climate,welfare} need 3, {growth} and {growth,welfare} need 5, {climate} and
-        // {climate,growth} need 8. Sorted ascending, that is the badge sequence.
-        const betaStars = await page.locator('.extension-cost-badge').evaluateAll(
-            (els) => els.map((el) => parseInt(el.textContent.replace(/[^0-9-]/g, ''), 10)));
-        expect(betaStars).toEqual([0, 3, 3, 5, 5, 8, 8]);
+test('beta-sigma cards existentially forget D but retain a representative receipt', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.evaluate(() => {
+        window.playground.editorController.loadClingoCode([
+            'assumption(a). assumption(b).',
+            'contrary(a,ca). contrary(b,cb).',
+            'weight(a,1).',
+            'head(r,cb). body(r,a).'
+        ].join('\n'));
     });
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'cf');
+    await page.selectOption('#budget-select', 'sum-ub');
+    await page.fill('#budget-input', '1');
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    // Seven (S,D) witnesses collapse to the four distinct conflict-free assumption sets.
+    await expect(page.locator('.answer-header')).toHaveCount(4);
+    const rows = await page.locator('.answer-set').evaluateAll((els) => els.map((el) => ({
+        members: [...el.querySelectorAll('.chip.in')].map((c) => c.textContent.replace(/[^\w]/g, '')).sort(),
+        discarded: el.querySelectorAll('.attack-item.discarded').length
+    })));
+    expect(rows.map((r) => r.members)).toEqual([[], ['a'], ['b'], ['a', 'b']]);
+    expect(rows.find((r) => r.members.join(',') === 'a,b')?.discarded).toBe(1);
+    expect(rows.filter((r) => r.members.join(',') !== 'a,b').every((r) => r.discarded === 0)).toBe(true);
+});
+
+test('preferred maximises inside each fixed discard reduct before forgetting D', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.evaluate(() => {
+        window.playground.editorController.loadClingoCode([
+            'assumption(a). assumption(b).',
+            'contrary(a,ca). contrary(b,cb).',
+            'weight(a,1).',
+            'head(r,cb). body(r,a).'
+        ].join('\n'));
+    });
+    await page.selectOption('#semiring-select', 'godel');
+    await page.selectOption('#semantics-select', 'preferred');
+    await page.selectOption('#budget-select', 'sum-ub');
+    await page.selectOption('#results-select', 'all');
+    await page.fill('#budget-input', '1');
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    const rows = await page.locator('.answer-set').evaluateAll((els) => els.map((el) => ({
+        members: [...el.querySelectorAll('.chip.in')].map((c) => c.textContent.replace(/[^\w]/g, '')).sort(),
+        discarded: el.querySelectorAll('.attack-item.discarded').length
+    })));
+    // D = empty yields preferred {a}; D = {a -> b} yields preferred {a,b}. A global
+    // subset-maximal filter (P2) would incorrectly delete {a}.
+    expect(rows).toEqual([
+        { members: ['a'], discarded: 0 },
+        { members: ['a', 'b'], discarded: 1 }
+    ]);
+});
+
+test('derived semantics match their assumption-level definitions', async ({ page }) => {
+    test.setTimeout(180000);
+    await waitForClingoReady(page);
+
+    const programFor = (edges) => {
+        const lines = [];
+        for (let i = 0; i < 3; i += 1) {
+            lines.push(`assumption(a${i}). contrary(a${i},c${i}).`);
+        }
+        edges.forEach(([source, target], index) => {
+            lines.push(`head(r${index},c${target}). body(r${index},a${source}).`);
+        });
+        return lines.join('\n');
+    };
+    const solve = async (edges, semantics) => {
+        await page.evaluate((program) => {
+            window.playground.editorController.loadClingoCode(program);
+        }, programFor(edges));
+        await page.selectOption('#semantics-select', semantics);
+        await page.selectOption('#budget-select', 'none');
+        await page.click('#run-btn');
+        await runFinished(page);
+        return page.locator('.answer-set').evaluateAll((els) => els.map((el) => (
+            [...el.querySelectorAll('.chip.in')]
+                .map((chip) => chip.textContent.replace(/[^\w]/g, '')).sort()
+        )));
+    };
+
+    const idealGraph = [[0, 0], [0, 1], [1, 0]];
+    expect(await solve(idealGraph, 'grounded')).toEqual([['a2']]);
+    expect(await solve(idealGraph, 'ideal')).toEqual([['a1', 'a2']]);
+
+    const eagerGraph = [[0, 1], [0, 2], [1, 1], [2, 0]];
+    expect(await solve(eagerGraph, 'ideal')).toEqual([[]]);
+    expect(await solve(eagerGraph, 'eager')).toEqual([['a0']]);
+
+    const semiGraph = [[0, 0], [1, 0], [1, 2], [2, 1]];
+    expect(await solve(semiGraph, 'semi-stable')).toEqual([['a1']]);
+
+    const rangeGraph = [[0, 1]];
+    expect(await solve(rangeGraph, 'naive')).toEqual([['a0', 'a2'], ['a1', 'a2']]);
+    expect(await solve(rangeGraph, 'stage')).toEqual([['a0', 'a2']]);
+});
 
 test('the Standard set-graph refuses frameworks with too many candidate sets', async ({ page }) => {
     await waitForClingoReady(page);
@@ -271,9 +353,8 @@ test('every semantics reports a per-extension cost', async ({ page }) => {
     await waitForClingoReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
 
-    // The complaint this covers: only Stable ever showed a cost. cf shows the monoid aggregate;
-    // the three defence semantics show the minimum they must concede, probed per extension.
-    for (const semantics of ['cf', 'stable', 'admissible', 'complete', 'preferred']) {
+    // Every semantics exposes the aggregate of the same discarded_attack/3 receipt.
+    for (const semantics of SEMANTICS) {
         await page.selectOption('#semantics-select', semantics);
         await page.fill('#budget-input', '30');
         await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
@@ -285,7 +366,7 @@ test('every semantics reports a per-extension cost', async ({ page }) => {
             null, { timeout: 90000 });
         const badges = await page.locator('.extension-cost-badge').count();
         expect(badges, `${semantics} exposed no cost`).toBeGreaterThan(0);
-        // exactly one badge per extension, not the old Cost + beta* pair
+        // exactly one aggregate badge per extension
         const headers = await page.locator('.answer-header').count();
         expect(badges, `${semantics} rendered ${badges} badges for ${headers} extensions`).toBe(headers);
     }
@@ -561,6 +642,55 @@ test('a file that is not a framework is refused instead of solving as empty',
         await expect(page.locator('.answer-header')).toHaveCount(0);
     });
 
+test('framework source cannot inject rules, runtime predicates, constraints or directives',
+    async ({ page }) => {
+        test.setTimeout(120000);
+        await waitForClingoReady(page);
+        await page.selectOption('#input-mode', 'advanced');
+
+        const attacks = [
+            ['assumption(a). contrary(a,ca). weight(a,1) :- in(a).', /rules and constraints/],
+            ['assumption(a). contrary(a,ca). in(a).', /reserved implementation predicate/],
+            ['assumption(a). contrary(a,ca). discarded_attack(ca,a,0).', /reserved implementation predicate/],
+            ['assumption(a). contrary(a,ca). :- out(a).', /rules and constraints/],
+            ['assumption(a). contrary(a,ca). #show in/1.', /directive "#show"/],
+            ['#const max=min. assumption(a). contrary(a,ca).', /implementation term/]
+        ];
+        for (const [source, expected] of attacks) {
+            await page.fill('#code-editor', source);
+            await page.click('#run-btn');
+            await runFinished(page);
+            await expect(page.locator('#output'), source).toContainText(expected);
+            await expect(page.locator('.answer-header')).toHaveCount(0);
+        }
+    });
+
+test('browser explains that local includes must be expanded', async ({ page }) => {
+    await waitForClingoReady(page);
+    await page.selectOption('#input-mode', 'advanced');
+    await page.fill('#code-editor', '#include "facts.lp".');
+    await page.click('#run-btn');
+    await runFinished(page);
+    await expect(page.locator('#output')).toContainText('no local include filesystem');
+    await expect(page.locator('#output')).toContainText('#include is CLI-only');
+});
+
+test('rule identifiers have one head and no orphan bodies', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.selectOption('#input-mode', 'advanced');
+
+    await page.fill('#code-editor', 'head(r,p). head(r,q).');
+    await page.click('#run-btn');
+    await runFinished(page);
+    await expect(page.locator('#output')).toContainText('exactly ONE head');
+
+    await page.fill('#code-editor', 'body(orphan,p).');
+    await page.click('#run-btn');
+    await runFinished(page);
+    await expect(page.locator('#output')).toContainText('declared by head/2');
+});
+
 test('running with an empty editor clears the previous run', async ({ page }) => {
     test.setTimeout(90000);
     await waitForClingoReady(page);
@@ -619,20 +749,20 @@ test('the stats line reports the bound direction the algebra actually applies',
         await settled(page);
         await page.selectOption('#semantics-select', 'admissible');
 
-        // semantics/admissible.lp derives the bound from the POLARITY: `#sum{paid} <= beta`
-        // under oplus=max, `#min{paid} >= beta` under oplus=min. Hard-coding "<= beta" told a
-        // cost-algebra user to RAISE beta for more results, when raising it removes them.
+        // Admissible uses the same externally selected monoid/bound modules as every other
+        // semantics; the stats line must describe that actual selection.
         await page.selectOption('#semiring-select', 'godel');
+        await page.selectOption('#budget-select', 'sum-ub');
         await page.fill('#budget-input', '8');
         await page.click('#run-btn');
         await runFinished(page);
-        await expect(page.locator('#stats')).toContainText('unanswered objections ≤ β');
+        await expect(page.locator('#stats')).toContainText('sum of concessions ≤ β');
 
         await page.selectOption('#semiring-select', 'tropical');
         await page.fill('#budget-input', '0');
         await page.click('#run-btn');
         await runFinished(page);
-        await expect(page.locator('#stats')).toContainText('every unanswered objection ≥ β');
+        await expect(page.locator('#stats')).toContainText('min of concessions ≥ β');
     });
 
 test('the algebra is flagged unused whenever no weight is priced', async ({ page }) => {
@@ -641,10 +771,7 @@ test('the algebra is flagged unused whenever no weight is priced', async ({ page
     await page.selectOption('#example-select', 'conflict_cycle');
     await settled(page);
 
-    // ABA recovery zeroes beta and loads no_discard, so NOTHING is priced -- including a
-    // defence semantics' own budget. weightsWereConsulted() used to short-circuit on the
-    // defence check before it ever looked at abaRecovery, so the stats line credited the
-    // algebra and denied the discarding in the same sentence.
+    // ABA recovery loads no_discard for every semantics, so NOTHING is priced.
     const abaToggle = page.locator('label.switch-toggle[for="aba-recovery-toggle"] .switch-slider');
     for (const semantics of ['stable', 'admissible']) {
         await page.selectOption('#semantics-select', semantics);
@@ -715,7 +842,7 @@ test('a failed run reopens the Results panel too', async ({ page }) => {
     await expect(page.locator('#output')).toContainText('No framework code to run');
 });
 
-test('a defence detour returns the budget and the Results choice intact', async ({ page }) => {
+test('switching semantics keeps the shared budget and Results choice intact', async ({ page }) => {
     await waitForClingoReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
     await settled(page);
@@ -724,17 +851,13 @@ test('a defence detour returns the budget and the Results choice intact', async 
     await page.fill('#budget-input', '8');
     await page.selectOption('#results-select', 'min');
 
-    // Two destructive writes: the algebra preselect's beta reset fired through the defence
-    // pin and never restored, and resultsSelect was overwritten with no snapshot at all.
-    await page.selectOption('#semantics-select', 'admissible');
-    await page.selectOption('#semiring-select', 'tropical');
-    await expect(page.locator('#budget-input')).toHaveValue('0');
-    await page.selectOption('#semiring-select', 'godel');
-    await page.selectOption('#semantics-select', 'stable');
-
-    await expect(page.locator('#budget-select')).toHaveValue('sum-ub');
-    await expect(page.locator('#budget-input'), 'beta lost across the detour').toHaveValue('8');
-    await expect(page.locator('#results-select'), 'Results choice lost').toHaveValue('min');
+    for (const semantics of ['admissible', 'complete', 'preferred', 'cf', 'stable']) {
+        await page.selectOption('#semantics-select', semantics);
+        await expect(page.locator('#budget-select')).toBeEnabled();
+        await expect(page.locator('#budget-select')).toHaveValue('sum-ub');
+        await expect(page.locator('#budget-input'), `${semantics} changed beta`).toHaveValue('8');
+        await expect(page.locator('#results-select'), `${semantics} changed Results`).toHaveValue('min');
+    }
 });
 
 test('selecting an extension restyles edges without moving anything', async ({ page }) => {
@@ -927,26 +1050,40 @@ test('an off-grid Łukasiewicz weight is refused and explained', async ({ page }
     await expect(page.locator('#output')).toContainText(/\ba\b/);
 });
 
-test('a defence semantics owns its budget, so the reading control is inert', async ({ page }) => {
+test('an authored infinite weight is refused at the browser boundary', async ({ page }) => {
+    test.setTimeout(120000);
+    await waitForClingoReady(page);
+    await page.setInputFiles('#file-upload-input', {
+        name: 'infinite.lp',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('assumption(a). contrary(a,ca). weight(a,#sup).\n')
+    });
+    await settled(page);
+    await page.click('#run-btn');
+    await runFinished(page);
+
+    await expect(page.locator('#output')).toContainText(/authored weights must be finite integers/);
+    await expect(page.locator('#output')).toContainText(/\ba\b/);
+});
+
+test('every semantics exposes the same monoid, bound and result controls', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
     await waitForClingoReady(page);
     await page.selectOption('#example-select', 'conflict_cycle');
 
-    for (const semantics of ['admissible', 'complete', 'preferred']) {
+    await page.selectOption('#budget-select', 'sum-ub');
+    await page.selectOption('#results-select', 'min');
+    for (const semantics of SEMANTICS) {
         await page.selectOption('#semantics-select', semantics);
-        // These carry their own SUM inconsistency budget and compose with no_discard, so
-        // pairing them with a monoid/bound is meaningless rather than merely unusual.
-        await expect(page.locator('#budget-select')).toBeDisabled();
-        await expect(page.locator('#budget-select')).toHaveValue('none');
-        // beta still applies -- it is the defence budget.
+        await expect(page.locator('#budget-select')).toBeEnabled();
+        await expect(page.locator('#budget-select')).toHaveValue('sum-ub');
         await expect(page.locator('#budget-input')).toBeEnabled();
+        await expect(page.locator('#results-select')).toBeEnabled();
+        await expect(page.locator('#results-select')).toHaveValue('min');
+        await expect(page.locator('#semantics-note')).toContainText('surviving attacks');
     }
-
-    // preferred is post-filtered, so it must enumerate rather than optimise.
-    await expect(page.locator('#results-select')).toBeDisabled();
-    await expect(page.locator('#results-select')).toHaveValue('all');
 
     await page.click('#run-btn');
     await expect(page.locator('.answer-header').first()).toBeVisible({ timeout: 60000 });
@@ -1117,15 +1254,18 @@ test('a timed-out run does not poison the session', async ({ page }) => {
     expect(probe.after.extensions, 'the solver did not recover after a timeout').toBeGreaterThan(0);
 });
 
-test('ABA recovery actually recovers classical ABA for the defence semantics', async ({ page }) => {
-    test.setTimeout(180000);
+test('ABA recovery forbids the common discard set for every semantics', async ({ page }) => {
+    test.setTimeout(300000);
     await waitForClingoReady(page);
-    await page.selectOption('#example-select', 'conflict_cycle');
-    await settled(page);
+    await page.evaluate(() => {
+        window.playground.editorController.loadClingoCode([
+            'assumption(a). assumption(b).',
+            'contrary(a,ca). contrary(b,cb).',
+            'weight(a,1).',
+            'head(r,cb). body(r,a).'
+        ].join('\n'));
+    });
     await page.selectOption('#semiring-select', 'godel');
-    await page.selectOption('#semantics-select', 'admissible');
-    // the preset carries beta = 8, which is what used to leak through
-    await expect(page.locator('#budget-input')).toHaveValue('8');
 
     const runCount = async () => {
         await page.evaluate(() => { document.getElementById('output').innerHTML = ''; });
@@ -1136,16 +1276,22 @@ test('ABA recovery actually recovers classical ABA for the defence semantics', a
         return page.locator('.answer-header').count();
     };
 
-    const budgeted = await runCount();
-    expect(budgeted).toBeGreaterThan(1);
+    const abaToggle = page.locator('label.switch-toggle[for="aba-recovery-toggle"] .switch-slider');
+    for (const semantics of SEMANTICS) {
+        await page.selectOption('#semantics-select', semantics);
+        if (await page.locator('#aba-recovery-toggle').isChecked()) await abaToggle.click();
+        await page.selectOption('#budget-select', 'none');
+        const classical = await runCount();
 
-    // The defence semantics price their own `pay` set, which constraint/no_discard.lp does not
-    // touch, so disabling the beta box was not enough -- beta kept being spent and recovery
-    // returned 7 extensions where classical ABA has 1.
-    await page.locator('label.switch-toggle[for="aba-recovery-toggle"] .switch-slider').click();
-    await expect(page.locator('#aba-recovery-toggle')).toBeChecked();
-    const recovered = await runCount();
-    expect(recovered, 'ABA recovery did not return the classical answer').toBe(1);
+        await page.selectOption('#budget-select', 'sum-ub');
+        await page.fill('#budget-input', '1');
+        await abaToggle.click();
+        await expect(page.locator('#aba-recovery-toggle')).toBeChecked();
+        const recovered = await runCount();
+        expect(recovered, `${semantics} recovery disagrees with its no-discard result`)
+            .toBe(classical);
+        await expect(page.locator('.attack-item.discarded')).toHaveCount(0);
+    }
 
     // and the config it produces must be one the app accepts
     const state = await page.evaluate(async () => {
@@ -1317,10 +1463,8 @@ test('STRESS: every algebra x every semantics solves with no page error', async 
             await page.selectOption('#semiring-select', semiring);
             await page.selectOption('#semantics-select', semantics);
             if (semiring === 'lukasiewicz') await page.fill('#luk-k-input', '20');
-            // Give the conflict-based semantics a live budget; the defence ones take beta
-            // through their own module and disable this control.
-            const budgetDisabled = await page.locator('#budget-select').isDisabled();
-            if (!budgetDisabled) await page.selectOption('#budget-select', 'sum-ub');
+            // Every semantics uses the same external discard/monoid/bound layer.
+            await page.selectOption('#budget-select', 'sum-ub');
             await page.fill('#budget-input', '30');
 
             // Blank the output FIRST. Waiting on `.answer-header` alone is a false green:
@@ -1367,8 +1511,7 @@ test("the UI's beta overrides a framework that pins its own #const beta", async 
     // it whenever the framework declared its own, because clingo rejects a redefined
     // constant. The CLI passes -c beta=N, which OVERRIDES a #const, so the two surfaces
     // disagreed: a framework pinning `#const beta = 0.` silently forced beta=0 in the
-    // browser. Under a cost algebra that made the defence guard vacuous and returned every
-    // candidate set. beta now travels as -c beta, so the caller's value wins in both.
+    // browser. beta now travels as -c beta, so the caller's value wins in both.
     await page.setInputFiles('#file-upload-input', {
         name: 'pinned-beta.lp',
         mimeType: 'text/plain',

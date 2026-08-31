@@ -1,5 +1,5 @@
-import { wabaModules } from '../waba-modules.js?v=20260731-8';
-import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective, isBudgetedDefence } from './config-service.js?v=20260731-8';
+import { wabaModules } from '../waba-modules.js?v=20260831-1';
+import { resolveBudgetProfile, resolveSolverOptMode, shouldLoadObjective } from './config-service.js?v=20260831-1';
 
 export function getCoreModule() {
     return wabaModules.core.base;
@@ -30,7 +30,7 @@ export function getFilterModule(filterType = 'standard') {
 }
 
 export function getSemanticsModule(semantics) {
-    // A derived semantics (preferred) has no module of its own: it is computed by
+    // A derived semantics has no module of its own: it is computed by
     // post-filtering the candidates of another one. metadata.derivedSemantics carries that
     // mapping straight from the sync policy, so it cannot drift from bin/waba.
     const derived = wabaModules.metadata.derivedSemantics || {};
@@ -38,10 +38,15 @@ export function getSemanticsModule(semantics) {
     return wabaModules.semantics[moduleKey] || wabaModules.semantics.stable;
 }
 
+export function getSemanticsAuxiliary(semantics) {
+    const moduleKey = wabaModules.metadata.semanticAuxiliaries?.[semantics];
+    return moduleKey ? (wabaModules.semantics[moduleKey] || '') : '';
+}
+
 /**
  * @param {string} framework
  * @param {import('../core/types.js').EffectiveConfig} config
- * @param {{ semantics?: string, includeObjective?: boolean }} [options]
+ * @param {{ semantics?: string, includeObjective?: boolean, auxiliaryFor?: string }} [options]
  */
 export function buildProgram(framework, config, options = {}) {
     const semanticsKey = options.semantics || config.semantics;
@@ -52,9 +57,8 @@ export function buildProgram(framework, config, options = {}) {
     //
     // Emitting it into the text could not override a framework that declares its own
     // `#const beta = 0.` (clingo rejects a redefined constant), so the playground silently
-    // yielded to the framework while the CLI's -c overrode it. Under a cost algebra that
-    // turned beta=101 into beta=0, the lower-bound defence guard went vacuous, and the
-    // playground returned every candidate set where the CLI returned the 7 correct ones.
+    // yielded to the framework while the CLI's -c overrode it. Under a lower-bound reading
+    // that could silently turn beta=101 into beta=0 and admit the wrong discard sets.
     // -c wins over #const, so this makes the caller's beta authoritative in both surfaces.
     const parts = [
         '%% Framework',
@@ -85,6 +89,10 @@ export function buildProgram(framework, config, options = {}) {
 
     parts.push('', '%% Output filter', getFilterModule(config.filterType));
     parts.push('', '%% Semantics', getSemanticsModule(semanticsKey));
+    const auxiliary = getSemanticsAuxiliary(options.auxiliaryFor || '');
+    if (auxiliary) {
+        parts.push('', '%% Internal semantics projection', auxiliary);
+    }
 
     return `${parts.join('\n')}\n`;
 }
@@ -98,11 +106,14 @@ export function buildSolverArgs(config) {
         constants.push('-c', `k=${config.lukK}`);
     }
     if (effectiveOptMode === 'ignore') {
-        // Budgeted-defence realises one extension via many discard sets, so project
-        // onto the shown atoms to enumerate each beta-admissible set once.
-        return isBudgetedDefence(config.semantics)
-            ? [...constants, '--opt-mode=ignore', '--project']
-            : [...constants, '--opt-mode=ignore'];
+        // Multiple affordable discard witnesses may realise the same extension under every
+        // semantics. ClingoManager intentionally retains those witnesses here, then deduplicates
+        // by in/1 after selecting a deterministic representative receipt. Projecting inside
+        // clingo would existentially forget D before preferred can maximise within each reduct.
+        return [...constants, '--opt-mode=ignore'];
     }
-    return [...constants, `--opt-mode=${effectiveOptMode}`, '--quiet=1', '--project'];
+    // Retain the discard witness even though semantics modules declare #project in/out. The
+    // browser performs extension-level deduplication after solving and keeps one receipt; using
+    // --project here would erase every discarded_attack/3 atom from the returned witness.
+    return [...constants, `--opt-mode=${effectiveOptMode}`, '--quiet=1'];
 }

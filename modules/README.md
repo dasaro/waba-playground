@@ -5,11 +5,11 @@ This directory contains the browser runtime for the static WABA playground.
 ## Runtime Split
 
 - [clingo-manager.js](modules/clingo-manager.js)
-  - resolves semiring family + polarity
+  - consumes the directly selected algebra and its generated metadata
   - injects default policy, monoid, optimization, and budget modules
   - initializes the Clingo worker with the correct path-relative WASM URL
   - serializes browser-side solver calls so graph recomputation and semantics runs cannot race
-  - runs exact browser-side `preferred`
+  - runs exact browser-side subset/range semantics
 - [graph-manager.js](modules/graph-manager.js)
   - keeps the existing vis.js graph architecture
   - builds graph data from the framework plus the selected semiring/default policy
@@ -29,6 +29,7 @@ Its schema is:
 ```js
 wabaModules = {
   core,
+  validate,
   semiring,
   defaults,
   monoid,
@@ -43,18 +44,24 @@ wabaModules = {
 
 `metadata` carries the canonical split used by the UI and runtime:
 
-- semiring families and polarities
-- canonical family/polarity -> module resolution
+- concrete algebras and their derived polarities
+- legacy canonical-family resolution for saved configurations
 - alias labels (`arctic`, `bottleneck_cost`)
 - supported semantics
 - supported bounded presets
 
-## Exact Preferred
+## Exact Higher-Order Semantics
 
-The playground stays plain-`clingo` and frontend-only. Exact `preferred` is therefore implemented as:
+The playground stays plain-`clingo` and frontend-only. Derived semantics are implemented as:
 
-1. enumerate `complete` candidates with the selected algebra/budget configuration
-2. run `subset_maximal_filter.lp` on generated `candidate/1` and `member/2` facts
-3. optionally apply numeric post-filtering if the user asked for `optN`
+1. enumerate the metadata-declared kernel candidates with the selected algebra/budget configuration
+2. run the metadata-declared subset/range filter on generated candidate, member, range and
+   discard facts, restricting every comparison to equal `D`
+3. existentially forget `D` and keep one representative receipt for each distinct `S`
+4. optionally apply numeric post-filtering if the user asked for `optN`
 
 This mirrors the mature WABA surface without requiring `asprin` or a backend wrapper.
+For eager semantics the candidate family is complete: the filter first identifies the
+range-maximal complete (semi-stable) candidates, then keeps the greatest complete candidate
+contained in all of them. This is equivalent to the ordinary definition because the unique
+greatest admissible set common to all semi-stable extensions is complete.

@@ -25,10 +25,84 @@ npm run validate
 7. Verify the live page with a no-cache reload.
 
 Do not hand-edit scattered `?v=` cache-busting fragments. The version scripts update:
-- [core/app-version.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/core/app-version.js)
-- [index.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/index.html)
-- [version-check.html](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/version-check.html)
+- `core/app-version.js`
+- `index.html`
+- `version-check.html`
 - changed module import references across the app
+
+## 20260831-1
+
+Cross-surface sync audit against the authoritative clingo tree (differential parity: 1,678
+CLI-vs-browser specs, 1,676 exact extension-set agreements, 2 CLI-only carrier rejections;
+13-agent adversarially-verified audit).
+
+- Pre-flight validation now rejects any solver outcome that is not a clean SAT/UNSAT answer.
+  A worker ERROR or clingo UNKNOWN (parse failure) previously counted as "no violations",
+  silently skipping every well-formedness guard; a framework `#const` colliding with the
+  validator's, or an invisible character, then either solved unchecked or wedged the shared
+  worker into a misleading 60-second timeout. This mirrors bin/waba's returncode gate.
+- The source boundary now rejects a U+FEFF byte-order mark outside quoted strings. JS `\s`
+  and `trim()` treat the BOM as whitespace but Python's `isspace()` and clingo's lexer do
+  not, so a file saved by a BOM-emitting editor was accepted here and rejected by the CLI.
+- The JS numeric post-filter now mirrors the lifted sum monoid: a `#inf`-priced discarded
+  attack makes the aggregate absorbing (`budget_value(#inf)`), and the sum objective tuple
+  ranks `#inf`/`#sup` on stratified sentinel levels exactly as `optimize/{minimize,maximize}.lp`
+  do. The raw drop-the-infinities sum mirrored a monoid that no longer exists.
+- Five curated examples still carried a relic `budget(beta).` line that the source boundary
+  itself rejects, so clicking them failed validation. Removed; a new unit test runs every
+  inline example through the boundary and its preset through validateConfig.
+- Re-authored the two curated examples whose advertised numbers had drifted under
+  maximal-context pricing: weakest_link_security prices the mirror attack at the rival's
+  intrinsic exposure (min(3,9)=3, as advertised), and testimony_erosion weights the legend
+  assumption with its own chain's reliability (max(300,300)=300). Both boundaries are sharp
+  (beta*=3 and beta*=300, re-measured).
+- CLI counterpart (ABA-variants repo): `--aba-recovery` now rejects `--default-policy`,
+  matching this UI and both surfaces' documentation.
+
+## 20260802-2
+
+- Clarified the Łukasiewicz operation as its t-norm throughout the interface and generated
+  module bundle, rather than calling it a bounded sum.
+- Documented the 2025 native SCC-recursive schema for flat ABA and why a direct budget-local
+  CF2 base case still needs a separate definition and correctness result.
+- Re-synchronized the official modules and advanced the browser cache version.
+
+## 20260802-1
+
+- Extended the common beta-sigma pipeline to eleven semantics. Grounded, naive, stage,
+  semi-stable, ideal, and eager now reuse the direct conflict-free, admissible, or complete
+  candidates and apply their exact subset/range comparison inside each fixed discard reduct.
+- Added the eager filter and its range data, with a separating ideal-versus-eager fixture and
+  synchronized CLI, browser, independent-oracle, and symbolic checks. Grounded is again
+  available as the least complete extension of each reduct; CF2 remains excluded because its
+  binary-graph SCC recursion is not a faithful collective-attack ABA semantics.
+- Added a shared data-only framework boundary. The supported browser accepts only ground
+  `assumption/1`, `contrary/2`, `head/2`, `body/2`, and `weight/2` facts (plus safe constants
+  and comments), while the CLI also validates included files. Authored solver rules,
+  directives, runtime predicates, and reserved constants are rejected before composition.
+- Re-synchronized the generated module bundle and strengthened tests for exact post-filtering,
+  witness handling, source validation, and all eleven configuration choices.
+
+## 20260801-1
+
+- Unified `cf`, `stable`, `admissible`, `complete`, and `preferred` behind one beta-sigma
+  pipeline: choose an affordable `discarded_attack/3` set with the selected monoid/bound,
+  then apply the ordinary semantics to the surviving attacks.
+- Removed the browser-only defence budget, `pay` pricing probes, polarity-dependent recovery
+  ceiling, and semantics-specific disabled controls. ABA recovery now loads the same
+  `no_discard` module for every semantics.
+- Corrected Preferred to P1: subset maximality is evaluated separately for each exact discard
+  witness before witnesses are existentially forgotten. Result cards are deduplicated by
+  accepted assumption set while retaining one deterministic representative receipt.
+- Made ASP witness parsing quote-aware as well as nesting-aware, including structured attack
+  terms used in preferred grouping and aggregate display.
+- Aligned browser preflight with the CLI: authored weights must be finite nonnegative integers,
+  every assumption has exactly one contrary, and malformed budget modes, result modes, beta
+  values, or Lukasiewicz bounds are rejected before solving. The default Lukasiewicz bound is
+  now the bundled module's `k = 1000`.
+- Strengthened bundle freshness checks to compare the validator and curated example contents,
+  and made the runtime schema require those synchronized sections. The release gate passes
+  63 unit tests and 72 browser tests.
 
 ## 20260729-2
 
@@ -66,7 +140,7 @@ following. Each fix is covered by a new regression test.
   itself, since clingo rejects a redefined constant). Verified: lb went from 0 discards to
   the correct 1; `ub` unchanged.
 - **Łukasiewicz semiring soundness (synced from the core).** A `#sup` premise short-circuited
-  a whole rule derivation to `k` instead of being substituted into the bounded sum, breaking
+  a whole rule derivation to `k` instead of being substituted into the t-norm fold, breaking
   the ⊗-identity law (`k ⊗ 300` gave 1000, not 300) and *inflating* weak arguments to maximal
   strength. Reachable in ordinary use because the `aba` default policy makes an unweighted
   assumption `#sup`.
@@ -167,7 +241,7 @@ Gate: sync + freshness, lint, typecheck, 32 unit, 7 browser (2 new).
 
 ## 20260706-4
 
-- **New curated example `testimony_erosion` (Łukasiewicz / bounded-sum) — the erosion algebra.** An
+- **New curated example `testimony_erosion` (Łukasiewicz t-norm) — the erosion algebra.** An
   eyewitness account preserved through 2 faithful copies vs a legend transmitted through 7 retellings.
   ⊗ = max(0, Σw − (n−1)·k), k=1000: with every link the same 90%-faithful (weight 900), the eyewitness
   account retains 900⊗900 = 800 but the 7-link legend erodes to max(0, 6300−6000) = 300 — the "telephone
@@ -665,10 +739,10 @@ edge cases) are documented for a follow-up.
 ## 20260312-7
 
 - narrowed the post-refactor cleanup instead of starting another architecture wave
-- split graph view-state logic out of [modules/graph-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js) into:
-  - [modules/graph-highlighting.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-highlighting.js)
-  - [modules/graph-assumption-builder.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-assumption-builder.js)
-- reduced [modules/graph-manager.js](/Users/fdasaro/Desktop/WABA-claude/ABA-variants/waba-playground/modules/graph-manager.js) from 1348 lines to 565 lines and left it focused on orchestration
+- split graph view-state logic out of `modules/graph-manager.js` into:
+  - `modules/graph-highlighting.js`
+  - `modules/graph-assumption-builder.js`
+- reduced `modules/graph-manager.js` from 1348 lines to 565 lines and left it focused on orchestration
 - removed remaining debug console noise from the graph, output, popup, and fullscreen UI paths
 - re-ran the full release gate, including Playwright headless browser checks
 

@@ -8,7 +8,7 @@ This records the refactor baseline and the contract intentionally preserved.
 - native ES modules
 - no backend
 - mature WABA browser surface only
-- neutral-only default policy in the UI
+- selectable `neutral` and `aba` default policies in the UI
 - exact browser-side `preferred`
 - curated examples primary, topology demos secondary
 - Simple Mode and Advanced ASP Mode both preserved
@@ -24,7 +24,7 @@ This records the refactor baseline and the contract intentionally preserved.
 | Program composition | `runtime/program-builder.js` | hardened | canonical split: semiring/default/monoid/optimize/constraint |
 | Generated bundle schema | `runtime/module-schema.js` | hardened | explicit schema check added |
 | Solver runtime | `modules/clingo-manager.js` | fixed | real WASM initialization and serialized solver queue |
-| Preferred orchestration | `modules/clingo-manager.js` | fixed | exact preferred stable again after queueing and no-discard preset |
+| Preferred orchestration | `modules/clingo-manager.js` | fixed | exact per-reduct preferred over the shared beta-sigma discard witnesses |
 | Result parsing | `runtime/answer-set-parser.js` | improved | explicit parsed object shape |
 | Output rendering | `modules/output-manager.js` | improved | objective math delegated to runtime helpers |
 | Graph rendering | `modules/graph-manager.js` | partially refactored | still large, but solver access and config dependency are explicit |

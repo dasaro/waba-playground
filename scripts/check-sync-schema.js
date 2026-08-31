@@ -37,6 +37,9 @@ const SECTION_DIRS = {
     semantics: 'semantics',
     filter: 'filter'
 };
+const SINGLE_FILES = {
+    'validate.framework': 'validate.lp'
+};
 
 function resolveIncludes(content, basedir) {
     return content.replace(/#include\s+"([^"]+)"\.?/g, (match, rel) => {
@@ -89,6 +92,46 @@ for (const [section, dir] of Object.entries(SECTION_DIRS)) {
             stale.push(`${section}.${key}`);
         }
     }
+}
+
+for (const [qualifiedKey, relativeFile] of Object.entries(SINGLE_FILES)) {
+    const [section, key] = qualifiedKey.split('.');
+    const file = path.join(WABA_ROOT, relativeFile);
+    if (!fs.existsSync(file)) {
+        missing.push(`${qualifiedKey} (no ${relativeFile})`);
+        continue;
+    }
+    const expected = resolveIncludes(fs.readFileSync(file, 'utf8'), path.dirname(file));
+    const bundled = wabaModules[section]?.[key];
+    if (typeof bundled !== 'string' || expected.trim() !== bundled.trim()) {
+        stale.push(qualifiedKey);
+    }
+}
+
+// Examples are generated recursively and keyed by basename. Check both their content and the
+// key set: otherwise editing, adding, or removing a shipped framework could leave the UI on a
+// different public surface while every logic module still passed freshness.
+const sourceExamples = {};
+const examplesRoot = path.join(WABA_ROOT, 'examples');
+const walkExamples = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walkExamples(full);
+        else if (entry.name.endsWith('.lp')) {
+            const key = path.basename(entry.name, '.lp');
+            sourceExamples[key] = resolveIncludes(fs.readFileSync(full, 'utf8'), path.dirname(full));
+        }
+    }
+};
+if (fs.existsSync(examplesRoot)) walkExamples(examplesRoot);
+const bundledExamples = wabaModules.examples || {};
+for (const [key, expected] of Object.entries(sourceExamples)) {
+    if (!(key in bundledExamples) || expected.trim() !== String(bundledExamples[key]).trim()) {
+        stale.push(`examples.${key}`);
+    }
+}
+for (const key of Object.keys(bundledExamples)) {
+    if (!(key in sourceExamples)) missing.push(`examples.${key} (no matching source example)`);
 }
 
 // A tree that is missing modules the bundle contains is not the tree the bundle was

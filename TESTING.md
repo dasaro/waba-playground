@@ -40,7 +40,8 @@ Covers:
 - canonical semiring metadata is present
 - alias metadata is present
 - supported semantics metadata is present
-- curated example manifest is present
+- the bundled validator matches `validate.lp`
+- every bundled curated example matches the source tree, including the key set
 
 This is the guardrail against silent drift between the WABA CLI manifest and the browser snapshot.
 
@@ -83,6 +84,9 @@ npm run test:unit
 Covers:
 
 - objective tuple and aggregate helpers
+- quote- and nesting-safe ASP witness parsing
+- extension deduplication with a retained discard receipt
+- per-reduct subset/range candidate facts
 - simple-mode round-trip conversion
 - generated bundle schema helpers
 - program-builder output shape
@@ -99,8 +103,9 @@ Covers:
 
 - panel collapse/expand
 - curated example loading
-- `stable` and `grounded` runs
-- exact `preferred`
+- all eleven semantics through the common beta-sigma controls
+- exact per-reduct (P1) `preferred`
+- ABA recovery through the common no-discard constraint
 - graph mode switching
 - analysis panel rendering
 - `version-check.html`

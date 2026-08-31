@@ -28,20 +28,39 @@ export function matchPredicate(predicate, name) {
     const inner = text.slice(head.length, -1);
     // Reject `in(a), foo(b)` and similar: the parens we stripped must be the matching pair.
     let depth = 0;
+    let quoted = false;
+    let escaped = false;
     for (const ch of inner) {
-        if (ch === '(') depth += 1;
+        if (quoted) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') quoted = false;
+            continue;
+        }
+        if (ch === '"') quoted = true;
+        else if (ch === '(') depth += 1;
         else if (ch === ')') { depth -= 1; if (depth < 0) return null; }
     }
-    return depth === 0 ? inner : null;
+    return depth === 0 && !quoted ? inner : null;
 }
 
 export function splitTopLevelArgs(str) {
     const segments = [];
     let depth = 0;
     let current = '';
+    let quoted = false;
+    let escaped = false;
     for (let i = 0; i < str.length; i += 1) {
         const ch = str[i];
-        if (ch === '(') {
+        if (quoted) {
+            current += ch;
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') quoted = false;
+        } else if (ch === '"') {
+            quoted = true;
+            current += ch;
+        } else if (ch === '(') {
             depth += 1;
             current += ch;
         } else if (ch === ')') {

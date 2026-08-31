@@ -11,7 +11,7 @@ export const wabaModules = {
 %% grounding small by avoiding repeated existential patterns.
 %%
 %% Three well-formedness guards live here, and all three REJECT rather than warn:
-%% flatness, well-foundedness of derivations, and functionality of weight/2.
+%% flatness, acyclicity of derivations, and functionality of weight/2.
 
 %% ====================
 %% DOMAIN PREDICATES
@@ -37,10 +37,12 @@ derived_atom(X) :- is_head(X), not assumption(X).
 %%
 %%   flat            no assumption is the head of a rule, so an assumption's weight is
 %%                   intrinsic rather than extension-dependent
-%%   well-founded    the rule-dependency graph is acyclic, so the ⊕-over-derivations /
+%%   acyclic         the rule-dependency graph has no cycle, so the ⊕-over-derivations /
 %%                   ⊗-over-body recursion has a unique least fixpoint
 %%   functional w    weight/2 is a partial FUNCTION on atoms
 %%   w into S        every declared weight is an element of the algebra's carrier
+%%   total/function c every assumption has exactly one contrary
+%%   rule IDs        every body belongs to exactly one declared rule head
 %%
 %% These are hypotheses of the definition, not part of the semantics, and a paper states them
 %% once rather than encoding each as a constraint. They used to be five guards plus their
@@ -66,29 +68,49 @@ supported(X) :- head(R,X), triggered_by_in(R).
 %% OPTIMIZED: Use rule(R) instead of head(R,_) for domain
 triggered_by_in(R) :- rule(R), supported(X) : body(R,X).
 
-%% Attack computation
-%% An attack exists when a supported atom X attacks an assumption Y
-%% (where Y's contrary is X), with the weight of X
-%% OPTIMIZED: Remove redundant supported(X) check (supported_with_weight(X,W) implies support)
-attacks_with_weight(X,Y,W) :- supported_with_weight(X,W), assumption(Y), contrary(Y,X).
+%% Maximal argument context
+%% ------------------------
+%% The beta-sigma construction removes attacks BEFORE a candidate extension is
+%% evaluated.  Its attack domain and weights must therefore be fixed independently
+%% of that candidate.  \`arg/1\` is the least closure of the full assumption set and
+%% \`arg_weight/2\` is the corresponding maximal-context propagation phase supplied by
+%% semiring/_phase.lp.
+%%
+%% \`budgeted_full\` is the existing switch for that phase.  It is now enabled for
+%% every supported semantics, rather than only for the former defence-specific
+%% encoding.
+budgeted_full.
+arg(X) :- assumption(X).
+arg(X) :- head(R,X), arg_triggered(R).
+arg_triggered(R) :- rule(R), arg(Z) : body(R,Z).
 
-%% Attack discretion choice
-%% We can choose to discard any attack (at a cost)
+%% Fixed atom-level attack relation.  Discarding (X,Y,W) removes the attack from
+%% EVERY use made of it by the ordinary sigma semantics; it is not re-priced or
+%% re-guessed for each candidate extension.
+attacks_with_weight(X,Y,W) :- arg_weight(X,W), assumption(Y), contrary(Y,X).
+
+%% One global attack-discard choice, shared by conflict-free, stable, admissible,
+%% complete and preferred semantics.
 { discarded_attack(X,Y,W) : attacks_with_weight(X,Y,W) }.
 
-%% Successful attacks
-%% An attack succeeds if it's not discarded
-attacks_successfully_with_weight(X,Y,W) :- attacks_with_weight(X,Y,W), not discarded_attack(X,Y,W).
+%% Surviving attacks form the fixed reduced framework Att \\ D.  This predicate is
+%% deliberately independent of the candidate extension and is used by defence.
+attack_survives_with_weight(X,Y,W) :-
+    attacks_with_weight(X,Y,W), not discarded_attack(X,Y,W).
+
+%% A candidate S successfully attacks Y when S derives X and X -> Y survives.
+%% Conflict-free and stable semantics consume this candidate-relative view.
+attacks_successfully_with_weight(X,Y,W) :-
+    supported(X), attack_survives_with_weight(X,Y,W).
 
 %% ====================
 %% BUDGET
 %% ====================
-%% The budget is supplied ONLY by -c beta=N, through effective_budget/1. A framework may
-%% still contain budget/1 facts -- earlier versions of this code and of the README asked for
-%% them -- but they are now INERT: every consumer reads effective_budget/1, so a framework
-%% cannot clamp, raise or nullify the budget the caller asked for. Previously both facts
-%% survived and the bound became min(N,beta) under ub, with budget(0) silently disabling
-%% --beta altogether.
+%% The budget is supplied ONLY by -c beta=N, through effective_budget/1. Earlier versions
+%% asked frameworks to carry budget/1 facts; the supported input boundary now rejects them
+%% because the framework language contains exactly five data predicates. Previously both a
+%% fact and the caller's value survived, and the bound became min(N,beta) under ub, with
+%% budget(0) silently disabling --beta altogether.
 effective_budget(beta).
 
 %% An unbound \`beta\` is not "budget disabled": clingo orders every integer strictly BELOW
@@ -112,21 +134,14 @@ effective_budget(beta).
 %% hypotheses of the definition, not part of the semantics, so they are not in core/base.lp:
 %% a paper states them once, and the core computes the mathematics.
 %%
-%% They are checked HERE, by clingo, on the framework alone. The first attempt scanned the
-%% framework text with regexes in bin/waba and in the playground, which was wrong in both
-%% directions and was caught by adversarial review:
+%% The supported entry points first apply a conservative source parser: only ground facts over
+%% the five public predicates, comments, constants and (in the CLI) recursively checked includes
+%% cross that boundary. This prevents a framework from defining candidate-dependent weights,
+%% runtime predicates, constraints or solver directives. The parser understands pooled and
+%% multi-line facts, block comments, function terms and quoted strings.
 %%
-%%   MISSED   pooled/compact facts -- \`head(r1,c; r1,a).\` -- which CLAUDE.md tells authors to
-%%            PREFER, so the most-recommended syntax bypassed every check
-%%   MISSED   a fact split across two lines (clingo does not care about newlines)
-%%   MISSED   a weight/2 derived by a RULE rather than stated as a fact
-%%   MISSED   %* ... *% block comments (the CLI stripped only %-to-end-of-line)
-%%   REJECTED legal frameworks whose atoms are function terms, f(a), because the identifier
-%%            regexes did not match them
-%%
-%% Running clingo instead means the framework is parsed by the same front end that will solve
-%% it, so every one of those forms is handled exactly and for free. Grounding a framework
-%% against this file alone is cheap: there is no choice rule and no search.
+%% The mathematical conditions below are then checked HERE, by clingo, on those facts alone.
+%% Grounding a framework against this file is cheap: there is no choice rule and no search.
 %%
 %% USAGE   clingo --outf=0 validate.lp <framework.lp>            [-c k=N for lukasiewicz]
 %%         Any violation/2 atom in the answer set is a rejection; the empty answer set means
@@ -135,6 +150,14 @@ effective_budget(beta).
 %% ============================================================================
 
 #const k = 0.                  %% overridden with -c k=N when the Lukasiewicz carrier applies
+
+%% ---- rule identifiers denote exactly one rule --------------------------------
+%% One identifier joins one head to zero or more body atoms. Reusing it for two heads gives both
+%% heads the same body, so the facts no longer encode the promised one-ID/one-rule translation;
+%% a body with no head is silently inert. Either case makes reconstruction non-lossless.
+has_head(R) :- head(R, _).
+violation(multi_head, R) :- head(R, X), head(R, Y), X != Y.
+violation(orphan_body, R) :- body(R, _), not has_head(R).
 
 %% ---- flat: no assumption is the head of a rule -------------------------------
 %% An assumption's weight is then intrinsic rather than extension-dependent, which is what the
@@ -155,6 +178,14 @@ violation(cyclic, X) :- reaches(X, X).
 %% successful in one answer set. Stated over weight/2 however it is DERIVED, so a rule-defined
 %% weight colliding with a fact is caught too.
 violation(multi_weight, X) :- weight(X, V), weight(X, W), V != W.
+
+%% ---- contrary is a total FUNCTION on assumptions ----------------------------
+%% The ABA signature requires exactly one contrary for every assumption.  Missing
+%% declarations silently turn an assumption into an unattacked atom; multiple declarations
+%% create more than one atomic attack unit for one target and invalidate |T_F| <= |A|.
+has_contrary(X) :- assumption(X), contrary(X, _).
+violation(missing_contrary, X) :- assumption(X), not has_contrary(X).
+violation(multi_contrary, X) :- assumption(X), contrary(X, C), contrary(X, D), C != D.
 
 %% ---- w maps into the algebra's carrier ---------------------------------------
 %% A non-integral weight is silently dropped by the monoid aggregates (#sum/#max/#min ignore a
@@ -227,16 +258,11 @@ violation(not_finite, X) :- finite_only = 1, weight(X, #inf).
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -254,13 +280,14 @@ violation(not_finite, X) :- finite_only = 1, weight(X, #inf).
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -390,16 +417,11 @@ rule_deriv(P, R, X, W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -417,13 +439,14 @@ rule_deriv(P, R, X, W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -517,16 +540,11 @@ rule_deriv(P, R, X, W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -544,13 +562,14 @@ rule_deriv(P, R, X, W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -630,8 +649,8 @@ arg_weight(X, W)            :- pweight(maximal, X, W).
 `,
         "arctic": `%% Arctic / max-plus semiring (additive family; negation-dual of tropical).
 %% Semiring: (ℤ ∪ {-∞}, ⊕=max, ⊗=+, 0̄=#inf, 1̄=0) — strength polarity.
-%% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
-%% Weights are rewards/benefits, higher is better (longest path).
+%% Conjunction = sum weighted premise support; disjunction = greatest-total proof (max).
+%% Weights are rewards/benefits on atoms, higher is better.
 
 
 oplus(max).
@@ -683,16 +702,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -710,13 +724,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -831,8 +846,8 @@ rule_deriv(P, R, X, W) :-
 `,
         "bottleneck_cost": `%% Bottleneck-cost semiring (idempotent family; order-dual of godel).
 %% Semiring: (ℤ ∪ {±∞}, ⊕=min, ⊗=max, 0̄=#sup, 1̄=#inf) — cost polarity.
-%% Conjunction = worst step (max); disjunction = cheapest alternative (min).
-%% An argument costs as much as its single worst step (worst-case path).
+%% Conjunction = costliest weighted premise (max); disjunction = cheapest alternative (min).
+%% An argument costs as much as its costliest weighted proof leaf (bottleneck path).
 
 
 oplus(min).
@@ -884,16 +899,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -911,13 +921,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -1060,16 +1071,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -1087,13 +1093,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -1188,8 +1195,8 @@ rule_deriv(P, R, X, W) :-
 %% and raw \`clingo ... semiring/godel_low.lp ...\` runs keep resolving.
 %% Bottleneck-cost semiring (idempotent family; order-dual of godel).
 %% Semiring: (ℤ ∪ {±∞}, ⊕=min, ⊗=max, 0̄=#sup, 1̄=#inf) — cost polarity.
-%% Conjunction = worst step (max); disjunction = cheapest alternative (min).
-%% An argument costs as much as its single worst step (worst-case path).
+%% Conjunction = costliest weighted premise (max); disjunction = cheapest alternative (min).
+%% An argument costs as much as its costliest weighted proof leaf (bottleneck path).
 
 
 oplus(min).
@@ -1241,16 +1248,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -1268,13 +1270,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -1377,11 +1380,10 @@ oplus(max).
 oplus_identity(0).
 otimes_identity(k).
 
-%% aba default is #sup (un-discardable): an unweighted assumption then behaves as a
-%% plain ABA assumption whose attack survives any finite budget, so β=0 / no_discard
-%% recovers classical ABA at every k. (In luk's ⊗, a #sup premise saturates to the
-%% grid top k, counted inline by the NS term below.)
-semiring_default_weight(aba,#sup).
+%% Both policies use the grid top k.  #sup is outside the carrier [0,k], so it cannot be
+%% injected as an ABA default merely to make an attack hard to discard.  Exact classical
+%% recovery is structural instead: constraint/no_discard.lp forbids every discard.
+semiring_default_weight(aba,k).
 semiring_default_weight(neutral,k).
 
 %% Default weight policy selection for unweighted assumptions.
@@ -1414,16 +1416,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -1441,13 +1438,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -1575,8 +1573,8 @@ rule_deriv(P, R, X, W) :-
 `,
         "tropical": `%% Tropical / min-plus semiring (additive family).
 %% Semiring: (ℤ ∪ {+∞}, ⊕=min, ⊗=+, 0̄=#sup, 1̄=0) — cost polarity.
-%% Conjunction = accumulate cost (sum); disjunction = cheapest proof (min).
-%% Weights are costs, lower is better (shortest path).
+%% Conjunction = sum weighted premise cost; disjunction = cheapest proof (min).
+%% Weights are costs on atoms, lower is better.
 
 
 oplus(min).
@@ -1628,16 +1626,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -1655,13 +1648,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -1781,8 +1775,8 @@ rule_deriv(P, R, X, W) :-
 %% \`clingo ... semiring/tropical_high.lp ...\` runs keep resolving.
 %% Arctic / max-plus semiring (additive family; negation-dual of tropical).
 %% Semiring: (ℤ ∪ {-∞}, ⊕=max, ⊗=+, 0̄=#inf, 1̄=0) — strength polarity.
-%% Conjunction = accumulate reward (sum); disjunction = strongest chain (max).
-%% Weights are rewards/benefits, higher is better (longest path).
+%% Conjunction = sum weighted premise support; disjunction = greatest-total proof (max).
+%% Weights are rewards/benefits on atoms, higher is better.
 
 
 oplus(max).
@@ -1834,16 +1828,11 @@ default_assumption_weight(W) :-
 %%   support : weights over the selected (in) atoms          -> supported_with_weight/2
 %%   maximal : weights over ALL assumptions                  -> arg_weight/2
 %%
-%% The maximal phase is INERT by default: the CLASSICAL defence semantics
-%% (semantics/admissible.lp) are weight-blind and do not need it. It is switched on by
-%% semantics/admissible.lp, which declares \`budgeted_full\` and supplies arg/1 +
-%% arg_triggered/1; arg_weight is then each attacker's strength in the maximal argument
-%% context, used as a fixed (extension-independent) attack cost.
-%%
-%% A third phase, \`undefeated\`, existed for an earlier budgeted-defence encoding
-%% (semantics/admissible_budgeted.lp) that priced attacks over the not-defeated set.
-%% Both were retired on 2026-07-29: that design budgeted defence but never internal
-%% conflict, so it was not the Dunne Def 6 lift the paper defines.
+%% The maximal phase is activated by core/base.lp for EVERY supported semantics.
+%% The beta-sigma construction must choose its discard set before applying sigma,
+%% so \`arg_weight\` fixes the atom-level attack relation and its prices in the closure
+%% of ALL assumptions.  Candidate-relative \`supported_with_weight\` remains available
+%% for tracing the selected set, but it never re-prices a discard.
 %%
 %% A concrete algebra is fixed by a thin shim that declares:
 %%   oplus(min|max)      -- ⊕ combine of alternative derivations
@@ -1861,13 +1850,14 @@ default_assumption_weight(W) :-
 %% A \`phase/1\` domain predicate is gone with it: P was always bound by the phase_active literal
 %% in the same body, so \`phase(P)\` was contributing neither safety nor a restriction.
 %% support : weights over the in-set S          (always on)      -> supported_with_weight/2
-%% maximal : weights over ALL assumptions       (budgeted_full)  -> arg_weight/2
-%%              (the intrinsic strongest strength of an argument, used as a fixed attack cost)
+%% maximal : weights over ALL assumptions       (always enabled by base.lp)
+%%                                                        -> arg_weight/2
+%%              (the fixed weight used by the common beta discard layer)
 phase_active(support, X)    :- supported(X).
 phase_triggered(support, R) :- triggered_by_in(R).
 
-%% maximal phase — gated on budgeted_full; every assumption is selected, so arg_weight is
-%% the strength of an argument in the largest possible context (its intrinsic strongest form).
+%% maximal phase — base.lp declares budgeted_full and selects every assumption, so
+%% arg_weight is fixed before any candidate extension is evaluated.
 phase_active(maximal, X)    :- budgeted_full, arg(X).
 phase_triggered(maximal, R) :- budgeted_full, arg_triggered(R).
 
@@ -2038,12 +2028,17 @@ budget_value(C) :- C = #min{ W : discarded_attack(_,_,W) }.
         "sum": `%% Sum monoid family.
 %% Aggregate: sum of discarded attack weights.
 %% Identity on the empty set: 0.
+%% #sum silently omits #inf tuples, but the lifted sum used here makes #inf absorbing:
+%% once any discarded unit has price #inf, the whole aggregate is #inf.
 
 active_monoid(sum).
 
 %% Canonical aggregate over the discarded-attack multiset (single source of truth).
 %% Consumed by constraint/ub.lp, constraint/lb.lp and optimize/{minimize,maximize}.lp.
-budget_value(C) :- C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
+sum_has_infimum :- discarded_attack(_,_,#inf).
+budget_value(#inf) :- sum_has_infimum.
+budget_value(C) :- not sum_has_infimum,
+    C = #sum{ W,X,Y : discarded_attack(X,Y,W) }.
 `
     },
     optimize: {
@@ -2053,8 +2048,13 @@ active_optimization(maximize).
 
 :- active_optimization(minimize).
 
-%% Sum: maximize the discarded multiset directly (fast path).
-#maximize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
+%% Sum: rank its canonical budget_value/1 rather than the raw tuples.  Raw #maximize
+%% would silently omit a #inf tuple.  Priority 2 makes that absorbing value smaller
+%% than every finite sum; priority 1 keeps finite sums below #sup; priority 0 orders
+%% finite sums in the requested descending direction.
+:~ active_monoid(sum), budget_value(M), M = #inf. [1@2]
+:~ active_monoid(sum), budget_value(M), M != #sup, M != #inf. [1@1]
+:~ active_monoid(sum), budget_value(M), M != #sup, M != #inf. [-M@0]
 
 %% Max/Min: maximize budget_value/1 (the active monoid aggregate from monoid/<m>.lp).
 :~ active_monoid(max), budget_value(M), M = #inf. [1@2]
@@ -2071,8 +2071,13 @@ active_optimization(minimize).
 
 :- active_optimization(maximize).
 
-%% Sum: minimize the discarded multiset directly (fast path; no single aggregate term).
-#minimize { W,X,Y : active_monoid(sum), discarded_attack(X,Y,W) }.
+%% Sum: rank its canonical budget_value/1 rather than the raw tuples.  Raw #minimize
+%% would silently omit a #inf tuple and tie an absorbing-#inf aggregate with a finite one.
+%% Priority 2 puts #sup above every usable aggregate; priority 1 puts every finite sum
+%% above #inf; priority 0 orders the finite sums normally.
+:~ active_monoid(sum), budget_value(M), M = #sup. [1@2]
+:~ active_monoid(sum), budget_value(M), M != #sup, M != #inf. [1@1]
+:~ active_monoid(sum), budget_value(M), M != #sup, M != #inf. [M@0]
 
 %% Max/Min: minimize budget_value/1 (the active monoid aggregate from monoid/<m>.lp).
 %% #sup/#inf are ordered above/below finite costs via separate priority levels.
@@ -2090,6 +2095,23 @@ active_optimization(minimize).
 
 
 %% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
+
+%% beta MUST be an integer whenever this module is loaded.
+%%
+%% Without this, omitting \`-c beta\` leaves \`beta\` an uninterpreted constant. clingo orders
+%% every integer strictly BELOW an uninterpreted constant, so the comparison below still
+%% GROUNDS and still SUCCEEDS -- it simply never fires. The failure is therefore silent, and
+%% it runs in OPPOSITE directions for the two bounds: \`C > beta\` becomes unsatisfiable, so
+%% ub is silently unbounded and admits every discard; \`C < beta\` becomes universally true,
+%% so lb silently collapses onto no_discard. Measured on a two-assumption cycle: ub without
+%% \`-c beta\` returns 3 extensions where \`-c beta=0\` returns 2.
+%%
+%% The test is arithmetic, not comparison, precisely because comparison is total over
+%% clingo's term order while \`+\` is undefined on a symbolic constant. It lives here rather
+%% than in core/base.lp so that runs loading no budget module never ground it.
+beta_is_integer :- beta = B, B = B + 0.
+:- not beta_is_integer.
+
 
 %% An empty discard set spends nothing; it does not "meet" a positive lower bound,
 %% but it must remain FEASIBLE (the no-discard extension always exists). Without this
@@ -2126,6 +2148,23 @@ some_discard :- discarded_attack(_,_,_).
 
 
 %% budget_value/1 is the active monoid's aggregate, defined once in monoid/<m>.lp.
+
+%% beta MUST be an integer whenever this module is loaded.
+%%
+%% Without this, omitting \`-c beta\` leaves \`beta\` an uninterpreted constant. clingo orders
+%% every integer strictly BELOW an uninterpreted constant, so the comparison below still
+%% GROUNDS and still SUCCEEDS -- it simply never fires. The failure is therefore silent, and
+%% it runs in OPPOSITE directions for the two bounds: \`C > beta\` becomes unsatisfiable, so
+%% ub is silently unbounded and admits every discard; \`C < beta\` becomes universally true,
+%% so lb silently collapses onto no_discard. Measured on a two-assumption cycle: ub without
+%% \`-c beta\` returns 3 extensions where \`-c beta=0\` returns 2.
+%%
+%% The test is arithmetic, not comparison, precisely because comparison is total over
+%% clingo's term order while \`+\` is undefined on a symbolic constant. It lives here rather
+%% than in core/base.lp so that runs loading no budget module never ground it.
+beta_is_integer :- beta = B, B = B + 0.
+:- not beta_is_integer.
+
 
 %% An empty discard set spends nothing, so it trivially respects any upper bound.
 %% Without this guard the min monoid breaks: #min{} over no discards = #sup, which
@@ -2175,219 +2214,277 @@ some_discard :- discarded_attack(_,_,_).
 `
     },
     semantics: {
-        "admissible": `%% ============================================================================
-%% wABA BUDGETED ADMISSIBLE — full structured lift of Dunne et al. (AIJ 2011) Def 6.
-%% ============================================================================
-%% S is beta-admissible iff there is a discard set \`pay\` of attacks with total
-%% propagated strength <= beta such that S is CLASSICALLY admissible in the framework
-%% with \`pay\` removed. ONE shared budget covers BOTH internal conflict repair (paying to
-%% un-defeat a member) AND external defence (paying to overrule an undefeated objection),
-%% exactly as Dunne Def 6 removes any total-weight-<=beta set of edges. beta = 0 => classical.
-%%
-%% Faithfulness in the STRUCTURED setting (vs weighted-ABSTRACT AFs): the discard ranges
-%% over the abstract attacks whose attacker is derivable in the MAXIMAL argument context,
-%% a fixed domain; each attack's cost is the attacker's strength in that context (its
-%% intrinsic strongest form, arg_weight). The reduced framework's defeat + undefeated set
-%% are recomputed over the surviving (unpaid) attacks. Because the discard domain is fixed
-%% (not the removal-dependent undefeated set) the guess-and-check is stratified.
-%%
-%% The BUDGET DIRECTION follows the algebra's polarity, rather than the algebra being
-%% refused. See "budget" below.
+        "_range": `%% Internal projection used by the range-based post-filters.
+%% \`defeated/1\` is supplied by cf.lp/admissible.lp and denotes exactly the
+%% assumptions attacked by the current candidate in the fixed reduct.
 
-budgeted_full.                 %% switches on the maximal-context weight phase in _phase.lp
-:- discarded_attack(_,_,_).    %% use our own single discard set \`pay\`, not base's support discard
+semantic_range(X) :- in(X).
+semantic_range(X) :- defeated(X).
 
-%% assumption in/out (base.lp provides supported/attacks; the argumentation choice lives here)
-1 { in(X) ; out(X) } 1 :- assumption(X).
-
-%% maximal argument set (derivable from ALL assumptions) — the FIXED attack domain
-arg(X) :- assumption(X).
-arg(X) :- head(R,X), arg_triggered(R).
-arg_triggered(R) :- rule(R), arg(Z) : body(R,Z).
-
-%% abstract attacks + the single shared discard set
-att(X,Y) :- contrary(Y,X), arg(X).
-{ pay(X,Y) : att(X,Y) }.
-
-%% ---- classical admissibility on the REDUCED framework (attacks minus \`pay\`) ----
-%% conflict-free: no member is defeated by a surviving support attack
-rdefeated(Y) :- supported(X), contrary(Y,X), not pay(X,Y).
-:- in(Y), rdefeated(Y).
-
-%% defended: no member is attacked by a surviving argument in the reduced undefeated set
-runde(X) :- assumption(X), not rdefeated(X).
-runde(X) :- head(R,X), runde(Z) : body(R,Z).
-:- in(Y), contrary(Y,X), runde(X), not pay(X,Y).
-
-%% ---- BUDGET, applied in the direction the POLARITY dictates ------------------
-%% This used to be \`:- oplus(min).\`, refusing cost algebras outright. That refusal keyed on
-%% the algebra's IDENTITY rather than on the weights it produces, so two algebras agreeing on
-%% every attack weight could still split SAT/UNSAT, and the beta=0 recovery this file's own
-%% header promises returned UNSATISFIABLE for the cost algebras instead of the classical
-%% extensions. The direction of the bound is now derived from the polarity, which is what the
-%% two readings of a weight require.
-haspay :- pay(_,_).
-
-%% STRENGTH polarity (oplus = max): a bigger weight is an objection that is harder to
-%% overrule, so the total strength conceded is bounded ABOVE and a maximal-strength (#sup)
-%% objection can never be paid for. beta = 0 then forbids every concession, which is exactly
-%% classical admissibility.
-%% An infinite arg_weight IS reachable: a leaf weighted #inf or #sup (raw clingo only --
-%% bin/waba rejects both) propagates through otimes. The two guards below are exact duals, and
-%% between them they leave nothing mis-priced. Under STRENGTH, #sup is the maximal objection and
-%% is un-droppable, while #inf is the oplus-identity -- an objection of no force at all -- which
-%% clingo's #sum drops, so it costs nothing above beta=0 and is still blocked AT beta=0 by the
-%% guard below it, preserving recovery. Under COST the roles swap: #inf is minimal cost, hence
-%% the best-supported objection, and is un-droppable; #sup is unestablishable, hence null, and
-%% #min drops it. Pinned by N11 in test/regression.sh.
-:- oplus(max), pay(X,Y), arg_weight(X,#sup).
-:- oplus(max), haspay, effective_budget(0).
-:- oplus(max), haspay, V = #sum{ W,X,Y : pay(X,Y), arg_weight(X,W) },
-   effective_budget(B), B != 0, V > B.
-
-%% COST polarity (oplus = min): a SMALLER weight is a more cheaply established, hence better
-%% supported, objection. Bounding the aggregate ABOVE would therefore licence dismissing
-%% precisely the best-supported objections -- the perversity the old refusal was guarding
-%% against. The bound reverses instead: every conceded objection must be at least
-%% beta-expensive, so the CHEAPEST concession is bounded BELOW, and a minimal-cost (#inf)
-%% objection can never be paid for. Note that the recovery budget is then a beta ABOVE every
-%% attack weight, not 0 -- the same asymmetry the lower bound has for conflict-based
-%% semantics.
-:- oplus(min), pay(X,Y), arg_weight(X,#inf).
-:- oplus(min), haspay, V = #min{ W,X,Y : pay(X,Y), arg_weight(X,W) },
-   effective_budget(B), V < B.
-
-%% \`pay\` is the discard-set witness; it is intentionally NOT #shown so that many discard
-%% sets realising the SAME extension project to one answer (bin/waba runs these with --project).
+#show semantic_range/1.
 `,
-        "cf": `defeated(X) :- attacks_successfully_with_weight(_,X,_).
-1{ in(X); out(X) }1 :- assumption(X).
-:- in(X), defeated(X).`,
-        "complete": `%% ============================================================================
-%% wABA BUDGETED COMPLETE — Dunne Def 6 lift of complete semantics.
-%% ============================================================================
-%% A complete extension is a budgeted-admissible S that contains every assumption it
-%% DEFENDS in the reduced framework (attacks minus \`pay\`): if Y has no surviving
-%% reduced-undefeated attacker, Y must be in. beta = 0 recovers classical complete.
+        "admissible": `%% ==========================================================================
+%% BETA-SIGMA ADMISSIBLE SEMANTICS
+%% ==========================================================================
+%% core/base.lp constructs one fixed maximal-context atom-level attack relation,
+%% guesses one discard set D, and the selected monoid/bound modules enforce
+%% cost(D) beta.  This file contains ONLY ordinary flat-ABA admissibility in the
+%% reduced framework Att \\ D.  In particular, there is no second \`pay\` relation
+%% and no defence-specific interpretation of beta.
 
-%% ============================================================================
-%% wABA BUDGETED ADMISSIBLE — full structured lift of Dunne et al. (AIJ 2011) Def 6.
-%% ============================================================================
-%% S is beta-admissible iff there is a discard set \`pay\` of attacks with total
-%% propagated strength <= beta such that S is CLASSICALLY admissible in the framework
-%% with \`pay\` removed. ONE shared budget covers BOTH internal conflict repair (paying to
-%% un-defeat a member) AND external defence (paying to overrule an undefeated objection),
-%% exactly as Dunne Def 6 removes any total-weight-<=beta set of edges. beta = 0 => classical.
-%%
-%% Faithfulness in the STRUCTURED setting (vs weighted-ABSTRACT AFs): the discard ranges
-%% over the abstract attacks whose attacker is derivable in the MAXIMAL argument context,
-%% a fixed domain; each attack's cost is the attacker's strength in that context (its
-%% intrinsic strongest form, arg_weight). The reduced framework's defeat + undefeated set
-%% are recomputed over the surviving (unpaid) attacks. Because the discard domain is fixed
-%% (not the removal-dependent undefeated set) the guess-and-check is stratified.
-%%
-%% The BUDGET DIRECTION follows the algebra's polarity, rather than the algebra being
-%% refused. See "budget" below.
+#project in/1.
+#project out/1.
 
-budgeted_full.                 %% switches on the maximal-context weight phase in _phase.lp
-:- discarded_attack(_,_,_).    %% use our own single discard set \`pay\`, not base's support discard
+1 { in(X); out(X) } 1 :- assumption(X).
 
-%% assumption in/out (base.lp provides supported/attacks; the argumentation choice lives here)
-1 { in(X) ; out(X) } 1 :- assumption(X).
+%% What the candidate S attacks in the reduced framework.
+defeated(Y) :- attacks_successfully_with_weight(_,Y,_).
 
-%% maximal argument set (derivable from ALL assumptions) — the FIXED attack domain
-arg(X) :- assumption(X).
-arg(X) :- head(R,X), arg_triggered(R).
-arg_triggered(R) :- rule(R), arg(Z) : body(R,Z).
+%% Conflict-freeness.
+:- in(Y), defeated(Y).
 
-%% abstract attacks + the single shared discard set
-att(X,Y) :- contrary(Y,X), arg(X).
-{ pay(X,Y) : att(X,Y) }.
+%% The closure of assumptions not attacked by S represents the arguments that
+%% are undefeated by S.  S defends each of its members exactly when no such
+%% argument has a surviving attack on that member.
+undefeated(X) :- assumption(X), not defeated(X).
+undefeated(X) :- head(R,X), undefeated_triggered(R).
+undefeated_triggered(R) :- rule(R), undefeated(Z) : body(R,Z).
 
-%% ---- classical admissibility on the REDUCED framework (attacks minus \`pay\`) ----
-%% conflict-free: no member is defeated by a surviving support attack
-rdefeated(Y) :- supported(X), contrary(Y,X), not pay(X,Y).
-:- in(Y), rdefeated(Y).
+attacked_by_undefeated(Y) :-
+    undefeated(X), attack_survives_with_weight(X,Y,_).
 
-%% defended: no member is attacked by a surviving argument in the reduced undefeated set
-runde(X) :- assumption(X), not rdefeated(X).
-runde(X) :- head(R,X), runde(Z) : body(R,Z).
-:- in(Y), contrary(Y,X), runde(X), not pay(X,Y).
-
-%% ---- BUDGET, applied in the direction the POLARITY dictates ------------------
-%% This used to be \`:- oplus(min).\`, refusing cost algebras outright. That refusal keyed on
-%% the algebra's IDENTITY rather than on the weights it produces, so two algebras agreeing on
-%% every attack weight could still split SAT/UNSAT, and the beta=0 recovery this file's own
-%% header promises returned UNSATISFIABLE for the cost algebras instead of the classical
-%% extensions. The direction of the bound is now derived from the polarity, which is what the
-%% two readings of a weight require.
-haspay :- pay(_,_).
-
-%% STRENGTH polarity (oplus = max): a bigger weight is an objection that is harder to
-%% overrule, so the total strength conceded is bounded ABOVE and a maximal-strength (#sup)
-%% objection can never be paid for. beta = 0 then forbids every concession, which is exactly
-%% classical admissibility.
-%% An infinite arg_weight IS reachable: a leaf weighted #inf or #sup (raw clingo only --
-%% bin/waba rejects both) propagates through otimes. The two guards below are exact duals, and
-%% between them they leave nothing mis-priced. Under STRENGTH, #sup is the maximal objection and
-%% is un-droppable, while #inf is the oplus-identity -- an objection of no force at all -- which
-%% clingo's #sum drops, so it costs nothing above beta=0 and is still blocked AT beta=0 by the
-%% guard below it, preserving recovery. Under COST the roles swap: #inf is minimal cost, hence
-%% the best-supported objection, and is un-droppable; #sup is unestablishable, hence null, and
-%% #min drops it. Pinned by N11 in test/regression.sh.
-:- oplus(max), pay(X,Y), arg_weight(X,#sup).
-:- oplus(max), haspay, effective_budget(0).
-:- oplus(max), haspay, V = #sum{ W,X,Y : pay(X,Y), arg_weight(X,W) },
-   effective_budget(B), B != 0, V > B.
-
-%% COST polarity (oplus = min): a SMALLER weight is a more cheaply established, hence better
-%% supported, objection. Bounding the aggregate ABOVE would therefore licence dismissing
-%% precisely the best-supported objections -- the perversity the old refusal was guarding
-%% against. The bound reverses instead: every conceded objection must be at least
-%% beta-expensive, so the CHEAPEST concession is bounded BELOW, and a minimal-cost (#inf)
-%% objection can never be paid for. Note that the recovery budget is then a beta ABOVE every
-%% attack weight, not 0 -- the same asymmetry the lower bound has for conflict-based
-%% semantics.
-:- oplus(min), pay(X,Y), arg_weight(X,#inf).
-:- oplus(min), haspay, V = #min{ W,X,Y : pay(X,Y), arg_weight(X,W) },
-   effective_budget(B), V < B.
-
-%% \`pay\` is the discard-set witness; it is intentionally NOT #shown so that many discard
-%% sets realising the SAME extension project to one answer (bin/waba runs these with --project).
-
-
-%% Y is attacked in the reduced framework iff some surviving (unpaid) reduced-undefeated
-%% argument is its contrary. A defended assumption is one with no such attacker.
-attacked_reduced(Y) :- assumption(Y), contrary(Y,X), runde(X), not pay(X,Y).
-:- out(Y), assumption(Y), not attacked_reduced(Y).
+:- in(Y), attacked_by_undefeated(Y).
 `,
-        "stable": `%% Guess an extension
-1{ in(X); out(X) }1 :- assumption(X).
+        "cf": `%% Ordinary ABA conflict-free semantics over the fixed reduced attack relation
+%% Att \\ D selected by the common beta layer in core/base.lp.
+#project in/1.
+#project out/1.
 
-%% Conflict-free on successful attacks
-:- supported(X), in(Y), attacks_successfully_with_weight(X,Y,_).
+1 { in(X); out(X) } 1 :- assumption(X).
 
-%% Defeated-by-S (counterattacked)
-defeated(Y) :- supported(Z), assumption(Y), attacks_successfully_with_weight(Z,Y,_).
+%% S attacks Y in the reduced framework iff S derives an attacking conclusion X
+%% and the fixed atom-level attack X -> Y was not discarded.
+defeated(Y) :- attacks_successfully_with_weight(_,Y,_).
 
-%% stable
-:- not defeated(X), out(X).
+:- in(Y), defeated(Y).
 `,
-        "subset_maximal_filter": `%% Exact subset-maximal filtering over precomputed candidate extensions.
+        "complete": `%% ==========================================================================
+%% BETA-SIGMA COMPLETE SEMANTICS
+%% ==========================================================================
+%% Complete extensions are precisely the ordinary complete extensions of the
+%% same reduced framework Att \\ D used by every other supported semantics.
+
+%% ==========================================================================
+%% BETA-SIGMA ADMISSIBLE SEMANTICS
+%% ==========================================================================
+%% core/base.lp constructs one fixed maximal-context atom-level attack relation,
+%% guesses one discard set D, and the selected monoid/bound modules enforce
+%% cost(D) beta.  This file contains ONLY ordinary flat-ABA admissibility in the
+%% reduced framework Att \\ D.  In particular, there is no second \`pay\` relation
+%% and no defence-specific interpretation of beta.
+
+#project in/1.
+#project out/1.
+
+1 { in(X); out(X) } 1 :- assumption(X).
+
+%% What the candidate S attacks in the reduced framework.
+defeated(Y) :- attacks_successfully_with_weight(_,Y,_).
+
+%% Conflict-freeness.
+:- in(Y), defeated(Y).
+
+%% The closure of assumptions not attacked by S represents the arguments that
+%% are undefeated by S.  S defends each of its members exactly when no such
+%% argument has a surviving attack on that member.
+undefeated(X) :- assumption(X), not defeated(X).
+undefeated(X) :- head(R,X), undefeated_triggered(R).
+undefeated_triggered(R) :- rule(R), undefeated(Z) : body(R,Z).
+
+attacked_by_undefeated(Y) :-
+    undefeated(X), attack_survives_with_weight(X,Y,_).
+
+:- in(Y), attacked_by_undefeated(Y).
+
+
+%% An assumption is defended when no undefeated argument has a surviving attack
+%% on it.  Completeness requires every defended assumption to belong to S.
+:- out(Y), not attacked_by_undefeated(Y).
+`,
+        "eager_filter": `%% Exact per-reduct eager filtering over precomputed complete candidates.
 %%
 %% Expected facts:
 %%   candidate(M).
 %%   member(M,A).
+%%   range_member(M,A).       % S union the assumptions attacked by S
+%%   discarded_member(M,X,Y,W).
 %%
 %% Output:
 %%   keep(M).
 %%
-%% Rationale:
-%%   exact subset-maximality is a set-inclusion property; it is kept separate
-%%   from WABA's numeric weight optimization layer instead of being encoded with
-%%   plain #maximize priority levels.
+%% First identify the semi-stable candidates: the complete candidates whose
+%% ranges are subset-maximal in one fixed reduct.  The eager extension is the
+%% greatest admissible set contained in every semi-stable extension; it is
+%% complete, so it is enough to retain complete candidates with that universal
+%% containment property and then subset-maximise them.  Every comparison below
+%% is guarded by equality of the discard witness D.
 
-model_pair(I,J) :- candidate(I), candidate(J), I != J.
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(I,X,Y,W), not discarded_member(J,X,Y,W).
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(J,X,Y,W), not discarded_member(I,X,Y,W).
+
+same_reduct(I,J) :- candidate(I), candidate(J), not discard_diff(I,J).
+model_pair(I,J) :- same_reduct(I,J), I != J.
+
+not_subset(I,J) :- model_pair(I,J), member(I,A), not member(J,A).
+has_extra(J,I) :- model_pair(I,J), member(J,A), not member(I,A).
+strict_subset(I,J) :-
+    model_pair(I,J),
+    not not_subset(I,J),
+    has_extra(J,I).
+
+not_range_subset(I,J) :-
+    model_pair(I,J), range_member(I,A), not range_member(J,A).
+has_range_extra(J,I) :-
+    model_pair(I,J), range_member(J,A), not range_member(I,A).
+strict_range_subset(I,J) :-
+    model_pair(I,J),
+    not not_range_subset(I,J),
+    has_range_extra(J,I).
+
+not_semi_stable(I) :- strict_range_subset(I,J).
+semi_stable(I) :- candidate(I), not not_semi_stable(I).
+
+not_in_every_semi_stable(I) :-
+    same_reduct(I,P), semi_stable(P), member(I,A), not member(P,A).
+eager_set(I) :- candidate(I), not not_in_every_semi_stable(I).
+
+dominated_eager(I) :- eager_set(I), eager_set(J), strict_subset(I,J).
+keep(I) :- eager_set(I), not dominated_eager(I).
+
+#show keep/1.
+`,
+        "ideal_filter": `%% Exact per-reduct ideal filtering over precomputed admissible candidates.
+%%
+%% Expected facts:
+%%   candidate(M).
+%%   member(M,A).
+%%   discarded_member(M,X,Y,W).
+%%
+%% Output:
+%%   keep(M).
+%%
+%% Preferred candidates are the subset-maximal admissible candidates for one
+%% fixed reduct.  An ideal set is admissible and contained in every such
+%% preferred extension; the (unique) ideal extension is the subset-maximal
+%% ideal set.  Both comparisons must remain inside the same reduct.
+
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(I,X,Y,W), not discarded_member(J,X,Y,W).
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(J,X,Y,W), not discarded_member(I,X,Y,W).
+
+same_reduct(I,J) :- candidate(I), candidate(J), not discard_diff(I,J).
+model_pair(I,J) :- same_reduct(I,J), I != J.
+
+not_subset(I,J) :- model_pair(I,J), member(I,A), not member(J,A).
+has_extra(J,I) :- model_pair(I,J), member(J,A), not member(I,A).
+strict_subset(I,J) :-
+    model_pair(I,J),
+    not not_subset(I,J),
+    has_extra(J,I).
+
+not_preferred(I) :- strict_subset(I,J).
+preferred(I) :- candidate(I), not not_preferred(I).
+
+not_in_every_preferred(I) :-
+    same_reduct(I,P), preferred(P), member(I,A), not member(P,A).
+ideal_set(I) :- candidate(I), not not_in_every_preferred(I).
+
+dominated_ideal(I) :-
+    ideal_set(I), ideal_set(J), strict_subset(I,J).
+keep(I) :- ideal_set(I), not dominated_ideal(I).
+
+#show keep/1.
+`,
+        "range_maximal_filter": `%% Exact per-reduct range-maximal filtering over precomputed candidates.
+%%
+%% Expected facts:
+%%   candidate(M).
+%%   range_member(M,A).       % S union the assumptions attacked by S
+%%   discarded_member(M,X,Y,W).
+%%
+%% Output:
+%%   keep(M).
+%%
+%% Loading complete candidates yields ordinary assumption-level semi-stable
+%% semantics; loading conflict-free candidates yields stage semantics.  Equal
+%% maximal ranges may have several witnessing extensions, all of which survive.
+
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(I,X,Y,W), not discarded_member(J,X,Y,W).
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(J,X,Y,W), not discarded_member(I,X,Y,W).
+
+same_reduct(I,J) :- candidate(I), candidate(J), not discard_diff(I,J).
+model_pair(I,J) :- same_reduct(I,J), I != J.
+
+not_range_subset(I,J) :-
+    model_pair(I,J), range_member(I,A), not range_member(J,A).
+has_range_extra(J,I) :-
+    model_pair(I,J), range_member(J,A), not range_member(I,A).
+
+strict_range_subset(I,J) :-
+    model_pair(I,J),
+    not not_range_subset(I,J),
+    has_range_extra(J,I).
+
+dominated(I) :- strict_range_subset(I,J).
+keep(I) :- candidate(I), not dominated(I).
+
+#show keep/1.
+`,
+        "stable": `%% Ordinary ABA stable semantics over the fixed reduced attack relation Att \\ D
+%% selected by the common beta layer in core/base.lp.
+#project in/1.
+#project out/1.
+
+1 { in(X); out(X) } 1 :- assumption(X).
+
+%% Conflict-free on successful attacks
+:- in(Y), attacks_successfully_with_weight(_,Y,_).
+
+%% Defeated-by-S (counterattacked)
+defeated(Y) :- attacks_successfully_with_weight(_,Y,_).
+
+%% stable
+:- out(X), not defeated(X).
+`,
+        "subset_maximal_filter": `%% Exact per-reduct subset-maximal filtering over precomputed candidates.
+%%
+%% Expected facts:
+%%   candidate(M).
+%%   member(M,A).
+%%   discarded_member(M,X,Y,W).
+%%
+%% Output:
+%%   keep(M).
+%%
+%% Each M records both an admissible assumption set and the affordable discard
+%% witness D that determines its reduced framework.  Beta-preferred means:
+%% choose D, apply ordinary preferred semantics to Att \\ D, then existentially
+%% forget D.  Consequently candidates may dominate one another only when their
+%% discard sets are identical.  Global maximality across different witnesses is
+%% a different semantics.
+
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(I,X,Y,W), not discarded_member(J,X,Y,W).
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(J,X,Y,W), not discarded_member(I,X,Y,W).
+
+same_reduct(I,J) :- candidate(I), candidate(J), not discard_diff(I,J).
+model_pair(I,J) :- same_reduct(I,J), I != J.
 
 not_subset(I,J) :- model_pair(I,J), member(I,A), not member(J,A).
 has_extra(J,I) :- model_pair(I,J), member(J,A), not member(I,A).
@@ -2398,6 +2495,42 @@ strict_subset(I,J) :-
     has_extra(J,I).
 
 dominated(I) :- strict_subset(I,J).
+keep(I) :- candidate(I), not dominated(I).
+
+#show keep/1.
+`,
+        "subset_minimal_filter": `%% Exact per-reduct subset-minimal filtering over precomputed candidates.
+%%
+%% Expected facts:
+%%   candidate(M).
+%%   member(M,A).
+%%   discarded_member(M,X,Y,W).
+%%
+%% Output:
+%%   keep(M).
+%%
+%% Complete ABA extensions have a unique least member: the grounded extension.
+%% The comparison is deliberately local to one discard witness D, because the
+%% beta-sigma construction first fixes F-D and only then applies grounded
+%% semantics.
+
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(I,X,Y,W), not discarded_member(J,X,Y,W).
+discard_diff(I,J) :- candidate(I), candidate(J),
+    discarded_member(J,X,Y,W), not discarded_member(I,X,Y,W).
+
+same_reduct(I,J) :- candidate(I), candidate(J), not discard_diff(I,J).
+model_pair(I,J) :- same_reduct(I,J), I != J.
+
+not_subset(I,J) :- model_pair(I,J), member(I,A), not member(J,A).
+has_extra(J,I) :- model_pair(I,J), member(J,A), not member(I,A).
+
+strict_subset(I,J) :-
+    model_pair(I,J),
+    not not_subset(I,J),
+    has_extra(J,I).
+
+dominated(I) :- strict_subset(J,I).
 keep(I) :- candidate(I), not dominated(I).
 
 #show keep/1.
@@ -2419,8 +2552,11 @@ assumption(a).
 assumption(b).
 assumption(c).
 
-% a attacks b
+% a attacks b; the other two contraries are fresh and underivable, so a and c
+% remain unattacked while contrary/2 stays total as required by the ABA signature.
+contrary(a, not_a).
 contrary(b, a).
+contrary(c, not_c).
 
 % Weights (all equal for plain ABA behavior)
 weight(a, 1).
@@ -2430,7 +2566,6 @@ weight(c, 1).
 % Budget definition for constraint files
 % Use beta=0 for plain ABA (no attack discarding)
 #const beta = 0.
-budget(beta).
 `,
         "practical_deliberation": `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% PRACTICAL DELIBERATION - Commonsense Default Reasoning for Daily Planning
@@ -2569,9 +2704,12 @@ contrary(assume_no_meeting, meeting_scheduled).
 %%   conjunction (rule body)   : +   over body  = surprisal of the product of premises
 %%   disjunction (derivations) : min            = the most probable proof
 %%
-%% This is the Viterbi semiring ([0,1], max, x) carried onto tropical (min,+) by the
-%% order-isomorphism p |-> -ln p. (Full MARGINAL probabilities -- a sum over ALL
-%% proofs -- would instead need the sum-product semiring, i.e. the ProbLog setting.)
+%% This is the Viterbi semiring ([0,1], max, x) carried onto tropical (min,+) by
+%% p |-> -ln p (max is mapped to min because -ln reverses the usual order).
+%% The result is a BEST-PROOF score, not a marginal probability.  Exact ProbLog
+%% marginals compile the proofs into a Boolean explanation and perform weighted
+%% model counting.  Merely replacing min by sum would double-count possible worlds
+%% whenever proofs overlap, so a plain sum-product fold is not enough.
 %%
 %% Probability table used below (p -> encoded weight):
 %%   rain        p = 0.90  ->  105
@@ -2579,8 +2717,15 @@ contrary(assume_no_meeting, meeting_scheduled).
 %%   cold_night  p = 0.50  ->  693
 %%
 %% SEMIRING : tropical (min,+), lower-is-better (smaller surprisal = more probable)
-%% MONOID   : sum  (the dismissed attacks' surprisals add; ub budget beta bounds the
-%%            JOINT probability of what you dismiss: sum <= beta  <=>  prod p >= e^-beta/1000)
+%% MONOID   : sum  (the dismissed attacks' numeric surprisals add; an upper-bound
+%%            budget enforces sum(w_i) <= beta, equivalently
+%%            product(exp(-w_i/1000)) >= exp(-beta/1000)).
+%%
+%% The product in that identity is a product of decoded BEST-PROOF SCORES.  It is
+%% not, in general, the joint probability of the discarded attacks: attacks can
+%% share probabilistic leaves.  Also note the polarity forced by surprisal: a more
+%% probable attack has a smaller numeric discard price.  \`beta\` is therefore a
+%% bound in surprisal units, not a probability-mass budget or evidential resistance.
 %%
 %% RUN (pure propagation; read supported_with_weight(X,w) and decode p = exp(-w/1000)):
 %%   ./bin/waba run --framework examples/probabilistic/probabilistic.lp \\
@@ -2591,10 +2736,9 @@ contrary(assume_no_meeting, meeting_scheduled).
 %%        constraint/ub.lp filter/projection.lp semantics/stable.lp \\
 %%        examples/probabilistic/probabilistic.lp
 %%   The {rain,sprinkler,cold_night,dry_path} extension discards \`slippery\` at
-%%   surprisal 798 (probability 0.45) and is feasible iff beta >= 798; it vanishes
-%%   at beta < 798. (sum+ub bounds the JOINT probability of the dismissed attacks
-%%   at >= exp(-beta/1000); under sum-min the optimiser instead prefers discarding
-%%   nothing, i.e. dry_path out at cost 0.)
+%%   surprisal 798 (decoded best-proof score about 0.45) and is feasible iff
+%%   beta >= 798; it vanishes below 798.  Under sum-min the optimiser instead
+%%   prefers discarding nothing, i.e. dry_path out at cost 0.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Probabilistic leaves (assumptions), weights = surprisals
@@ -2615,9 +2759,15 @@ head(r3, slippery).   body(r3, grass_wet).  body(r3, cold_night).   % slippery <
 %% Default belief: the path is safe to walk. The (probabilistic) conclusion
 %% \`slippery\` is its contrary, i.e. slippery attacks dry_path with weight 798.
 assumption(dry_path).
+%% The probabilistic leaves are unattacked assumptions, represented by fresh underivable
+%% contraries so that contrary/2 remains a total function.
+contrary(rain, not_rain).
+contrary(sprinkler, not_sprinkler).
+contrary(cold_night, not_cold_night).
 contrary(dry_path, slippery).
 %% Under sum+ub, dry_path can be accepted only by discarding the slippery attack,
-%% at surprisal cost 798 (probability 0.45); beta caps that cost.
+%% at surprisal cost 798 (decoded best-proof score about 0.45); beta caps that
+%% numeric surprisal.  It does not turn the extension into a probabilistic event.
 `,
         "aspforaba_journal_example": `%% Journal paper reference case from ASPforABA comparison work.
 %% Expected classical results with no attack discarding:
@@ -2632,6 +2782,8 @@ assumption(b).
 assumption(c).
 assumption(d).
 
+% a is unattacked; its fresh contrary has no defining rule.
+contrary(a, not_a).
 contrary(b, x).
 contrary(c, y).
 contrary(d, z).
@@ -2651,7 +2803,6 @@ weight(y, 100).
 weight(z, 100).
 
 #const beta = 0.
-budget(beta).
 `,
         "scientific_theory": `%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SCIENTIFIC THEORY CHOICE - Explanatory Power vs. Theoretical Complexity
@@ -2779,13 +2930,20 @@ body(r9, assume_auxiliary_h1).
 body(r9, assume_relativistic).
 body(r9, assume_quantum).
 
+%% Newtonian mechanics has one contrary, as required by ABA. Its two alternative
+%% incompatibility derivations are combined before they form the single atomic attack unit.
+head(r10, against_newtonian).
+body(r10, incompatible_newtonian_quantum).
+head(r11, against_newtonian).
+body(r11, incompatible_classical_relativistic).
+
 %% ============================================================================
 %% CONTRARIES (Theoretical Inconsistencies Defeat Hypotheses)
 %% ============================================================================
 
-contrary(assume_newtonian, incompatible_newtonian_quantum).
+contrary(assume_newtonian, against_newtonian).
+contrary(assume_relativistic, incompatible_classical_relativistic).
 contrary(assume_quantum, incompatible_newtonian_quantum).
-contrary(assume_newtonian, incompatible_classical_relativistic).
 contrary(assume_auxiliary_h1, excessive_complexity).
 
 %% ============================================================================
@@ -2798,6 +2956,133 @@ contrary(assume_auxiliary_h1, excessive_complexity).
     },
     metadata: {
         "generatedFrom": "ABA-variants/WABA",
+        "inputPolicy": {
+            "frameworkPredicates": {
+                "assumption": 1,
+                "contrary": 2,
+                "head": 2,
+                "body": 2,
+                "weight": 2
+            },
+            "reservedPredicates": [
+                "active_monoid",
+                "active_optimization",
+                "add_body_has",
+                "add_prefix",
+                "advisory",
+                "arg",
+                "arg_triggered",
+                "arg_weight",
+                "attack_survives_with_weight",
+                "attacked_by_undefeated",
+                "attacks_successfully_with_weight",
+                "attacks_with_weight",
+                "beta_is_integer",
+                "body_first",
+                "body_last",
+                "body_next",
+                "budget_value",
+                "budgeted_full",
+                "candidate",
+                "default_assumption_weight",
+                "defeated",
+                "derived_atom",
+                "direct_weight",
+                "discard_diff",
+                "discarded_attack",
+                "discarded_member",
+                "dominated",
+                "dominated_eager",
+                "dominated_ideal",
+                "eager_set",
+                "effective_budget",
+                "explicit_default_policy",
+                "has_body",
+                "has_contrary",
+                "has_extra",
+                "has_head",
+                "has_range_extra",
+                "ideal_set",
+                "in",
+                "integral",
+                "is_head",
+                "keep",
+                "luk_body_has_inf",
+                "luk_prefix",
+                "luk_val",
+                "member",
+                "model_pair",
+                "not_in_every_preferred",
+                "not_in_every_semi_stable",
+                "not_preferred",
+                "not_range_subset",
+                "not_semi_stable",
+                "not_subset",
+                "oplus",
+                "oplus_identity",
+                "opposite_infinity",
+                "otimes",
+                "otimes_identity",
+                "out",
+                "phase_active",
+                "phase_triggered",
+                "preferred",
+                "pweight",
+                "range_member",
+                "reaches",
+                "rule",
+                "rule_deriv",
+                "same_reduct",
+                "semantic_range",
+                "semi_stable",
+                "semiring_default_weight",
+                "sentinel",
+                "some_discard",
+                "strict_range_subset",
+                "strict_subset",
+                "sum_has_infimum",
+                "supported",
+                "supported_with_weight",
+                "supports",
+                "triggered_by_in",
+                "undec",
+                "undefeated",
+                "undefeated_triggered",
+                "violation"
+            ],
+            "reservedConstants": [
+                "aba",
+                "cyclic",
+                "finite_only",
+                "leaf_reuse",
+                "max",
+                "maximal",
+                "maximize",
+                "min",
+                "minimize",
+                "missing_contrary",
+                "multi_contrary",
+                "multi_head",
+                "multi_weight",
+                "negative",
+                "neutral",
+                "not_a_number",
+                "not_finite",
+                "not_flat",
+                "off_grid",
+                "orphan_body",
+                "sum",
+                "support"
+            ],
+            "authoritativeConstants": [
+                "beta",
+                "k"
+            ],
+            "allowedDirectives": [
+                "const",
+                "include"
+            ]
+        },
         "semiringInfo": {
             "arctic": {
                 "oplus": "max",
@@ -2898,24 +3183,37 @@ contrary(assume_auxiliary_h1, excessive_complexity).
         },
         "semanticsInfo": {
             "admissible": {
-                "defence": true,
-                "polarityDependentBound": true
+                "betaSigma": true
             },
             "cf": {
-                "defence": false,
-                "polarityDependentBound": false
+                "betaSigma": true
             },
             "complete": {
-                "defence": true,
-                "polarityDependentBound": true
+                "betaSigma": true
             },
             "stable": {
-                "defence": false,
-                "polarityDependentBound": false
+                "betaSigma": true
             },
             "preferred": {
-                "defence": true,
-                "polarityDependentBound": true
+                "betaSigma": true
+            },
+            "grounded": {
+                "betaSigma": true
+            },
+            "naive": {
+                "betaSigma": true
+            },
+            "semi-stable": {
+                "betaSigma": true
+            },
+            "stage": {
+                "betaSigma": true
+            },
+            "ideal": {
+                "betaSigma": true
+            },
+            "eager": {
+                "betaSigma": true
             }
         },
         "semiringFamilies": [
@@ -2967,13 +3265,45 @@ contrary(assume_auxiliary_h1, excessive_complexity).
             "cf",
             "complete",
             "stable",
-            "preferred"
+            "preferred",
+            "grounded",
+            "naive",
+            "semi-stable",
+            "stage",
+            "ideal",
+            "eager"
         ],
         "postFilteredSemantics": [
-            "preferred"
+            "preferred",
+            "grounded",
+            "naive",
+            "semi-stable",
+            "stage",
+            "ideal",
+            "eager"
         ],
         "derivedSemantics": {
-            "preferred": "admissible"
+            "preferred": "admissible",
+            "grounded": "complete",
+            "naive": "cf",
+            "semi-stable": "complete",
+            "stage": "cf",
+            "ideal": "admissible",
+            "eager": "complete"
+        },
+        "semanticFilters": {
+            "preferred": "subset_maximal_filter",
+            "grounded": "subset_minimal_filter",
+            "naive": "subset_maximal_filter",
+            "semi-stable": "range_maximal_filter",
+            "stage": "range_maximal_filter",
+            "ideal": "ideal_filter",
+            "eager": "eager_filter"
+        },
+        "semanticAuxiliaries": {
+            "semi-stable": "_range",
+            "stage": "_range",
+            "eager": "_range"
         },
         "canonicalSemiring": {
             "godel": {
